@@ -8,43 +8,25 @@
 
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
-config/name="Autobattler"
+config/name="三国·羁绊战棋"
 config/version="0.6"
-run/main_scene="res://UI/Root.tscn"
-config/features=PackedStringArray("4.2", "Forward Plus")
-config/icon="res://icon.svg"
-
-[autoload]
-
-Sounds="*res://UI/Sounds.gd"
-Dialogs="*res://UI/Dialogs/Dialogs.gd"
-TooltipLayer="*res://UI/TooltipLayer.gd"
+run/main_scene="res://ThreeKingdom/ThreeKingdom.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
 
 [display]
 
-window/size/window_width_override=2304
-window/size/window_height_override=1296
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/size/window_width_override=1600
+window/size/window_height_override=900
 window/stretch/mode="canvas_items"
 
-[editor_plugins]
+[rendering]
 
-enabled=PackedStringArray("res://addons/gut/plugin.cfg")
-
-[input]
-
-LeftClick={
-"deadzone": 0.5,
-"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":1,"position":Vector2(523, 20),"global_position":Vector2(531, 100),"factor":1.0,"button_index":1,"canceled":false,"pressed":true,"double_click":false,"script":null)
-]
-}
-Escape={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194305,"key_label":0,"unicode":0,"echo":false,"script":null)
-]
-}
-
-[internationalization]
-
-locale/translations=PackedStringArray("res://UI/Translations/translations.de.translation", "res://UI/Translations/translations.en.translation", "res://UI/Translations/translations.fr.translation", "res://UI/Translations/translations.pl.translation")
+textures/vram_compression/import_etc2_astc=true

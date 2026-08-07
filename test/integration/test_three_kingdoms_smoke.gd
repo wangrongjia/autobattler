@@ -1,0 +1,53 @@
+extends SceneTree
+
+func _initialize() -> void:
+	var game = load("res://ThreeKingdom/ThreeKingdom.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	assert(game.menu_overlay.visible)
+	game._show_encyclopedia()
+	assert(game.encyclopedia_overlay.visible)
+	assert(game.encyclopedia_grid.get_child_count() == 15)
+	game.encyclopedia_overlay.hide()
+	game._start_new_from_menu()
+	assert(game.draft_overlay.visible)
+	game._hide_draft_layer()
+	assert(not game.draft_overlay.visible)
+	game._toggle_draft_layer()
+	assert(game.draft_overlay.visible)
+	assert(game.phase == "draft")
+	game._toggle_language()
+	assert(game.language == "en")
+	game._toggle_language()
+	assert(game.choices.size() == 2)
+	game._choose_hero(game.choices[0])
+	assert(game.phase == "draft")
+	assert(game.draft_picks_remaining == 2)
+	game._choose_hero(game.choices[0])
+	game._choose_hero(game.choices[0])
+	assert(game.phase == "placement")
+	assert(game.player_units.size() == 3)
+	assert(game.enemy_units.size() == 2)
+	game.auto_button.emit_signal("pressed")
+	assert(game._can_start_battle())
+	game.battle_button.emit_signal("pressed")
+	game.tick_timer.stop()
+	for unit in game.combat_units: unit.stun = 999.0
+	game.battle_time = 29.8
+	game._battle_tick()
+	assert(game.phase == "draft")
+	assert(game.round_number == 2)
+	assert(game.ROUND_LIMIT == 15)
+	assert(game.player_units.size() == 3)
+	assert(game.enemy_units.size() == 4)
+	assert(game.choices.size() == 2)
+	assert(game.draft_picks_remaining == 3)
+	game.round_number = 15
+	game.phase = "combat"
+	game.battle_running = true
+	game._finish_battle()
+	assert(game.final_battle)
+	assert(game.phase == "combat")
+	assert(game.battle_running)
+	game.tick_timer.stop()
+	quit()

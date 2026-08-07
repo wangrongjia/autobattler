@@ -2,3 +2,5 @@
 .godot/
 Target/
 .DS_Store
+*.apk
+*.idsig

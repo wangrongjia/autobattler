@@ -1,0 +1,6 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+SCRIPT ERROR: Invalid access to property or key 'ally_stealth' on a base object of type 'Dictionary'.
+   at: _initialize (res://test/integration/test_three_kingdoms特色_rework.gd:57)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://test/integration/test_three_kingdoms特色_rework.gd:57)

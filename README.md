@@ -1,18 +1,50 @@
-# autobattler project
+# 三国·羁绊战棋
 
-Creature collector deckbuilding autobattler inspired by the siralim series.
+使用 Godot 4.7 开发的三国主题战棋原型。玩家在 15 关流程中招募武将、调整阵型、合成升星，并利用阵营和人物羁绊挑战持续增援的敌军。
 
-<div align="center"><a href="https://www.youtube.com/watch?v=XiAm_GEBdfM">
-     <img 
-      src="https://github.com/debris/autobattler/assets/2613714/c7037079-8357-40a3-906c-7abce97bf58b" 
-      alt="Everything Is AWESOME" 
-      style="width:100%;">
-</a></div>
+## 已实现
 
-## Requirements
+- 魏、蜀、吴、群四大阵营，共 56 名武将
+- 4 × 3 棋盘、9 格备战区、拖拽布阵与出售
+- 每关三轮二选一、候选位独立刷新、二合一升星、最高三星
+- 行动条驱动的主动技能战斗
+- 护盾、治疗、眩晕、魅惑、灼烧、范围与弹射伤害
+- 阵营羁绊、人物组合羁绊、战斗统计、存档与读档
+- 中文 / English 切换与武将图鉴
 
-- [Godot 4.2.1](https://godotengine.org/download/macos/)
+## 运行
 
-# Wanna contribute?
+用 Godot 4.7 导入 `project.godot`，按 F5 运行；也可以执行：
 
-### join [discord](https://discord.gg/psGa3xr7)
+```bash
+godot --path .
+```
+
+## 项目结构
+
+```text
+ThreeKingdom/
+├── ThreeKingdom.tscn              主场景
+├── three_kingdom_game.gd          极薄启动入口
+├── systems/
+│   ├── game_state.gd              常量、运行状态、武将数据与基础工具
+│   ├── game_flow.gd               招募、布阵、回合、存档
+│   ├── combat_system.gd           战斗、技能、状态与羁绊执行
+│   ├── game_ui.gd                 界面构建、渲染、图鉴与交互
+│   └── visual_effects.gd          投射物、近战、命中特效与飘字
+└── Portraits/                     武将立绘与来源说明
+tools/export_balance_snapshot.gd   从实际运行时导出武将平衡快照
+test/integration/                  Godot SceneTree 集成测试
+```
+
+模块边界、依赖方向和本轮清理记录见 `ARCHITECTURE.md`。
+
+## 测试
+
+每个集成测试都可独立运行，例如：
+
+```bash
+godot --headless --path . --script test/integration/test_three_kingdoms_smoke.gd
+```
+
+`tools/export_balance_snapshot.gd` 会加载真实场景和全部数据预处理逻辑，再输出报告用快照，避免静态脚本与游戏内数值不一致。

@@ -1,2 +1,0 @@
-extends SelectAvatarAction
-class_name SelectAvatarActionCancel

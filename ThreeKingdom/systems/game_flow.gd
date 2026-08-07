@@ -1,0 +1,352 @@
+extends "res://ThreeKingdom/systems/game_state.gd"
+
+func _new_game() -> void:
+	round_number = 1
+	phase = "draft"
+	player_ruler_hp = RULER_MAX_HP
+	enemy_ruler_hp = RULER_MAX_HP
+	ruler_regen = {"player":{"amount":0.0, "time":0.0, "clock":0.0}, "enemy":{"amount":0.0, "time":0.0, "clock":0.0}}
+	player_units = []
+	enemy_units = []
+	pending_unit_ids = []
+	chosen_this_round = []
+	selected_unit = ""
+	battle_running = false
+	battle_paused = false
+	action_in_progress = false
+	final_battle = false
+	battle_speed = game_speed
+	battle_stats = {}
+	last_battle_stats = []
+	ground_effects.clear()
+	refresh_charges = 0
+	if tick_timer: tick_timer.stop()
+	if is_instance_valid(log_box): log_box.clear()
+	_prepare_round()
+	_log(t("征战开始：每关进行三轮二选一，三名武将全部锁定后进入布阵。", "Campaign begins: complete three pick-one-of-two rounds, then deploy the three locked recruits."))
+	_render()
+
+func _save_game(silent := false) -> bool:
+	if battle_running:
+		if not silent: _log(t("战斗过程中不能保存，请在选人或布阵阶段保存。", "Save during draft or formation, not combat."))
+		return false
+	var data := {
+		"version":5, "round_number":round_number, "phase":phase,
+		"player_ruler_hp":player_ruler_hp, "enemy_ruler_hp":enemy_ruler_hp,
+		"player_units":player_units, "enemy_units":enemy_units,
+		"draft_roster_baseline":draft_roster_baseline,
+		"choices":choices, "pending_unit_ids":pending_unit_ids,
+		"chosen_this_round":chosen_this_round, "draft_picks_remaining":draft_picks_remaining,
+		"draft_refresh_available":draft_refresh_available,
+		"refresh_charges":refresh_charges,
+		"selected_unit":selected_unit, "final_battle":final_battle,
+		"ruler_regen":ruler_regen,
+		"last_battle_stats":last_battle_stats
+	}
+	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if file == null: return false
+	file.store_string(JSON.stringify(data))
+	file.close()
+	if is_instance_valid(continue_button): continue_button.disabled = false
+	if not silent: _log(t("游戏进度已保存。", "Game saved."))
+	_render()
+	return true
+
+func _load_game() -> bool:
+	if battle_running or not FileAccess.file_exists(SAVE_PATH): return false
+	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if file == null: return false
+	var data = JSON.parse_string(file.get_as_text())
+	file.close()
+	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) not in [3, 4, 5]:
+		_log(t("存档版本不兼容。", "The save version is incompatible."))
+		return false
+	tick_timer.stop()
+	round_number = int(data.round_number)
+	phase = str(data.phase)
+	player_ruler_hp = int(data.player_ruler_hp)
+	enemy_ruler_hp = int(data.enemy_ruler_hp)
+	player_units = data.player_units
+	enemy_units = data.enemy_units
+	draft_roster_baseline = data.get("draft_roster_baseline", player_units.duplicate(true))
+	choices = data.choices
+	pending_unit_ids.clear()
+	for id in data.pending_unit_ids: pending_unit_ids.append(str(id))
+	chosen_this_round.clear()
+	for id in data.chosen_this_round: chosen_this_round.append(str(id))
+	draft_picks_remaining = int(data.draft_picks_remaining)
+	draft_refresh_available = [true, true]
+	var loaded_refresh_state: Array = data.get("draft_refresh_available", [true, true])
+	for index in mini(DRAFT_SIZE, loaded_refresh_state.size()):
+		draft_refresh_available[index] = bool(loaded_refresh_state[index])
+	refresh_charges = int(data.get("refresh_charges", 0))
+	var loaded_reserves := _reserve_units()
+	while loaded_reserves.size() > RESERVE_LIMIT:
+		player_units.erase(loaded_reserves.pop_back())
+		refresh_charges += 1
+	selected_unit = str(data.selected_unit)
+	final_battle = bool(data.get("final_battle", false))
+	ruler_regen = data.get("ruler_regen", {"player":{"amount":0.0, "time":0.0, "clock":0.0}, "enemy":{"amount":0.0, "time":0.0, "clock":0.0}})
+	last_battle_stats = data.get("last_battle_stats", [])
+	battle_running = false
+	battle_paused = false
+	action_in_progress = false
+	combat_units = []
+	visual_events.clear()
+	ground_effects.clear()
+	if phase == "draft" and choices.size() != DRAFT_SIZE:
+		_generate_choices()
+	_log(t("存档已读取。", "Save loaded."))
+	_render()
+	return true
+
+func _prepare_round() -> void:
+	phase = "draft"
+	draft_user_hidden = false
+	draft_picks_remaining = PICKS_PER_ROUND
+	pending_unit_ids = []
+	chosen_this_round = []
+	draft_roster_baseline = player_units.duplicate(true)
+	selected_unit = ""
+	_add_enemy_wave()    # 按当前关卡数添加 2 名固定敌方武将
+	_generate_choices()
+
+func _generate_choices() -> void:
+	var pool: Array = heroes.keys().filter(func(hero_id):
+		return (draft_faction_filter.is_empty() or heroes[hero_id].f == draft_faction_filter) and not chosen_this_round.has(str(hero_id))
+	)
+	pool.shuffle()  # 打乱顺序
+	choices = pool.slice(0, min(DRAFT_SIZE, pool.size()))
+	draft_refresh_available = [true, true]
+
+func _refresh_draft_choice(choice_index: int) -> void:
+	if phase != "draft" or battle_running or choice_index < 0 or choice_index >= choices.size():
+		return
+	if choice_index >= draft_refresh_available.size() or not draft_refresh_available[choice_index]:
+		return
+	var old_id := str(choices[choice_index])
+	var excluded := choices.duplicate()
+	excluded.append_array(chosen_this_round)
+	var pool: Array = heroes.keys().filter(func(hero_id):
+		return (draft_faction_filter.is_empty() or heroes[hero_id].f == draft_faction_filter) and not excluded.has(hero_id)
+	)
+	if pool.is_empty():
+		return
+	pool.shuffle()
+	choices[choice_index] = pool[0]
+	draft_refresh_available[choice_index] = false
+	_log(t("已单独刷新 ", "Refreshed ") + _hero_name(old_id) + t(" 的候选位。", " candidate slot."))
+	_render()
+
+func _refresh_shop(choice_index := 0) -> void:
+	_refresh_draft_choice(int(choice_index))
+
+func _add_enemy_wave() -> void:
+	var wave: Array = ENEMY_WAVES[min(round_number - 1, ENEMY_WAVES.size() - 1)]
+	for hero_id in wave:
+		var unit := _make_roster_unit("enemy", hero_id)
+		enemy_units.append(unit)
+		_auto_place_enemy(unit)
+		_try_upgrade(enemy_units, hero_id)  # 敌方同名武将也会升星
+	_log(t("第 %d 关敌军增援：" % round_number, "Stage %d enemy reinforcements: " % round_number) + _hero_name(wave[0]) + "、" + _hero_name(wave[1]))
+
+func _choose_hero(id: String) -> void:
+	if battle_running or phase != "draft" or not choices.has(id): return
+	if not _can_accept_hero(id):
+		_log(t("场上和备战区均已满。", "The field and reserve are both full."))
+		return
+	var unit := _make_roster_unit("player", id)
+	player_units.append(unit)
+	_try_upgrade(player_units, id)
+	chosen_this_round.append(id)
+	draft_picks_remaining -= 1
+	var locked_count := PICKS_PER_ROUND - draft_picks_remaining
+	_log(t("第%d/3轮锁定：" % locked_count, "Pick %d/3 locked: " % locked_count) + _hero_name(id))
+	if draft_picks_remaining <= 0:
+		phase = "placement"
+		draft_user_hidden = true
+	else:
+		_generate_choices()
+		draft_user_hidden = false
+	_render()
+
+func _can_accept_hero(hero_id: String) -> bool:
+	if _reserve_units().size() < RESERVE_LIMIT: return true
+	return player_units.filter(func(unit): return unit.alive and unit.hero_id == hero_id and int(unit.get("level", 1)) == 1).size() >= 1
+
+func _try_upgrade(roster: Array, hero_id: String):
+	var upgraded_unit = null
+	for level in [1, 2]:  # 检查 1→2 星 和 2→3 星
+		while true:
+			var copies := roster.filter(func(unit): return unit.alive and unit.hero_id == hero_id and int(unit.get("level", 1)) == level)
+			if copies.size() < 2: break  # 不足 2 个无法合成
+			copies.sort_custom(func(a, b): return (a.row >= 0) and (b.row < 0))
+			var primary: Dictionary = copies[0]
+			var old_max: float = primary.max_hp
+			primary.level = level + 1
+			primary.stat_mult = float(primary.get("stat_mult", 1.0)) * 1.5  # 属性 ×1.5
+			primary.max_hp *= 1.5
+			if float(primary.get("sunquan_initial_max_hp", 0.0)) > 0.0:
+				primary.sunquan_initial_max_hp = float(primary.sunquan_initial_max_hp) * 1.5
+			primary.hp = min(primary.max_hp, primary.hp + (primary.max_hp - old_max))  # 血量按差额补满
+			for consumed in [copies[1]]:
+				pending_unit_ids.erase(consumed.id)
+				roster.erase(consumed)  # 消耗掉副本
+			pending_unit_ids.erase(primary.id)
+			upgraded_unit = primary
+			_log(_hero_name(hero_id) + t(" 升至 ", " upgraded to ") + "★".repeat(int(primary.level)) + t("，生命与技能效果提高 50%。", "; HP and skill effects +50%."))
+	return upgraded_unit
+
+func _auto_place_enemy(unit: Dictionary) -> void:
+	var hero: Dictionary = heroes[unit.hero_id]
+	var rows := [0, 1, 2] if bool(hero.get("all_rows", false)) else ([0] if int(hero.range) == 1 else ([0, 1, 2] if hero.range <= 2 else [2, 1, 0]))
+	for row in rows:
+		for col in BOARD_COLUMNS:
+			if _unit_at(enemy_units, row, col) == null:
+				unit.row = row
+				unit.col = col
+				return
+	var deployed := enemy_units.filter(func(existing): return existing.alive and existing.row >= 0 and existing.id != unit.id and _can_unit_use_row(unit, int(existing.row)))
+	if not deployed.is_empty():
+		var replaced: Dictionary = deployed[0]
+		unit.row = replaced.row
+		unit.col = replaced.col
+		replaced.row = -1
+		replaced.col = -1
+
+func _auto_place_player() -> void:
+	if phase != "placement": return
+	if pending_unit_ids.is_empty():
+		for reserve in _reserve_units(): pending_unit_ids.append(reserve.id)
+	if pending_unit_ids.is_empty(): return
+	while not pending_unit_ids.is_empty():
+		var unit: Variant = _find_by_id(player_units, pending_unit_ids[0])
+		if unit == null:
+			pending_unit_ids.pop_front()
+			continue
+		var hero: Dictionary = heroes[unit.hero_id]
+		var rows := [0, 1, 2] if bool(hero.get("all_rows", false)) else ([0] if int(hero.range) == 1 else ([0, 1, 2] if hero.range <= 2 else [2, 1, 0]))
+		var placed := false
+		for row in rows:
+			for col in BOARD_COLUMNS:
+				if _unit_at(player_units, row, col) == null:
+					unit.row = row
+					unit.col = col
+					placed = true
+					break
+			if placed: break
+		if not placed:
+			unit.row = -1
+			unit.col = -1
+			_log(_hero_name(unit.hero_id) + t(" 已进入备战区。", " moved to the reserve."))
+		pending_unit_ids.pop_front()
+		if placed: _log(_hero_name(unit.hero_id) + t(" 已自动布阵。", " was placed automatically."))
+	_render()
+
+func _on_player_cell(row: int, col: int) -> void:
+	if phase != "placement" or battle_running: return
+	var occupant: Variant = _unit_at(player_units, row, col)
+	if not pending_unit_ids.is_empty():
+		if occupant != null: return
+		var pending: Variant = _find_by_id(player_units, pending_unit_ids[0])
+		if pending:
+			if not _can_unit_use_row(pending, row):
+				_log(t("射程1的近战武将只能部署在前排。", "Range-1 melee generals can only deploy in the front row."))
+				return
+			pending.row = row
+			pending.col = col
+			pending_unit_ids.pop_front()
+			_log(_hero_name(pending.hero_id) + t(" 已上阵。", " deployed."))
+	elif occupant != null:
+		var selected: Variant = _find_by_id(player_units, selected_unit)
+		if selected != null and selected.row < 0:
+			if not _can_unit_use_row(selected, row): return
+			occupant.row = -1
+			occupant.col = -1
+			selected.row = row
+			selected.col = col
+			selected_unit = ""
+			_log(_hero_name(selected.hero_id) + t(" 从备战区替换上场。", " swaps in from reserve."))
+		else:
+			selected_unit = occupant.id
+	else:
+		var selected: Variant = _find_by_id(player_units, selected_unit)
+		if selected:
+			if not _can_unit_use_row(selected, row): return
+			selected.row = row
+			selected.col = col
+			_log(_hero_name(selected.hero_id) + t(" 已调整站位。", " repositioned."))
+		selected_unit = ""
+	_render()
+
+func _can_start_battle() -> bool:
+	return phase == "placement" and pending_unit_ids.is_empty() and player_units.any(func(unit): return unit.alive and unit.row >= 0) and enemy_units.any(func(unit): return unit.alive and unit.row >= 0)
+
+func _start_battle() -> void:
+	if not _can_start_battle(): return
+	phase = "combat"
+	battle_running = true
+	battle_paused = false
+	battle_time = 0.0
+	action_in_progress = false
+	battle_speed = game_speed
+	selected_unit = ""
+	combat_units = []
+	ground_effects.clear()
+	_reset_faction_battle_state()
+	for team_units in [player_units, enemy_units]:
+		for unit in team_units:
+			if not unit.alive or unit.row < 0: continue
+			_ensure_unit_fields(unit)
+			unit.team = "player" if team_units == player_units else "enemy"
+			if not unit.has("action"): unit.action = 0.0
+			unit.action_gain_mult = 1.0
+			unit.heal_multiplier = 1.0
+			unit.charm_multiplier = 1.0
+			unit.current_hp_ratio = 0.06
+			combat_units.append(unit)
+	battle_stats = {}
+	for unit in combat_units:
+		battle_stats[unit.id] = {"unit_id":unit.id, "hero_id":unit.hero_id, "team":unit.team, "level":int(unit.get("level", 1)), "damage":0.0, "healing":0.0, "taken":0.0, "control":0.0}
+	_apply_combo_bonds()
+	_apply_faction_bonuses()
+	_apply_opening_skills()
+	_log("[color=#f6c860]" + t("第 ", "Stage ") + str(round_number) + t(" 关战斗开始（30 秒）！", " battle begins (30 seconds)!") + "[/color]")
+	tick_timer.start()
+	_render()
+
+func _finish_battle() -> void:
+	tick_timer.stop()
+	battle_running = false
+	battle_paused = false
+	action_in_progress = false
+	_capture_battle_stats()
+	var result: String
+	if player_ruler_hp == enemy_ruler_hp: result = t("本关战斗结束，平局。", "Stage complete — draw.")
+	elif player_ruler_hp > enemy_ruler_hp: result = t("本关战斗胜利！", "Stage won!")
+	else: result = t("本关战斗失利。", "Stage lost.")
+	_log("[color=#f6c860]" + result + "[/color]")
+	if player_ruler_hp <= 0:
+		phase = "finished"
+		_log(t("主公阵亡，闯关失败。", "Your ruler has fallen. Campaign failed."))
+	elif final_battle:
+		phase = "finished"
+		_log(t("最终决战胜利，天下归一！", "Final victory. The realm is united!"))
+	elif round_number >= ROUND_LIMIT:
+		_start_final_battle()
+	else:
+		round_number += 1
+		_prepare_round()
+		_save_game(true)
+		_log(t("进入下一关：敌方主公保留剩余生命，再进行三轮二选一。", "Next stage: the enemy ruler keeps its remaining HP; complete three pick-one-of-two rounds."))
+	_render()
+
+func _start_final_battle() -> void:
+	final_battle = true
+	phase = "placement"
+	pending_unit_ids.clear()
+	_log("[color=#f6c860]" + t("十五轮备战结束：不再选将，进入无时间限制的最终决战！", "Fifteen preparation rounds complete. The unlimited final battle begins!") + "[/color]")
+	if _can_start_battle(): _start_battle()
+	else:
+		phase = "finished"
+		_log(t("我方已无可上阵武将，征战失败。", "No allied generals remain to deploy. Campaign failed."))
