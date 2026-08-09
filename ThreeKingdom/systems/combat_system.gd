@@ -1,7 +1,7 @@
 extends "res://ThreeKingdom/systems/game_flow.gd"
 
 func _ensure_unit_fields(unit: Dictionary) -> void:
-	var defaults := {"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0, "vulnerable":0.0, "vulnerable_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":false, "spell_ward":0, "cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0, "faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0, "faction_cooldown_reduction":0.0, "shu_damage_stacks":0, "four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false, "burn_missing_hp_scale":false, "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0, "regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_magic_reduction":0.0, "regen_source":"", "timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_reduction":0.0, "timed_reduction_time":0.0, "all_lifesteal":0.0, "all_lifesteal_time":0.0, "bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0}
+	var defaults := {"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0, "vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":false, "spell_ward":0, "cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0, "faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0, "faction_cooldown_reduction":0.0, "shu_damage_stacks":0, "four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false, "burn_missing_hp_scale":false, "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0, "freeze":0.0, "freeze_shatter_per_second":0.0, "poison":0.0, "poison_ratio":0.0, "poison_clock":0.0, "poison_source":"", "regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_magic_reduction":0.0, "regen_source":"", "timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_reduction":0.0, "timed_reduction_time":0.0, "timed_action_bonus":0.0, "timed_action_time":0.0, "rear_damage_reduction":0.0, "rear_damage_reduction_time":0.0, "front_damage_reduction":0.0, "front_damage_reduction_time":0.0, "all_lifesteal":0.0, "all_lifesteal_time":0.0, "bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0}
 	for key in defaults:
 		if not unit.has(key): unit[key] = defaults[key]
 
@@ -74,14 +74,12 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 		unit.charm_multiplier = 1.0
 		unit.control_multiplier = 1.0
 		unit.current_hp_ratio = 0.06
-		unit.counter_chance = 0.0
 		unit.ghost_bond = false
 		unit.multi_bonus = 0
 		unit.burn_multiplier = 1.0
 		unit.heal_extra_targets = 0
 		unit.four_heroes = false
 		unit.lvmeng_ganning = false
-		unit.guard_link = false
 		unit.sun_legacy = false
 		unit.ambush_link = false
 		unit.sunce_taishi = false
@@ -102,11 +100,12 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 		var active := _team_units(team)
 		if _roster_has_all(active, ["liubei", "guanyu", "zhangfei"]):
 			if announce: _log(t("【桃园结义】刘备持续治疗升至300%技能强度，关羽按列斩实际伤害的30%恢复自身，张飞号令追加20%减伤。", "[Peach Garden] Liu Bei regenerates at 300% SKILL, Guan Yu heals for 30% of actual cleave damage, and Zhang Fei's command adds 20% reduction."))
-		if _roster_has_all(active, ["caocao", "dianwei", "xuchu"]):
-			_combat_hero(team, "caocao").counter_chance = 0.65
-			_combat_hero(team, "dianwei").guard_link = true
-			_combat_hero(team, "xuchu").guard_link = true
-			if announce: _log(t("【护主双壁】曹操受重击时，典韦或许褚会替其承担部分伤害并提前行动。", "[Twin Guards] Dian Wei or Xu Chu intercepts heavy hits on Cao Cao and advances their gauge."))
+		if _roster_has_all(active, ["caocao", "dianwei"]):
+			if announce: _log(t("【古之恶来】曹操和典韦互相强化技能。", "[Evil of Old] Cao Cao and Dian Wei empower each other's skills."))
+		if _roster_has_all(active, ["caocao", "xuchu"]):
+			if announce: _log(t("【虎卫护主】曹操和许褚互相强化技能。", "[Tiger Guard] Cao Cao and Xu Chu empower each other's skills."))
+		if _roster_has_all(active, ["dianwei", "xuchu"]):
+			if announce: _log(t("【魏武双卫】典韦和许褚互相强化技能。", "[Twin Wei Guards] Dian Wei and Xu Chu empower each other's skills."))
 		if _roster_has_all(active, ["zhouyu", "luxun", "lusu", "lvmeng"]):
 			for id in ["zhouyu", "luxun", "lusu", "lvmeng"]:
 				_combat_hero(team, id).four_heroes = true
@@ -136,15 +135,30 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 			_combat_hero(team, "weiyan").flying_meteor = true
 			_combat_hero(team, "huangzhong").flying_meteor = true
 			if announce: _log(t("【飞火流星】黄忠箭击有50%概率造成双倍伤害；敌方前军阵亡时，魏延回复50%最大生命。", "[Flying Meteor] Huang Zhong has a 50% chance to deal double damage; Wei Yan heals 50% max HP whenever an enemy frontliner falls."))
-		if _roster_has_count(active, ["zhangliao", "yuejin", "zhanghe", "xuhuang", "yujin"], 3):
-			var n := active.filter(func(u): return u.alive and ["zhangliao", "yuejin", "zhanghe", "xuhuang", "yujin"].has(u.hero_id)).size()
-			var yue = _combat_hero(team, "yuejin")
-			if yue != null: yue.multi_bonus = 2 if n >= 5 else 1
-			var xu = _combat_hero(team, "xuhuang")
-			if xu != null: xu.control_multiplier = 1.25 if n >= 5 else 1.10
-		if _roster_has_all(active, ["simayi", "guojia"]):
-			_combat_hero(team, "simayi").multi_bonus = 1
-			_combat_hero(team, "guojia").control_multiplier = 1.45
+		if _roster_has_all(active, ["zhangliao", "yuejin"]):
+			if announce: _log(t("【逍遥津先锋】张辽与乐进互相强化技能。", "[Hefei Vanguard] Zhang Liao and Yue Jin empower each other's skills."))
+		if _roster_has_all(active, ["zhanghe", "xuhuang"]):
+			if announce: _log(t("【巧变开山】张郃与徐晃互相强化技能。", "[Adaptive Vanguard] Zhang He and Xu Huang empower each other's skills."))
+		if _roster_has_all(active, ["zhangliao", "yuejin", "zhanghe", "xuhuang", "yujin"]):
+			if announce: _log(t("【五子良将】五人绝技全部获得完全体强化。", "[Five Elite Generals] All five signature skills reach their complete form."))
+		var xiahouyuan = _combat_hero(team, "xiahouyuan")
+		if xiahouyuan != null:
+			var xhy_cd := float(heroes.xiahouyuan.cooldown)
+			if _roster_has_all(active, ["xiahouyuan", "caoren"]): xhy_cd -= 0.5
+			if _roster_has_all(active, ["xiahouyuan", "xiahoudun"]): xhy_cd -= 0.5
+			xiahouyuan.bond_cooldown = xhy_cd
+		var guojia = _combat_hero(team, "guojia")
+		if guojia != null:
+			var guo_cd := float(heroes.guojia.cooldown)
+			for ally_id in ["simayi", "xunyu", "jiaxu"]:
+				if _roster_has_all(active, ["guojia", ally_id]): guo_cd -= 0.5
+			guojia.bond_cooldown = guo_cd
+		var xunyu = _combat_hero(team, "xunyu")
+		if xunyu != null:
+			var xun_cd := float(heroes.xunyu.cooldown)
+			for ally_id in ["simayi", "guojia", "jiaxu"]:
+				if _roster_has_all(active, ["xunyu", ally_id]): xun_cd -= 0.4
+			xunyu.bond_cooldown = xun_cd
 		if _roster_has_all(active, ["sunjian", "sunce", "sunquan", "sunshangxiang"]):
 			for id in ["sunjian", "sunce", "sunquan", "sunshangxiang"]: _combat_hero(team, id).sun_legacy = true
 			_combat_hero(team, "sunshangxiang").bond_cooldown = float(heroes.sunshangxiang.ability_params.get("sun_legacy_cooldown", 6.0))
@@ -219,6 +233,7 @@ func _capture_battle_stats() -> void:
 
 func _unit_action_gain_multiplier(unit: Dictionary) -> float:
 	var result := float(unit.get("action_gain_mult", 1.0))
+	result *= 1.0 + float(unit.get("timed_action_bonus", 0.0))
 	if bool(unit.get("five_tigers_speed", false)): result *= 1.15
 	var cooldown_reduction := clampf(float(unit.get("faction_cooldown_reduction", 0.0)), 0.0, 0.95)
 	if cooldown_reduction > 0.0:
@@ -234,7 +249,7 @@ func _control_duration_multiplier(unit: Dictionary) -> float:
 
 func _battle_tick() -> void:
 	if not battle_running or battle_paused or action_in_progress: return
-	var already_ready := combat_units.filter(func(unit): return unit.alive and unit.stun <= 0 and unit.charm <= 0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
+	var already_ready := combat_units.filter(func(unit): return unit.alive and unit.stun <= 0 and unit.charm <= 0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.get("freeze", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
 	if not already_ready.is_empty():
 		_begin_action(already_ready[0])
 		return
@@ -252,13 +267,13 @@ func _battle_tick() -> void:
 		_begin_effect_pause()
 		return
 	for unit in combat_units:
-		if not unit.alive or unit.stun > 0 or unit.charm > 0 or float(unit.get("fear", 0.0)) > 0.0: continue
+		if not unit.alive or unit.stun > 0 or unit.charm > 0 or float(unit.get("fear", 0.0)) > 0.0 or float(unit.get("freeze", 0.0)) > 0.0: continue
 		var gain_per_second: float = ACTION_MAX / maxf(0.001, _unit_skill_cooldown(unit))
 		var silence_slow := 0.5 if float(unit.get("silence", 0.0)) > 0.0 else 0.0
 		unit.action = min(ACTION_MAX, float(unit.action) + gain_per_second * delta * _unit_action_gain_multiplier(unit) * (1.0 - float(unit.get("slow", 0.0)) - silence_slow))
 	_update_action_bars()
 	_update_battle_time_bar()
-	var ready := combat_units.filter(func(unit): return unit.alive and unit.stun <= 0 and unit.charm <= 0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
+	var ready := combat_units.filter(func(unit): return unit.alive and unit.stun <= 0 and unit.charm <= 0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.get("freeze", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
 	if not ready.is_empty(): _begin_action(ready[0])
 	if battle_time >= BATTLE_LIMIT and not final_battle: _finish_battle()
 
@@ -333,6 +348,20 @@ func _process_statuses(delta: float = TICK) -> void:
 			if unit.fear <= 0.0:
 				unit.fear_damage_ratio = 0.0
 				unit.fear_clock = 0.0
+		if float(unit.get("poison", 0.0)) > 0.0:
+			unit.poison_clock = float(unit.get("poison_clock", 0.0)) + delta
+			while float(unit.poison_clock) >= 1.0 and unit.alive:
+				unit.poison_clock = float(unit.poison_clock) - 1.0
+				var poison_source = _find_by_id(combat_units, str(unit.get("poison_source", "")))
+				var poison_amount := float(unit.max_hp) * float(unit.get("poison_ratio", 0.01))
+				if poison_source != null: poison_amount /= maxf(0.001, float(poison_source.get("stat_mult", 1.0)))
+				_damage(poison_source, unit, poison_amount, "magic", t("中毒", "Poison"))
+			unit.poison = maxf(0.0, float(unit.poison) - delta)
+			if unit.poison <= 0.0:
+				unit.poison_ratio = 0.0
+				unit.poison_clock = 0.0
+				unit.poison_source = ""
+		unit.freeze = maxf(0.0, float(unit.get("freeze", 0.0)) - delta)
 		unit.stun = max(0.0, unit.stun - delta)
 		unit.charm = max(0.0, unit.charm - delta)
 		unit.silence = max(0.0, float(unit.get("silence", 0.0)) - delta)
@@ -341,12 +370,20 @@ func _process_statuses(delta: float = TICK) -> void:
 		if unit.slow_time <= 0.0: unit.slow = 0.0
 		unit.vulnerable_time = max(0.0, float(unit.get("vulnerable_time", 0.0)) - delta)
 		if unit.vulnerable_time <= 0.0: unit.vulnerable = 0.0
+		unit.grievous_time = max(0.0, float(unit.get("grievous_time", 0.0)) - delta)
+		if unit.grievous_time <= 0.0: unit.grievous = 0.0
 		unit.timed_damage_time = max(0.0, float(unit.get("timed_damage_time", 0.0)) - delta)
 		if unit.timed_damage_time <= 0.0: unit.timed_damage_buff = 0.0
 		unit.all_lifesteal_time = max(0.0, float(unit.get("all_lifesteal_time", 0.0)) - delta)
 		if unit.all_lifesteal_time <= 0.0: unit.all_lifesteal = 0.0
 		unit.timed_reduction_time = max(0.0, float(unit.get("timed_reduction_time", 0.0)) - delta)
 		if unit.timed_reduction_time <= 0.0: unit.timed_reduction = 0.0
+		unit.timed_action_time = maxf(0.0, float(unit.get("timed_action_time", 0.0)) - delta)
+		if unit.timed_action_time <= 0.0: unit.timed_action_bonus = 0.0
+		unit.rear_damage_reduction_time = maxf(0.0, float(unit.get("rear_damage_reduction_time", 0.0)) - delta)
+		if unit.rear_damage_reduction_time <= 0.0: unit.rear_damage_reduction = 0.0
+		unit.front_damage_reduction_time = maxf(0.0, float(unit.get("front_damage_reduction_time", 0.0)) - delta)
+		if unit.front_damage_reduction_time <= 0.0: unit.front_damage_reduction = 0.0
 		if float(unit.get("regen_time", 0.0)) > 0.0:
 			unit.regen_clock = float(unit.get("regen_clock", 0.0)) + delta
 			unit.regen_time = max(0.0, float(unit.regen_time) - delta)
@@ -446,6 +483,18 @@ func _cast_active_skill(unit: Dictionary) -> void:
 		"guanyu": _cast_guanyu_skill(unit)
 		"lvbu": _cast_lvbu_skill(unit)
 		"xuchu": _cast_xuchu_skill(unit)
+		"zhangliao": _cast_zhangliao_skill(unit)
+		"yuejin": _cast_yuejin_skill(unit)
+		"xuhuang": _cast_xuhuang_skill(unit)
+		"zhanghe": _cast_zhanghe_skill(unit)
+		"yujin": _cast_yujin_skill(unit)
+		"xiahouyuan": _cast_xiahouyuan_skill(unit)
+		"caoren": _cast_caoren_skill(unit)
+		"xiahoudun": _cast_xiahoudun_skill(unit)
+		"simayi": _cast_simayi_skill(unit)
+		"guojia": _cast_guojia_skill(unit)
+		"xunyu": _cast_xunyu_skill(unit)
+		"jiaxu": _cast_jiaxu_skill(unit)
 		"dongzhuo": _cast_dongzhuo_skill(unit)
 		_: _cast_generic_ability(unit)
 
@@ -661,23 +710,145 @@ func _cast_dingfeng_skill(unit: Dictionary) -> void:
 			if adjacent.alive:
 				_reduce_action_bar(unit, adjacent, float(params.get("bond_splash_action_reduction", 15.0)))
 
+func _random_unique_living_enemies(unit: Dictionary, count: int, row := -1) -> Array:
+	var candidates := _enemy_units(unit.team).filter(func(enemy):
+		return enemy.alive and float(enemy.get("stealth", 0.0)) <= 0.0 and (row < 0 or int(enemy.row) == row)
+	)
+	var result: Array = []
+	for _index in mini(count, candidates.size()):
+		var picked := rng.randi_range(0, candidates.size() - 1)
+		result.append(candidates[picked])
+		candidates.remove_at(picked)
+	return result
+
+func _apply_skill_stun(source: Dictionary, target: Dictionary, duration: float) -> void:
+	if target == null or not target.alive or duration <= 0.0: return
+	var actual := duration * _unit_effect_multiplier(source) * _control_duration_multiplier(source)
+	target.stun = maxf(float(target.stun), actual)
+	_add_stat(source, "control", actual)
+
 func _cast_caocao_command(unit: Dictionary) -> void:
-	var params: Dictionary = heroes[unit.hero_id].ability_params
-	unit.counter_chance = max(float(unit.get("counter_chance", 0.0)), float(params.get("counter_chance", 0.45)))
-	unit.timed_reduction = max(float(unit.get("timed_reduction", 0.0)), float(params.get("reduction", 0.15)))
-	unit.timed_reduction_time = max(float(unit.get("timed_reduction_time", 0.0)), float(params.get("duration", 4.0)))
-	var tile := _random_enemy_tile(unit)
-	var target = tile.target
-	var base: float = float(params.get("base_value", heroes[unit.hero_id].skill_value)) * float(params.get("mult", 1.0))
-	if target == null:
-		_hit_ruler(unit, base, tile, t("奸雄反制空击", "Cunning Counter missed"))
-	else:
-		_damage(unit, target, base, "physical", t("奸雄反制", "Cunning Counter"))
-		if target.alive and rng.randf() < float(params.get("stun_chance", 0.35)):
-			target.stun = max(float(target.stun), float(params.get("stun", 1.0)) * _unit_effect_multiplier(unit) * _control_duration_multiplier(unit))
-			_add_stat(unit, "control", float(target.stun))
-			_log(_hero_name("caocao") + t(" 眩晕了 ", " stuns ") + _hero_name(target.hero_id) + "！")
-	visual_events.append({"kind":"skill", "source_id":unit.id, "target_id":unit.id, "amount":0, "style":"magic"})
+	var params: Dictionary = heroes.caocao.ability_params
+	var has_dianwei := _pair_active(unit.team, "caocao", "dianwei")
+	var has_xuchu := _pair_active(unit.team, "caocao", "xuchu")
+	var target_count := int(params.get("target_count", 2))
+	if has_dianwei: target_count += int(params.get("bond_bonus_targets", 1))
+	if has_xuchu: target_count += int(params.get("bond_bonus_targets", 1))
+	var targets := _random_unique_living_enemies(unit, target_count)
+	var base := float(heroes.caocao.skill_value) * float(params.get("mult", 2.0))
+	var visual_group := "caocao_command:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	if targets.is_empty():
+		_hit_ruler(unit, base, _random_enemy_tile(unit), t("魏武震慑空击", "Dominion Stun missed"), visual_group, "multi_target")
+	for target in targets:
+		var favored := (has_dianwei and int(target.row) == BOARD_ROWS - 1) or (has_xuchu and int(target.row) == 0)
+		var amount := base * (float(params.get("favored_row_mult", 2.0)) if favored else 1.0)
+		_damage(unit, target, amount, "physical", t("魏武震慑", "Dominion Stun"), visual_group, "multi_target")
+		_apply_skill_stun(unit, target, float(params.get("stun", 2.5)) * (float(params.get("favored_row_stun_mult", 2.0)) if favored else 1.0))
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _wei_pair_count(team: String, hero_id: String, partners: Array) -> int:
+	var count := 0
+	for partner in partners:
+		if _pair_active(team, hero_id, str(partner)): count += 1
+	return count
+
+func _cast_xiahouyuan_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.xiahouyuan.ability_params
+	var bond_count := _wei_pair_count(unit.team, "xiahouyuan", ["caoren", "xiahoudun"])
+	var stun_duration := float(params.get("stun", 1.5)) + 0.5 * bond_count
+	var targets := _random_unique_living_enemies(unit, int(params.get("target_count", 2)))
+	var visual_group := "xiahouyuan_suppression:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	if targets.is_empty():
+		_hit_ruler(unit, float(heroes.xiahouyuan.skill_value) * float(params.get("mult", 1.75)), _random_enemy_tile(unit), t("神速震袭空击", "Swift Suppression missed"), visual_group, "multi_target")
+	for target in targets:
+		var was_stunned := float(target.stun) > 0.0
+		var mult := float(params.get("stunned_mult", 2.50)) if was_stunned else float(params.get("mult", 1.75))
+		_damage(unit, target, float(heroes.xiahouyuan.skill_value) * mult, "physical", t("神速震袭", "Swift Suppression"), visual_group, "multi_target")
+		_apply_skill_stun(unit, target, stun_duration)
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _cast_caoren_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.caoren.ability_params
+	var bond_count := _wei_pair_count(unit.team, "caoren", ["xiahouyuan", "xiahoudun"])
+	var target_count := int(params.get("target_count", 2)) + bond_count
+	var stun_duration := float(params.get("stun", 1.5)) + 0.5 * bond_count
+	var targets := _random_unique_living_enemies(unit, target_count, BOARD_ROWS - 1)
+	var visual_group := "caoren_rear_guard:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	for target in targets:
+		_damage(unit, target, float(heroes.caoren.skill_value) * float(params.get("mult", 1.50)), "physical", t("樊城镇远", "Rearward Bulwark"), visual_group, "multi_target")
+		_apply_skill_stun(unit, target, stun_duration)
+	unit.rear_damage_reduction = float(params.get("rear_reduction", 0.20)) + 0.10 * bond_count
+	unit.rear_damage_reduction_time = float(params.get("guard_time", 6.0))
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _cast_xiahoudun_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.xiahoudun.ability_params
+	var bond_count := _wei_pair_count(unit.team, "xiahoudun", ["xiahouyuan", "caoren"])
+	var target_count := int(params.get("target_count", 2)) + bond_count
+	var stun_duration := float(params.get("stun", 1.5)) + 0.5 * bond_count
+	var targets := _random_unique_living_enemies(unit, target_count, 0)
+	var visual_group := "xiahoudun_front_guard:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	for target in targets:
+		_damage(unit, target, float(heroes.xiahoudun.skill_value) * float(params.get("mult", 1.50)), "physical", t("刚烈镇前", "Vanguard Bulwark"), visual_group, "multi_target")
+		_apply_skill_stun(unit, target, stun_duration)
+	unit.front_damage_reduction = float(params.get("front_reduction", 0.20)) + 0.10 * bond_count
+	unit.front_damage_reduction_time = float(params.get("guard_time", 6.5))
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _cast_simayi_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.simayi.ability_params
+	var bond_count := _wei_pair_count(unit.team, "simayi", ["guojia", "xunyu", "jiaxu"])
+	var targets := _random_unique_living_enemies(unit, int(params.get("target_count", 2)) + bond_count)
+	var mult := float(params.get("mult", 1.75)) + 0.25 * bond_count
+	var visual_group := "simayi_thunder:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	if targets.is_empty(): _hit_ruler(unit, float(heroes.simayi.skill_value) * mult, _random_enemy_tile(unit), t("雷霆谋断空击", "Thunder Judgment missed"), visual_group, "multi_target")
+	for target in targets:
+		_damage(unit, target, float(heroes.simayi.skill_value) * mult, "magic", t("雷霆谋断", "Thunder Judgment"), visual_group, "multi_target")
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _cast_guojia_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.guojia.ability_params
+	var bond_count := _wei_pair_count(unit.team, "guojia", ["simayi", "xunyu", "jiaxu"])
+	var targets := _random_unique_living_enemies(unit, int(params.get("target_count", 2)) + bond_count)
+	var duration := float(params.get("freeze", 4.0)) * _unit_effect_multiplier(unit) * _control_duration_multiplier(unit)
+	for target in targets:
+		target.freeze = maxf(float(target.get("freeze", 0.0)), duration)
+		target.freeze_shatter_per_second = float(params.get("shatter_per_second", 400.0))
+		_add_stat(unit, "control", duration)
+		visual_events.append({"kind":"skill", "source_id":unit.id, "target_id":target.id, "amount":roundi(duration * 10.0), "style":"magic"})
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _random_unique_living_allies(unit: Dictionary, count: int) -> Array:
+	var candidates := _team_units(unit.team).filter(func(ally): return ally.alive)
+	var result: Array = []
+	for _index in mini(count, candidates.size()):
+		var picked := rng.randi_range(0, candidates.size() - 1)
+		result.append(candidates[picked])
+		candidates.remove_at(picked)
+	return result
+
+func _cast_xunyu_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.xunyu.ability_params
+	var bond_count := _wei_pair_count(unit.team, "xunyu", ["simayi", "guojia", "jiaxu"])
+	var targets := _random_unique_living_allies(unit, int(params.get("target_count", 2)) + bond_count)
+	for target in targets:
+		target.timed_action_bonus = maxf(float(target.get("timed_action_bonus", 0.0)), float(params.get("action_bonus", 0.20)))
+		target.timed_action_time = maxf(float(target.get("timed_action_time", 0.0)), float(params.get("duration", 6.0)))
+		visual_events.append({"kind":"skill", "source_id":unit.id, "target_id":target.id, "amount":20, "style":"magic", "nonblocking":true})
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _cast_jiaxu_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.jiaxu.ability_params
+	var bond_count := _wei_pair_count(unit.team, "jiaxu", ["simayi", "guojia", "xunyu"])
+	var targets := _random_unique_living_enemies(unit, int(params.get("target_count", 2)) + bond_count)
+	var duration := float(params.get("duration", 5.0)) + 0.5 * bond_count
+	for target in targets:
+		target.poison = maxf(float(target.get("poison", 0.0)), duration)
+		target.poison_ratio = float(params.get("poison_ratio", 0.01))
+		target.poison_clock = 0.0
+		target.poison_source = unit.id
+		visual_events.append({"kind":"skill", "source_id":unit.id, "target_id":target.id, "amount":roundi(duration * 10.0), "style":"magic"})
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
 
 func _cast_liubei_regen(unit: Dictionary) -> void:
 	var params: Dictionary = heroes[unit.hero_id].ability_params
@@ -1067,22 +1238,135 @@ func _cast_guanyu_skill(unit: Dictionary) -> void:
 		_heal_with_overflow(unit, unit, damage_dealt * 0.30)
 
 func _cast_dianwei_skill(unit: Dictionary) -> void:
-	var params: Dictionary = heroes[unit.hero_id].ability_params
-	var tile := _ability_enemy_tile(unit, params)
-	var target = tile.target
-	var base: float = float(params.get("base_value", heroes[unit.hero_id].skill_value)) * float(params.get("mult", 1.8))
-	if target == null: _hit_ruler(unit, base, tile, t("恶来擒杀号空击", "Evil's Capture missed")); return
-	target.skill_debuff = float(params.get("skill_damage_reduction", 0.25))
-	_damage(unit, target, base, "physical", t("恶来擒杀号", "Evil's Capture"))
+	var params: Dictionary = heroes.dianwei.ability_params
+	var target_count := int(params.get("target_count", 2)) + (int(params.get("caocao_bonus_targets", 1)) if _pair_active(unit.team, "dianwei", "caocao") else 0)
+	var mult := float(params.get("xuchu_mult", 4.0)) if _pair_active(unit.team, "dianwei", "xuchu") else float(params.get("mult", 2.0))
+	var targets := _random_unique_living_enemies(unit, target_count, BOARD_ROWS - 1)
+	var visual_group := "dianwei_rear:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	if targets.is_empty():
+		_hit_ruler(unit, float(heroes.dianwei.skill_value) * mult, {"row":BOARD_ROWS - 1, "col":rng.randi_range(0, BOARD_COLUMNS - 1), "team":_enemy_team_id(unit.team)}, t("恶来袭后空击", "Evil Guard Raid missed"), visual_group, "multi_target")
+	for target in targets:
+		_damage(unit, target, float(heroes.dianwei.skill_value) * mult, "physical", t("恶来袭后", "Evil Guard Raid"), visual_group, "multi_target")
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
 
 func _cast_xuchu_skill(unit: Dictionary) -> void:
-	var params: Dictionary = heroes[unit.hero_id].ability_params
-	var tile := _random_enemy_tile(unit)
-	var target = tile.target
-	var base: float = float(params.get("base_value", heroes[unit.hero_id].skill_value)) * float(params.get("mult", 1.0))
-	var extra: float = min(base * float(params.get("extra_cap", 1.4)), float(unit.hp) * float(params.get("current_hp_ratio", 0.08)))
-	if target == null: _hit_ruler(unit, base + extra, tile, t("虎痴重锤空击", "Tiger Hammer missed")); return
-	_damage(unit, target, base + extra, "physical", t("虎痴重锤", "Tiger Hammer"))
+	var params: Dictionary = heroes.xuchu.ability_params
+	var target_count := int(params.get("target_count", 2)) + (int(params.get("caocao_bonus_targets", 1)) if _pair_active(unit.team, "xuchu", "caocao") else 0)
+	var mult := float(params.get("dianwei_mult", 4.0)) if _pair_active(unit.team, "xuchu", "dianwei") else float(params.get("mult", 2.0))
+	var targets := _random_unique_living_enemies(unit, target_count, 0)
+	var visual_group := "xuchu_front:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	if targets.is_empty():
+		_hit_ruler(unit, float(heroes.xuchu.skill_value) * mult, {"row":0, "col":rng.randi_range(0, BOARD_COLUMNS - 1), "team":_enemy_team_id(unit.team)}, t("虎卫破前空击", "Tiger Guard Break missed"), visual_group, "multi_target")
+	for target in targets:
+		_damage(unit, target, float(heroes.xuchu.skill_value) * mult, "physical", t("虎卫破前", "Tiger Guard Break"), visual_group, "multi_target")
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _five_elites_active(team: String) -> bool:
+	return _roster_has_all(_team_units(team), ["zhangliao", "yuejin", "zhanghe", "xuhuang", "yujin"])
+
+func _cast_zhangliao_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.zhangliao.ability_params
+	var five := _five_elites_active(unit.team)
+	var mult := float(params.get("yuejin_mult", 2.0)) if _pair_active(unit.team, "zhangliao", "yuejin") else float(params.get("mult", 1.0))
+	var amount := float(heroes.zhangliao.skill_value) * mult
+	var col := rng.randi_range(0, BOARD_COLUMNS - 1)
+	var target_team := _enemy_team_id(unit.team)
+	var affected: Array = []
+	for hit_index in int(params.get("hit_count", 2)):
+		var visual_group := "zhangliao_boomerang:" + str(unit.id) + ":" + str(unit.get("cast_count", 0)) + ":" + str(hit_index)
+		for row in BOARD_ROWS:
+			var target = _unit_at(_enemy_units(unit.team), row, col)
+			if target == null:
+				_hit_ruler(unit, amount, {"row":row, "col":col, "team":target_team}, t("威震回刃空击", "Returning Blade empty strike"), visual_group, "column_impact")
+			else:
+				_damage(unit, target, amount, "physical", t("威震回刃", "Returning Blade"), visual_group, "column_impact")
+				if not affected.has(target): affected.append(target)
+	if five:
+		for target in affected:
+			if target.alive:
+				target.vulnerable = maxf(float(target.get("vulnerable", 0.0)), float(params.get("five_vulnerable", 0.40)))
+				target.vulnerable_time = maxf(float(target.get("vulnerable_time", 0.0)), float(params.get("five_vulnerable_time", 3.5)))
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _cast_yuejin_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.yuejin.ability_params
+	var five := _five_elites_active(unit.team)
+	var pair := _pair_active(unit.team, "zhangliao", "yuejin")
+	var target_count := int(params.get("five_target_count", 7)) if five else (int(params.get("zhangliao_target_count", 5)) if pair else int(params.get("target_count", 3)))
+	var mult := float(params.get("five_mult", 2.0)) if five else (float(params.get("zhangliao_mult", 1.5)) if pair else float(params.get("mult", 1.0)))
+	var targets := _random_unique_living_enemies(unit, target_count)
+	var visual_group := "yuejin_volley:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	if targets.is_empty():
+		_hit_ruler(unit, float(heroes.yuejin.skill_value) * mult, _random_enemy_tile(unit), t("先登乱射空击", "Vanguard Volley missed"), visual_group, "multi_target")
+	for target in targets:
+		_damage(unit, target, float(heroes.yuejin.skill_value) * mult, "physical", t("先登乱射", "Vanguard Volley"), visual_group, "multi_target")
+		if five and target.alive:
+			target.grievous = maxf(float(target.get("grievous", 0.0)), float(params.get("five_grievous", 0.60)))
+			target.grievous_time = maxf(float(target.get("grievous_time", 0.0)), float(params.get("five_grievous_time", 4.0)))
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _cast_xuhuang_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.xuhuang.ability_params
+	var five := _five_elites_active(unit.team)
+	var pair := _pair_active(unit.team, "xuhuang", "zhanghe")
+	var row := rng.randi_range(0, BOARD_ROWS - 1) if five else 0
+	var mult := float(params.get("five_mult", 3.0)) if five else (float(params.get("zhanghe_mult", 2.0)) if pair else float(params.get("mult", 1.25)))
+	var stun_time := float(params.get("five_stun", 5.0)) if five else float(params.get("stun", 2.0))
+	var visual_group := "xuhuang_row:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	var target_team := _enemy_team_id(unit.team)
+	for col in BOARD_COLUMNS:
+		var target = _unit_at(_enemy_units(unit.team), row, col)
+		if target == null:
+			_hit_ruler(unit, float(heroes.xuhuang.skill_value) * mult, {"row":row, "col":col, "team":target_team}, t("撼地开山空击", "Earth-Splitting Axe empty strike"), visual_group, "row_impact")
+		else:
+			_damage(unit, target, float(heroes.xuhuang.skill_value) * mult, "physical", t("撼地开山", "Earth-Splitting Axe"), visual_group, "row_impact")
+			_apply_skill_stun(unit, target, stun_time)
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _random_adjacent_row_target(unit: Dictionary, row: int, col: int) -> Variant:
+	var candidates := _enemy_units(unit.team).filter(func(enemy): return enemy.alive and int(enemy.row) == row and abs(int(enemy.col) - col) <= 1 and float(enemy.get("stealth", 0.0)) <= 0.0)
+	return null if candidates.is_empty() else candidates[rng.randi_range(0, candidates.size() - 1)]
+
+func _cast_zhanghe_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.zhanghe.ability_params
+	var five := _five_elites_active(unit.team)
+	var pair := _pair_active(unit.team, "zhanghe", "xuhuang")
+	var front_targets := _random_unique_living_enemies(unit, BOARD_COLUMNS, 0)
+	if front_targets.is_empty():
+		_hit_ruler(unit, float(heroes.zhanghe.skill_value) * float(params.get("mult", 2.0)), {"row":0, "col":rng.randi_range(0, BOARD_COLUMNS - 1), "team":_enemy_team_id(unit.team)}, t("巧变连枪空击", "Coiling Spear missed"))
+		return
+	var primary: Dictionary = front_targets[rng.randi_range(0, front_targets.size() - 1)]
+	var targets: Array = [primary]
+	if pair:
+		var adjacent_fronts := front_targets.filter(func(enemy): return enemy.id != primary.id and abs(int(enemy.col) - int(primary.col)) == 1)
+		if not adjacent_fronts.is_empty(): targets.append(adjacent_fronts[rng.randi_range(0, adjacent_fronts.size() - 1)])
+	if five:
+		var middle = _random_adjacent_row_target(unit, 1, int(primary.col))
+		if middle != null:
+			targets.append(middle)
+			var rear = _random_adjacent_row_target(unit, 2, int(middle.col))
+			if rear != null: targets.append(rear)
+	var visual_group := "zhanghe_chain:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	for target in targets:
+		var stunned_before := float(target.get("stun", 0.0)) > 0.0
+		var mult := float(params.get("five_stunned_mult", 5.0)) if five and stunned_before else (float(params.get("five_mult", 3.0)) if five else float(params.get("mult", 2.0)))
+		_damage(unit, target, float(heroes.zhanghe.skill_value) * mult, "physical", t("巧变连枪", "Coiling Spear Chain"), visual_group, "multi_target")
+		_apply_skill_stun(unit, target, float(params.get("stun", 1.5)))
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
+
+func _cast_yujin_skill(unit: Dictionary) -> void:
+	var params: Dictionary = heroes.yujin.ability_params
+	var five := _five_elites_active(unit.team)
+	var target_count := int(params.get("five_target_count", 3)) if five else int(params.get("target_count", 1))
+	var flat := float(params.get("five_flat_shield", 300.0)) if five else float(params.get("flat_shield", 200.0))
+	var ratio := float(params.get("five_max_hp_shield_ratio", 0.05)) if five else float(params.get("max_hp_shield_ratio", 0.03))
+	var allies := _team_units(unit.team).filter(func(ally): return ally.alive)
+	allies.sort_custom(func(a, b): return float(a.hp) < float(b.hp))
+	for ally in allies.slice(0, mini(target_count, allies.size())):
+		var shield_value := flat + float(ally.max_hp) * ratio
+		_grant_shield(ally, shield_value)
+		visual_events.append({"kind":"heal", "source_id":unit.id, "target_id":ally.id, "amount":round(shield_value), "style":"shield"})
+	unit.cast_count = int(unit.get("cast_count", 0)) + 1
 
 func _cast_dongzhuo_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes[unit.hero_id].ability_params
@@ -1505,6 +1789,8 @@ func _heal_weakest_fixed(unit: Dictionary, heal_amount: float, reduction: float,
 	target.damage_reduction = max(target.damage_reduction, reduction)
 func _heal_with_overflow(source: Dictionary, target, amount: float, visual_kind := "heal", nonblocking := false) -> void:
 	if source == null or amount <= 0.0: return
+	if target != null and target.alive:
+		amount *= 1.0 - clampf(float(target.get("grievous", 0.0)), 0.0, 0.95)
 	var overflow := amount
 	if target != null and target.alive:
 		var missing: float = maxf(0.0, float(target.max_hp) - float(target.hp))
@@ -1525,6 +1811,7 @@ func _heal_with_overflow(source: Dictionary, target, amount: float, visual_kind 
 
 func _heal_unit_only(source: Dictionary, target: Dictionary, amount: float) -> float:
 	if source == null or target == null or not target.alive or amount <= 0.0: return 0.0
+	amount *= 1.0 - clampf(float(target.get("grievous", 0.0)), 0.0, 0.95)
 	var missing := maxf(0.0, float(target.max_hp) - float(target.hp))
 	var restored := minf(missing, amount)
 	if restored <= 0.0: return 0.0
@@ -1554,9 +1841,12 @@ func _debuff_score(unit: Dictionary) -> float:
 		+ float(unit.get("silence", 0.0))
 		+ float(unit.get("slow_time", 0.0))
 		+ float(unit.get("vulnerable_time", 0.0))
+		+ float(unit.get("grievous_time", 0.0))
 		+ float(unit.get("strategy_mark", 0.0))
 		+ float(unit.get("skill_debuff", 0.0))
 		+ float(unit.get("fear", 0.0))
+		+ float(unit.get("freeze", 0.0))
+		+ float(unit.get("poison", 0.0))
 		+ (1.0 if bool(unit.get("zhuge_fire_mark", false)) else 0.0)
 	)
 
@@ -1641,8 +1931,20 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		if heroes[source.hero_id].f == "wei" and int(source.get("faction_tier", 0)) >= 3 and _has_any_debuff(target):
 			value *= 1.15
 		if source.hero_id == "lvbu" and target.charm > 0: value *= 1.80
+	var freeze_remaining := float(target.get("freeze", 0.0))
+	if freeze_remaining > 0.0:
+		var shatter_damage := freeze_remaining * float(target.get("freeze_shatter_per_second", 400.0))
+		target.freeze = 0.0
+		target.freeze_shatter_per_second = 0.0
+		value += shatter_damage
+		visual_events.append({"kind":"skill", "source_id":"" if source == null else source.id, "target_id":target.id, "amount":roundi(shatter_damage), "style":"magic"})
+		_log(t("冰封提前破碎，追加 ", "Freeze shatters early for ") + str(roundi(shatter_damage)) + t(" 点伤害。", " extra damage."))
 	var total_reduction: float = max(float(target.damage_reduction), float(target.get("timed_reduction", 0.0)))
 	if damage_type == "magic": total_reduction = max(total_reduction, float(target.get("regen_magic_reduction", 0.0)))
+	if source != null and int(source.row) == BOARD_ROWS - 1 and float(target.get("rear_damage_reduction_time", 0.0)) > 0.0:
+		total_reduction += float(target.get("rear_damage_reduction", 0.0))
+	if source != null and int(source.row) == 0 and float(target.get("front_damage_reduction_time", 0.0)) > 0.0:
+		total_reduction += float(target.get("front_damage_reduction", 0.0))
 	if target.hero_id == "sunce" and bool(target.get("sun_legacy", false)):
 		var params: Dictionary = heroes.sunce.ability_params
 		var missing_hp_reduction := _missing_hp_damage_multiplier(target, float(params.get("missing_hp_step", 0.10)), float(params.get("missing_hp_reduction_per_step", 0.04))) - 1.0
@@ -1652,15 +1954,6 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	if heroes[target.hero_id].f == "shu" and int(target.get("faction_tier", 0)) >= 3:
 		faction_reduction += 0.02 * clampi(int(target.get("shu_damage_stacks", 0)), 0, 3)
 	value *= 1.0 - clampf(faction_reduction, 0.0, 0.95)
-	if target.hero_id == "caocao" and source != null and value >= target.max_hp * 0.08:
-		var guards := _team_units(target.team).filter(func(ally): return ally.alive and ally.get("guard_link", false))
-		if not guards.is_empty():
-			guards.sort_custom(func(a, b): return float(a.hp) / float(a.max_hp) > float(b.hp) / float(b.max_hp))
-			var guard: Dictionary = guards[0]
-			var redirected := value * 0.25
-			value -= redirected
-			_damage(null, guard, redirected, damage_type, t("护主替伤", "Guard interception"))
-			guard.action = min(ACTION_MAX, float(guard.action) + 20.0)
 	if damage_type == "magic" and float(target.get("strategy_mark", 0.0)) > 0.0 and source != null:
 		value *= 1.30
 		target.strategy_mark = 0.0
@@ -1686,10 +1979,6 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	visual_events.append({"kind":"damage", "source_id":"" if source == null else source.id, "target_id":target.id, "team":target.team, "row":target.row, "col":target.col, "amount":round(value), "skill":true, "style":effect_style, "visual_group":visual_group, "group_style":group_style})
 	var source_name := t("环境", "Effect") if source == null else _hero_name(source.hero_id)
 	_log(source_name + t(" 对 ", " hits ") + _hero_name(target.hero_id) + t(" 造成 ", " for ") + str(round(value)) + t(" 伤害（", " damage (") + label + "）")
-	if source != null and target.hero_id == "caocao" and source.alive and rng.randf() < float(target.get("counter_chance", 0.0)):
-		source.stun = max(float(source.stun), 1.5)
-		_add_stat(target, "control", float(source.stun))
-		_log(_hero_name("caocao") + t(" 触发护卫反制，眩晕了 ", " counters and stuns ") + _hero_name(source.hero_id) + "！")
 	if target.hp <= 0:
 		if float(target.get("death_prevention", 0.0)) > 0.0:
 			target.hp = max(1.0, target.max_hp * 0.08)

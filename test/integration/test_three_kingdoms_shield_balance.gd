@@ -23,13 +23,12 @@ func _initialize() -> void:
 	game.enemy_units = []
 	game.combat_units = game.player_units
 	game._apply_combo_bonds()
-	for _i in 10:
-		game._cast_generic_ability(yujin)
-		game._cast_generic_ability(caoren)
+	game._cast_active_skill(yujin)
+	for _i in 10: game._cast_generic_ability(caoren)
 	assert(yujin.shield == 0.0)
 	assert(caoren.shield == 0.0)
 	assert(ally.shield > 0.0)
-	assert(ally.shield <= 225.0)
+	assert(is_equal_approx(float(ally.shield), 200.0 + float(ally.max_hp) * 0.03))
 	assert(ally.shield < ally.max_hp * 0.30)
 
 	# Sun Quan's reworked signature no longer leaves any team/column damage buff.

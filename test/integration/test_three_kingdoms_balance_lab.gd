@@ -6,12 +6,35 @@ func _initialize() -> void:
 	await process_frame
 	game.tick_timer.stop()
 	assert(is_instance_valid(game.balance_lab_overlay))
-	assert(game.balance_editor_hero_list.item_count == 58)
+	assert(game.balance_editor_hero_list.item_count == 59)
 	assert(game.lab_player_board.get_child_count() == 15)
 	assert(game.lab_enemy_board.get_child_count() == 15)
 	assert(int(game.lab_player_board.get_child(0).board_row) == 0)
 	assert(int(game.lab_enemy_board.get_child(0).board_row) == 0)
 	assert(int(game.lab_enemy_board.get_child((game.BOARD_ROWS - 1) * game.BOARD_COLUMNS).board_row) == game.BOARD_ROWS - 1)
+	game._refresh_lab_presets()
+	var builtin_presets: Array = game.lab_presets.filter(func(preset): return bool(preset.get("builtin", false)))
+	assert(builtin_presets.size() == 6)
+	for preset in builtin_presets:
+		assert(preset.player.size() == game.heroes.values().filter(func(hero): return str(hero.f) == str(preset.player_faction)).size())
+		assert(preset.enemy.size() == game.heroes.values().filter(func(hero): return str(hero.f) == str(preset.enemy_faction)).size())
+	var preset_count_before_delete: int = game.lab_presets.size()
+	game.lab_preset_list.select(0)
+	game._delete_selected_lab_preset()
+	assert(game.lab_presets.size() == preset_count_before_delete)
+	assert(game.lab_status.text.contains("不能删除") or game.lab_status.text.contains("cannot be deleted"))
+	for cleanup_index in range(game.lab_presets.size() - 1, -1, -1):
+		if str(game.lab_presets[cleanup_index].get("id", "")) == "test_rename": game.lab_presets.remove_at(cleanup_index)
+	game.lab_presets.append({"id":"test_rename", "name":"旧名字", "builtin":false, "player":builtin_presets[0].player.duplicate(true), "enemy":builtin_presets[0].enemy.duplicate(true), "runs":10})
+	game._refresh_lab_presets()
+	var rename_index: int = game.lab_presets.find_custom(func(preset): return str(preset.get("id", "")) == "test_rename")
+	game.lab_preset_list.select(rename_index)
+	game.lab_preset_name.text = "新名字"
+	game._rename_selected_lab_preset()
+	rename_index = game.lab_presets.find_custom(func(preset): return str(preset.get("id", "")) == "test_rename")
+	assert(rename_index >= 0 and str(game.lab_presets[rename_index].name) == "新名字")
+	game.lab_preset_list.select(rename_index)
+	game._delete_selected_lab_preset()
 	game._set_lab_view_mode("result")
 	assert(not game.lab_setup_panel.visible and game.lab_result_panel.visible)
 	game._set_lab_view_mode("formation")
@@ -49,7 +72,7 @@ func _initialize() -> void:
 	game._move_lab_unit(true, original_row, original_col, 1, 3)
 	assert(game.lab_player_lineup[0].row == 1 and game.lab_player_lineup[0].col == 3)
 	game.lab_player_lineup.append({"hero_id":"guanyu", "level":1, "row":0, "col":0})
-	assert(not game._can_move_lab_unit(true, 0, 0, 2, 0))
+	assert(game._can_move_lab_unit(true, 0, 0, 2, 0))
 
 	# Editing the skill base value also refreshes derived skill damage.
 	var old_hero: Dictionary = game.heroes.xusheng.duplicate(true)
@@ -66,20 +89,19 @@ func _initialize() -> void:
 	var old_dianwei: Dictionary = game.heroes.dianwei.duplicate(true)
 	var signature_params: Dictionary = game._editable_ability_params("dianwei")
 	signature_params.mult = 2.25
-	signature_params.skill_damage_reduction = 0.40
+	signature_params.target_count = 2
 	game._apply_hero_override("dianwei", {"hp":1460, "skill_value":80, "cooldown":2.2, "range":1, "ability_params":signature_params})
 	assert(game.heroes.dianwei.ability_params.mult == 2.25)
 	var signature_actor: Dictionary = game._make_roster_unit("player", "dianwei")
 	var signature_target: Dictionary = game._make_roster_unit("enemy", "caocao")
 	signature_actor.row = 0; signature_actor.col = 0
-	signature_target.row = 0; signature_target.col = 0
+	signature_target.row = 2; signature_target.col = 0
 	signature_target.max_hp = 100000.0
 	signature_target.hp = signature_target.max_hp
 	game.combat_units = [signature_actor, signature_target]
-	for _attempt in 12:
-		game._cast_dianwei_skill(signature_actor)
-		if signature_target.skill_debuff == 0.40: break
-	assert(signature_target.skill_debuff == 0.40)
+	var target_hp_before := float(signature_target.hp)
+	game._cast_dianwei_skill(signature_actor)
+	assert(is_equal_approx(target_hp_before - float(signature_target.hp), 80.0 * 2.25))
 	game.heroes.dianwei = old_dianwei
 
 	# Live battle uses the selected formation, locks deployment, supports speed,

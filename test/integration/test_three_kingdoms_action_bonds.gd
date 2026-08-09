@@ -45,10 +45,10 @@ func _initialize() -> void:
 	var wei := _build_team(game, ["caocao", "dianwei", "xuchu"])
 	game.combat_units = wei
 	game._apply_combo_bonds()
-	assert(wei[0].counter_chance == 0.65)
 	assert(wei[1].damage_reduction == 0.0)
-	assert(wei[1].guard_link)
-	assert(wei[2].guard_link)
+	assert(not wei[0].has("counter_chance") or float(wei[0].counter_chance) == 0.0)
+	assert(not wei[1].has("guard_link") or not bool(wei[1].guard_link))
+	assert(not wei[2].has("guard_link") or not bool(wei[2].guard_link))
 	var wu := _build_team(game, ["zhouyu", "luxun", "lusu", "lvmeng"])
 	game.combat_units = wu
 	game._apply_combo_bonds()

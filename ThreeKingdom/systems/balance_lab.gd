@@ -44,6 +44,7 @@ var lab_setup_panel: Control
 var lab_result_panel: Control
 var lab_status: Label
 var lab_presets: Array = []
+var lab_loaded_preset_id := ""
 var lab_live_battle := false
 var lab_live_paused := false
 var lab_live_stop_requested := false
@@ -604,6 +605,7 @@ func _build_preset_panel() -> PanelContainer:
 	lab_preset_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_enable_touch_value_scroll(lab_preset_list)
 	lab_preset_list.item_activated.connect(func(_index): _load_selected_lab_preset())
+	lab_preset_list.item_selected.connect(_on_lab_preset_selected)
 	box.add_child(lab_preset_list)
 	var save := _button(t("保存当前", "SAVE CURRENT"))
 	save.pressed.connect(_save_current_lab_preset)
@@ -611,6 +613,9 @@ func _build_preset_panel() -> PanelContainer:
 	var load_button := _button(t("载入", "LOAD"))
 	load_button.pressed.connect(_load_selected_lab_preset)
 	box.add_child(load_button)
+	var rename_button := _button(t("重命名", "RENAME"))
+	rename_button.pressed.connect(_rename_selected_lab_preset)
+	box.add_child(rename_button)
 	var transfer := HBoxContainer.new()
 	box.add_child(transfer)
 	var export_button := _button(t("导出", "EXPORT"))
@@ -695,9 +700,6 @@ func _selected_lab_entry_index(is_player: bool) -> int:
 func _can_move_lab_unit(is_player: bool, from_row: int, from_col: int, to_row: int, to_col: int) -> bool:
 	var source = _lab_unit_at(is_player, from_row, from_col)
 	if source == null: return false
-	if not bool(heroes[source.hero_id].get("all_rows", false)) and int(heroes[source.hero_id].range) == 1 and to_row != 0: return false
-	var target = _lab_unit_at(is_player, to_row, to_col)
-	if target != null and not bool(heroes[target.hero_id].get("all_rows", false)) and int(heroes[target.hero_id].range) == 1 and from_row != 0: return false
 	return true
 
 func _move_lab_unit(is_player: bool, from_row: int, from_col: int, to_row: int, to_col: int) -> void:
@@ -718,7 +720,7 @@ func _move_lab_unit(is_player: bool, from_row: int, from_col: int, to_row: int, 
 func _preferred_lab_rows(hero_id: String) -> Array:
 	if bool(heroes[hero_id].get("all_rows", false)): return [0, 1, 2]
 	var range_tier := int(heroes[hero_id].range)
-	if range_tier == 1: return [0]
+	if range_tier == 1: return [0, 1, 2]
 	if range_tier == 2: return [1, 0, 2]
 	return [2, 1, 0]
 
@@ -775,7 +777,79 @@ func _load_lab_presets() -> void:
 			var preset: Dictionary = value.duplicate(true)
 			preset.player = _sanitize_lab_lineup(preset.get("player", []))
 			preset.enemy = _sanitize_lab_lineup(preset.get("enemy", []))
+			if str(preset.get("id", "")).is_empty(): preset.id = _new_lab_preset_id()
+			preset.builtin = bool(preset.get("builtin", false))
 			lab_presets.append(preset)
+	_ensure_builtin_lab_presets()
+	_save_lab_presets()
+
+func _new_lab_preset_id() -> String:
+	return "custom_" + str(Time.get_unix_time_from_system()) + "_" + str(lab_presets.size())
+
+func _default_faction_lineup(faction: String) -> Array:
+	var hero_ids: Array = heroes.keys().filter(func(hero_id): return str(heroes[hero_id].f) == faction)
+	hero_ids.sort_custom(func(a, b):
+		var range_a := int(heroes[a].range)
+		var range_b := int(heroes[b].range)
+		return range_a < range_b if range_a != range_b else str(a) < str(b)
+	)
+	var lineup: Array = []
+	for hero_id in hero_ids:
+		var position := _next_lab_position(lineup, str(hero_id))
+		if position.x < 0: continue
+		lineup.append({"hero_id":str(hero_id), "level":1, "row":position.x, "col":position.y})
+	return lineup
+
+func _builtin_lab_preset_specs() -> Array:
+	return [
+		["shu", "wei", "蜀国满编 vs 魏国满编"],
+		["shu", "wu", "蜀国满编 vs 吴国满编"],
+		["shu", "qun", "蜀国满编 vs 群雄满编"],
+		["wei", "wu", "魏国满编 vs 吴国满编"],
+		["wei", "qun", "魏国满编 vs 群雄满编"],
+		["wu", "qun", "吴国满编 vs 群雄满编"]
+	]
+
+func _ensure_builtin_lab_presets() -> void:
+	for spec in _builtin_lab_preset_specs():
+		var preset_id := "builtin_" + str(spec[0]) + "_vs_" + str(spec[1])
+		var existing_index := -1
+		for index in lab_presets.size():
+			if str(lab_presets[index].get("id", "")) == preset_id:
+				existing_index = index
+				break
+		if existing_index >= 0:
+			lab_presets[existing_index].builtin = true
+			lab_presets[existing_index].name = str(spec[2])
+			lab_presets[existing_index].player_faction = str(spec[0])
+			lab_presets[existing_index].enemy_faction = str(spec[1])
+			lab_presets[existing_index].player = _normalize_builtin_faction_lineup(lab_presets[existing_index].get("player", []), str(spec[0]))
+			lab_presets[existing_index].enemy = _normalize_builtin_faction_lineup(lab_presets[existing_index].get("enemy", []), str(spec[1]))
+			continue
+		lab_presets.append({
+			"id":preset_id,
+			"name":str(spec[2]),
+			"builtin":true,
+			"player_faction":str(spec[0]),
+			"enemy_faction":str(spec[1]),
+			"player":_default_faction_lineup(str(spec[0])),
+			"enemy":_default_faction_lineup(str(spec[1])),
+			"runs":100
+		})
+	var builtin_presets := lab_presets.filter(func(preset): return bool(preset.get("builtin", false)))
+	var custom_presets := lab_presets.filter(func(preset): return not bool(preset.get("builtin", false)))
+	lab_presets = builtin_presets + custom_presets
+
+func _normalize_builtin_faction_lineup(value, faction: String) -> Array:
+	var lineup := _sanitize_lab_lineup(value)
+	var expected_ids: Array = heroes.keys().filter(func(hero_id): return str(heroes[hero_id].f) == faction)
+	for index in range(lineup.size() - 1, -1, -1):
+		if not expected_ids.has(str(lineup[index].hero_id)): lineup.remove_at(index)
+	for hero_id in expected_ids:
+		if lineup.any(func(entry): return str(entry.hero_id) == str(hero_id)): continue
+		var position := _next_lab_position(lineup, str(hero_id))
+		if position.x >= 0: lineup.append({"hero_id":str(hero_id), "level":1, "row":position.x, "col":position.y})
+	return lineup
 
 func _sanitize_lab_lineup(value) -> Array:
 	var sanitized: Array = []
@@ -786,7 +860,6 @@ func _sanitize_lab_lineup(value) -> Array:
 		var hero_id := str(raw_entry.get("hero_id", ""))
 		if not heroes.has(hero_id): continue
 		var row := clampi(int(raw_entry.get("row", 0)), 0, BOARD_ROWS - 1)
-		if not bool(heroes[hero_id].get("all_rows", false)) and int(heroes[hero_id].range) == 1: row = 0
 		var col := clampi(int(raw_entry.get("col", 0)), 0, BOARD_COLUMNS - 1)
 		for index in range(sanitized.size() - 1, -1, -1):
 			if int(sanitized[index].row) == row and int(sanitized[index].col) == col:
@@ -800,8 +873,18 @@ func _save_lab_presets() -> void:
 func _refresh_lab_presets() -> void:
 	if not is_instance_valid(lab_preset_list): return
 	lab_preset_list.clear()
-	for preset in lab_presets:
-		lab_preset_list.add_item(str(preset.get("name", t("未命名阵容", "Unnamed preset"))) + "  ·  " + str(preset.get("player", []).size()) + "v" + str(preset.get("enemy", []).size()))
+	for index in lab_presets.size():
+		var preset: Dictionary = lab_presets[index]
+		var prefix := "◆ " if bool(preset.get("builtin", false)) else ""
+		lab_preset_list.add_item(prefix + str(preset.get("name", t("未命名阵容", "Unnamed preset"))) + "  ·  " + str(preset.get("player", []).size()) + "v" + str(preset.get("enemy", []).size()))
+		lab_preset_list.set_item_metadata(index, str(preset.get("id", "")))
+		if str(preset.get("id", "")) == lab_loaded_preset_id: lab_preset_list.select(index)
+
+func _on_lab_preset_selected(index: int) -> void:
+	if index < 0 or index >= lab_presets.size(): return
+	var preset: Dictionary = lab_presets[index]
+	lab_preset_name.text = str(preset.get("name", ""))
+	lab_preset_name.editable = not bool(preset.get("builtin", false))
 
 func _save_current_lab_preset() -> void:
 	if lab_player_lineup.is_empty() or lab_enemy_lineup.is_empty():
@@ -810,14 +893,27 @@ func _save_current_lab_preset() -> void:
 	var preset_name := lab_preset_name.text.strip_edges()
 	if preset_name.is_empty():
 		preset_name = t("演练方案 ", "Simulation ") + str(lab_presets.size() + 1)
-	var preset := {"name":preset_name, "player":lab_player_lineup.duplicate(true), "enemy":lab_enemy_lineup.duplicate(true), "runs":int(lab_runs.value)}
+	var selected_index := _selected_lab_preset_index()
+	if selected_index >= 0 and bool(lab_presets[selected_index].get("builtin", false)):
+		lab_presets[selected_index].player = _normalize_builtin_faction_lineup(lab_player_lineup, str(lab_presets[selected_index].player_faction))
+		lab_presets[selected_index].enemy = _normalize_builtin_faction_lineup(lab_enemy_lineup, str(lab_presets[selected_index].enemy_faction))
+		lab_presets[selected_index].runs = int(lab_runs.value)
+		lab_loaded_preset_id = str(lab_presets[selected_index].id)
+		_save_lab_presets()
+		_refresh_lab_presets()
+		lab_status.text = t("默认对决的站位、星级和演练次数已更新。", "Built-in matchup formation, stars, and run count updated.")
+		return
+	var preset := {"id":_new_lab_preset_id(), "name":preset_name, "builtin":false, "player":lab_player_lineup.duplicate(true), "enemy":lab_enemy_lineup.duplicate(true), "runs":int(lab_runs.value)}
 	var replaced := false
 	for index in lab_presets.size():
 		if str(lab_presets[index].get("name", "")) == preset_name:
+			if bool(lab_presets[index].get("builtin", false)): continue
+			preset.id = str(lab_presets[index].get("id", preset.id))
 			lab_presets[index] = preset
 			replaced = true
 			break
 	if not replaced: lab_presets.append(preset)
+	lab_loaded_preset_id = str(preset.id)
 	_save_lab_presets()
 	_refresh_lab_presets()
 	lab_status.text = t("阵容方案已保存。", "Lineup preset saved.")
@@ -830,7 +926,9 @@ func _load_selected_lab_preset() -> void:
 	var index := _selected_lab_preset_index()
 	if index < 0: return
 	var preset: Dictionary = lab_presets[index]
+	lab_loaded_preset_id = str(preset.get("id", ""))
 	lab_preset_name.text = str(preset.get("name", ""))
+	lab_preset_name.editable = not bool(preset.get("builtin", false))
 	lab_player_lineup = _sanitize_lab_lineup(preset.get("player", []))
 	lab_enemy_lineup = _sanitize_lab_lineup(preset.get("enemy", []))
 	lab_runs.value = int(preset.get("runs", 10))
@@ -840,10 +938,36 @@ func _load_selected_lab_preset() -> void:
 func _delete_selected_lab_preset() -> void:
 	var index := _selected_lab_preset_index()
 	if index < 0: return
+	if bool(lab_presets[index].get("builtin", false)):
+		lab_status.text = t("默认对决不能删除，但可以载入后调整并重新保存。", "Built-in matchups cannot be deleted; load, adjust, and save them instead.")
+		return
+	if str(lab_presets[index].get("id", "")) == lab_loaded_preset_id: lab_loaded_preset_id = ""
 	lab_presets.remove_at(index)
 	_save_lab_presets()
 	_refresh_lab_presets()
 	lab_status.text = t("已删除阵容方案。", "Lineup preset deleted.")
+
+func _rename_selected_lab_preset() -> void:
+	var index := _selected_lab_preset_index()
+	if index < 0:
+		lab_status.text = t("请先选择要重命名的阵容。", "Select a preset to rename first.")
+		return
+	if bool(lab_presets[index].get("builtin", false)):
+		lab_status.text = t("默认对决名称固定，不能重命名。", "Built-in matchup names are fixed.")
+		return
+	var new_name := lab_preset_name.text.strip_edges()
+	if new_name.is_empty():
+		lab_status.text = t("阵容名称不能为空。", "Preset name cannot be empty.")
+		return
+	for other_index in lab_presets.size():
+		if other_index != index and str(lab_presets[other_index].get("name", "")) == new_name:
+			lab_status.text = t("已有同名阵容。", "A preset with that name already exists.")
+			return
+	lab_presets[index].name = new_name
+	lab_loaded_preset_id = str(lab_presets[index].get("id", ""))
+	_save_lab_presets()
+	_refresh_lab_presets()
+	lab_status.text = t("阵容已重命名。", "Preset renamed.")
 
 func _export_selected_lab_preset() -> void:
 	var index := _selected_lab_preset_index()
@@ -860,6 +984,8 @@ func _import_lab_preset() -> void:
 	if str(preset.get("name", "")).is_empty(): preset.name = t("导入阵容", "Imported lineup")
 	preset.player = _sanitize_lab_lineup(preset.player)
 	preset.enemy = _sanitize_lab_lineup(preset.enemy)
+	preset.id = _new_lab_preset_id()
+	preset.builtin = false
 	if preset.player.is_empty() or preset.enemy.is_empty():
 		lab_status.text = t("导入阵容缺少有效武将。", "Imported preset has no valid heroes.")
 		return
@@ -1199,7 +1325,7 @@ func _simulate_fast_battle(player_setup: Array, enemy_setup: Array, seed: int) -
 		var player_alive: Array = sandbox._team_units("player").filter(func(unit): return unit.alive)
 		var enemy_alive: Array = sandbox._team_units("enemy").filter(func(unit): return unit.alive)
 		if player_alive.is_empty() or enemy_alive.is_empty() or sandbox._has_winner(): break
-		var ready: Array = sandbox.combat_units.filter(func(unit): return unit.alive and unit.stun <= 0.0 and unit.charm <= 0.0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
+		var ready: Array = sandbox.combat_units.filter(func(unit): return unit.alive and unit.stun <= 0.0 and unit.charm <= 0.0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.get("freeze", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
 		if not ready.is_empty():
 			var acting: Dictionary = ready[0]
 			acting.action = maxf(0.0, float(acting.action) - ACTION_MAX)
@@ -1211,8 +1337,8 @@ func _simulate_fast_battle(player_setup: Array, enemy_setup: Array, seed: int) -
 		sandbox._process_statuses(TICK)
 		sandbox.visual_events.clear()
 		for unit in sandbox.combat_units:
-			if not unit.alive or unit.stun > 0.0 or unit.charm > 0.0 or float(unit.get("fear", 0.0)) > 0.0: continue
-			var gain_per_second: float = ACTION_MAX / maxf(0.001, float(sandbox.heroes[unit.hero_id].cooldown))
+			if not unit.alive or unit.stun > 0.0 or unit.charm > 0.0 or float(unit.get("fear", 0.0)) > 0.0 or float(unit.get("freeze", 0.0)) > 0.0: continue
+			var gain_per_second: float = ACTION_MAX / maxf(0.001, sandbox._unit_skill_cooldown(unit))
 			var silence_slow := 0.5 if float(unit.get("silence", 0.0)) > 0.0 else 0.0
 			unit.action = minf(ACTION_MAX, float(unit.action) + gain_per_second * TICK * sandbox._unit_action_gain_multiplier(unit) * (1.0 - float(unit.get("slow", 0.0)) - silence_slow))
 

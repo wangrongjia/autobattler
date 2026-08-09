@@ -583,7 +583,7 @@ void fragment() {
 	return fire_effect_cutout_material
 
 func _hero_fx(hero_id: String) -> Dictionary:
-	var glyphs := {"liubei":"仁", "guanyu":"龍", "zhangfei":"吼", "zhaoyun":"胆", "huangzhong":"穿", "machao":"骑", "liushan":"汉", "zhugeliang":"卦", "jiangwei":"伐", "menghuo":"蛮", "zhurong":"焰", "dailaidongzhu":"兽", "weiyan":"骨", "madai":"羽", "pangtong":"链", "caocao":"魏", "dianwei":"戟", "xuchu":"锤", "zhangliao":"威", "yuejin":"矢", "zhanghe":"变", "xuhuang":"斧", "yujin":"阵", "xiahouyuan":"速", "caoren":"城", "xiahoudun":"烈", "guojia":"冰", "simayi":"雷", "xunyu":"佐", "zhouyu":"赤", "luxun":"炎", "lusu":"盟", "lvmeng":"袭", "sunjian":"虎", "sunce":"霸", "sunquan":"衡", "sunshangxiang":"弩", "daqiao":"花", "xiaoqiao":"风", "taishici":"义", "dingfeng":"雪", "xusheng":"潮", "ganning":"锦", "huanggai":"苦", "lvbu":"无", "diaochan":"魅", "dongzhuo":"暴", "gaoshun":"陷", "chengong":"谋", "yanliang":"猛", "wenchou":"返", "qunzhanghe":"幕", "gaolan":"策", "huatuo":"医", "yuji":"妖", "zhangjiao":"黄", "yuanshao":"盟", "yuanshu":"帝"}
+	var glyphs := {"liubei":"仁", "guanyu":"龍", "zhangfei":"吼", "zhaoyun":"胆", "huangzhong":"穿", "machao":"骑", "liushan":"汉", "zhugeliang":"卦", "jiangwei":"伐", "menghuo":"蛮", "zhurong":"焰", "dailaidongzhu":"兽", "weiyan":"骨", "madai":"羽", "pangtong":"链", "caocao":"魏", "dianwei":"戟", "xuchu":"锤", "zhangliao":"威", "yuejin":"矢", "zhanghe":"变", "xuhuang":"斧", "yujin":"阵", "xiahouyuan":"速", "caoren":"城", "xiahoudun":"烈", "guojia":"冰", "simayi":"雷", "xunyu":"佐", "jiaxu":"毒", "zhouyu":"赤", "luxun":"炎", "lusu":"盟", "lvmeng":"袭", "sunjian":"虎", "sunce":"霸", "sunquan":"衡", "sunshangxiang":"弩", "daqiao":"花", "xiaoqiao":"风", "taishici":"义", "dingfeng":"雪", "xusheng":"潮", "ganning":"锦", "huanggai":"苦", "lvbu":"无", "diaochan":"魅", "dongzhuo":"暴", "gaoshun":"陷", "chengong":"谋", "yanliang":"猛", "wenchou":"返", "qunzhanghe":"幕", "gaolan":"策", "huatuo":"医", "yuji":"妖", "zhangjiao":"黄", "yuanshao":"盟", "yuanshu":"帝"}
 	var weapons := {
 		"liubei":"双股剑", "guanyu":"青龙偃月刀", "zhangfei":"丈八蛇矛", "zhaoyun":"龙胆亮银枪", "huangzhong":"落日弓",
 		"machao":"虎头湛金枪", "weiyan":"鬼头刀", "madai":"斩马刀", "liushan":"细剑", "zhugeliang":"七星卧龙扇",
@@ -620,7 +620,7 @@ func _hero_fx(hero_id: String) -> Dictionary:
 	elif hero_id in ["simayi", "zhangjiao", "yuji"]: element = "lightning"
 	elif hero_id in ["guojia", "xiaoqiao"]: element = "frost"
 	elif hero_id in ["liubei", "lusu", "daqiao", "huatuo"]: element = "heal"
-	elif hero_id in ["zhugeliang", "pangtong", "xunyu", "diaochan", "gaolan", "yuanshu"]: element = "arcane"
+	elif hero_id in ["zhugeliang", "pangtong", "xunyu", "jiaxu", "diaochan", "gaolan", "yuanshu"]: element = "arcane"
 	var faction := str(heroes.get(hero_id, {}).get("f", "qun"))
 	var base: Color = FACTION_COLORS.get(faction, Color("#d8b060")).lightened(0.20)
 	var hue := fmod(abs(float(hash(hero_id))) / 997.0, 1.0)

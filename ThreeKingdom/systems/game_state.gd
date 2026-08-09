@@ -10,7 +10,7 @@ const ACTION_MAX := 100.0          # 行动条上限:从 0 涨到 100 时武将�
 const FACTION_BOND_TIERS: Array[int] = [2, 5, 8] # 四阵营统一羁绊档位
 const DEFAULT_SKILL_COOLDOWN := 8.5 # 未单独配置武将的初始冷却；不是均衡实验室的调整下限
 const COOLDOWN_INPUT_MIN := 0.0     # 均衡实验室允许设置为 0，战斗计算处另行防止除零
-const HERO_COOLDOWN_DEFAULTS := {"liubei":4.0, "liushan":4.0, "zhangfei":6.5, "zhaoyun":4.5, "huangzhong":4.0, "machao":6.0, "zhugeliang":4.0, "dailaidongzhu":8.0, "weiyan":5.0, "madai":20.0, "sunquan":10.0, "sunshangxiang":8.0, "taishici":4.0, "ganning":8.0, "huanggai":10.0}
+const HERO_COOLDOWN_DEFAULTS := {"liubei":4.0, "liushan":4.0, "zhangfei":6.5, "zhaoyun":4.5, "huangzhong":4.0, "machao":6.0, "zhugeliang":4.0, "dailaidongzhu":8.0, "weiyan":5.0, "madai":20.0, "sunquan":10.0, "sunshangxiang":8.0, "taishici":4.0, "ganning":8.0, "huanggai":10.0, "caocao":6.0, "dianwei":4.0, "xuchu":4.0, "zhangliao":5.0, "yuejin":6.5, "xuhuang":8.0, "zhanghe":4.0, "yujin":10.0, "xiahouyuan":5.5, "caoren":6.0, "xiahoudun":6.5, "simayi":7.5, "guojia":7.0, "xunyu":7.2, "jiaxu":6.5}
 const HEALTH_SCALE := 12.0         # 全体基础血量由原来的 ×6 提高到 ×12，最终获得双倍血量
 const RESERVE_LIMIT := 9           # 备战区(棋盘下方的替补区)最多放 9 名武将
 const BOARD_LIMIT := BOARD_COLUMNS * BOARD_ROWS  # 棋盘总格数 = 15
@@ -168,9 +168,9 @@ var heroes := {
 	"liubei": {"zh":"刘备", "en":"Liu Bei", "f":"shu", "roles":["治疗", "辅助"], "hp":260, "skill_value":32, "cooldown":4.0, "range":4, "skill":"Benevolent Rule", "zh_skill":"仁德", "summary":"治疗生命最低的友军，并赋予减伤。", "en_summary":"Heals the weakest ally and grants damage reduction."},
 	"guanyu": {"zh":"关羽", "en":"Guan Yu", "f":"shu", "roles":["战士", "爆发"], "hp":360, "skill_value":58, "cooldown":3.0, "range":1, "skill":"Green Dragon Cleave", "zh_skill":"青龙断阵", "summary":"斩击同列敌人；击杀后追击。", "en_summary":"Cleave enemies in a column; pursue after a kill."},
 	"zhangfei": {"zh":"张飞", "en":"Zhang Fei", "f":"shu", "roles":["坦克", "辅助"], "hp":390, "skill_value":44, "cooldown":4.0, "range":1, "skill":"Roar of Yan", "zh_skill":"燕人怒吼", "summary":"开场为同排友军施加护盾。", "en_summary":"Grants shields to allies in his row at battle start."},
-	"caocao": {"zh":"曹操", "en":"Cao Cao", "f":"wei", "roles":["坦克", "控制"], "hp":380, "skill_value":46, "cooldown":3.0, "range":1, "skill":"Cunning Counter", "zh_skill":"奸雄反制", "summary":"释放技能时有概率眩晕目标。", "en_summary":"His skill has a chance to stun the target."},
-	"dianwei": {"zh":"典韦", "en":"Dian Wei", "f":"wei", "roles":["坦克", "战士"], "hp":365, "skill_value":52, "cooldown":3.0, "range":1, "skill":"Evil's Capture", "zh_skill":"恶来擒杀号", "summary":"重创最远的敌军并降低其技能伤害。", "en_summary":"Strikes the farthest enemy and reduces its skill damage."},
-	"xuchu": {"zh":"许褚", "en":"Xu Chu", "f":"wei", "roles":["战士"], "hp":350, "skill_value":60, "cooldown":3.0, "range":1, "skill":"Tiger Hammer", "zh_skill":"虎痴重锤", "summary":"当前生命越高，技能追加伤害越高。", "en_summary":"His skill deals bonus damage based on current health."},
+	"caocao": {"zh":"曹操", "en":"Cao Cao", "f":"wei", "roles":["坦克", "控制"], "hp":380, "skill_value":46, "cooldown":6.0, "range":1, "skill":"Dominion Stun", "zh_skill":"魏武震慑", "summary":"随机攻击两名敌军并眩晕。", "en_summary":"Damages and stuns two random enemies."},
+	"dianwei": {"zh":"典韦", "en":"Dian Wei", "f":"wei", "roles":["坦克", "战士"], "hp":365, "skill_value":52, "cooldown":4.0, "range":1, "skill":"Evil Guard Raid", "zh_skill":"恶来袭后", "summary":"重创两名随机敌方后军。", "en_summary":"Strikes two random enemy rearguards."},
+	"xuchu": {"zh":"许褚", "en":"Xu Chu", "f":"wei", "roles":["战士"], "hp":350, "skill_value":60, "cooldown":4.0, "range":1, "skill":"Tiger Guard Break", "zh_skill":"虎卫破前", "summary":"重创两名随机敌方前军。", "en_summary":"Strikes two random enemy vanguards."},
 	"zhouyu": {"zh":"周瑜", "en":"Zhou Yu", "f":"wu", "roles":["法师", "灼烧"], "hp":225, "skill_value":72, "cooldown":4.0, "range":4, "skill":"Red Cliffs", "zh_skill":"赤壁点火", "summary":"点燃敌方一整排。", "en_summary":"Ignites an entire enemy row."},
 	"luxun": {"zh":"陆逊", "en":"Lu Xun", "f":"wu", "roles":["法师", "爆发"], "hp":235, "skill_value":68, "cooldown":4.0, "range":4, "skill":"Flames of Camp", "zh_skill":"火烧连营", "summary":"火球命中目标并弹射邻格。", "en_summary":"A fireball hits a target and bounces nearby."},
 	"lusu": {"zh":"鲁肃", "en":"Lu Su", "f":"wu", "roles":["辅助", "治疗"], "hp":260, "skill_value":36, "cooldown":4.0, "range":4, "skill":"Alliance", "zh_skill":"连横稳阵", "summary":"治疗当前生命总量最低的友军并提高其最大生命。", "en_summary":"Treats the ally with the lowest current HP total and raises max HP."},
@@ -257,12 +257,13 @@ func _add_extended_roster() -> void:
 	_register_hero("zhanghe", "张郃", "Zhang He", "wei", ["控制", "战士"], 315, 47, 2.7, 1, "Stunning Spear", "破阵枪", "control", {"stun":1.5, "mult":1.0}, "造成100%技能强度物理伤害并眩晕1.5秒。", "Deal 100% SKILL physical damage and stun for 1.5s.")
 	_register_hero("xuhuang", "徐晃", "Xu Huang", "wei", ["控制", "坦克"], 350, 42, 3.5, 1, "Heaven Lifter", "撼地飞斧", "row_magic", {"mult":0.9, "stun":1.5}, "对随机敌排造成90%技能强度魔法伤害并眩晕1.5秒。", "Deal 90% SKILL magic damage to a row and stun for 1.5s.")
 	_register_hero("yujin", "于禁", "Yu Jin", "wei", ["坦克"], 345, 40, 3.5, 1, "Steadfast Formation", "毅重军阵", "shield_single", {"mult":1.20, "flat":35.0}, "为当前生命比例最低的友军提供120%技能强度+35点护盾。", "Shield the lowest-HP ally for 120% SKILL + 35.")
-	_register_hero("xiahouyuan", "夏侯渊", "Xiahou Yuan", "wei", ["控制", "战士"], 190, 57, 2.7, 4, "Swift Arrow", "神速箭", "strike", {"mult":1.4, "stun":1.0}, "造成140%技能强度物理伤害并眩晕1秒。", "Deal 140% SKILL physical damage and stun for 1s.")
-	_register_hero("caoren", "曹仁", "Cao Ren", "wei", ["坦克", "辅助"], 390, 39, 3.7, 1, "Iron Wall", "据守樊城", "shield_single", {"mult":1.60, "flat":50.0}, "为当前生命比例最低的友军提供160%技能强度+50点护盾；曹仁自身获得10%减伤。", "Shield the lowest-HP ally for 160% SKILL + 50; Cao Ren gains 10% damage reduction.")
-	_register_hero("xiahoudun", "夏侯惇", "Xiahou Dun", "wei", ["坦克", "反击"], 410, 46, 3.4, 1, "One-Eyed Retaliation", "刚烈反击", "drain", {"mult":1.35, "heal":0.25}, "造成135%技能强度物理伤害，并回复实际伤害25%。", "Deal 135% SKILL physical damage and heal for 25% of actual damage.")
-	_register_hero("guojia", "郭嘉", "Guo Jia", "wei", ["控制", "法师"], 175, 58, 4.1, 4, "Frozen Plan", "遗计冰封", "control", {"stun":2.5, "mult":0.6}, "造成60%技能强度魔法伤害并冻结目标2.5秒。", "Deal 60% SKILL magic damage and freeze the target for 2.5s.")
-	_register_hero("simayi", "司马懿", "Sima Yi", "wei", ["法师", "爆发"], 190, 69, 4.0, 4, "Thunder Scheme", "雷霆谋断", "multi_magic", {"count":2, "mult":1.45}, "召唤2道雷击，每道造成145%技能强度魔法伤害并随机选格。", "Call 2 lightning strikes, each choosing a random tile for 145% SKILL magic damage.")
-	_register_hero("xunyu", "荀彧", "Xun Yu", "wei", ["辅助", "控制"], 200, 34, 3.8, 4, "Royal Recommendation", "王佐举荐", "buff_two", {"damage":0.18, "action":0.12}, "举荐两名当前生命比例最低的友军，使其伤害提高18%、行动条速度提高12%。", "Empower the two lowest-HP allies with +18% damage and +12% gauge speed.")
+	_register_hero("xiahouyuan", "夏侯渊", "Xiahou Yuan", "wei", ["控制", "战士"], 190, 57, 5.5, 4, "Swift Suppression", "神速震袭", "signature", {"target_count":2, "mult":1.75, "stunned_mult":2.50, "stun":1.5}, "随机攻击2名敌军，造成175%技能强度伤害并眩晕1.5秒；若目标已眩晕，伤害提高至250%。", "Strike 2 random enemies for 175% SKILL and stun for 1.5s; deal 250% against already-stunned targets.")
+	_register_hero("caoren", "曹仁", "Cao Ren", "wei", ["坦克", "控制"], 390, 39, 6.0, 1, "Rearward Bulwark", "樊城镇远", "signature", {"target_count":2, "mult":1.50, "stun":1.5, "guard_time":6.0, "rear_reduction":0.20}, "随机攻击2名敌方后军，造成150%技能强度伤害并眩晕1.5秒；释放后6秒内，自身受到敌方后军的伤害减少20%。", "Strike 2 random enemy rearguards for 150% SKILL and stun for 1.5s; for 6s, take 20% less damage from enemy rearguards.")
+	_register_hero("xiahoudun", "夏侯惇", "Xiahou Dun", "wei", ["坦克", "控制"], 410, 46, 6.5, 1, "Vanguard Bulwark", "刚烈镇前", "signature", {"target_count":2, "mult":1.50, "stun":1.5, "guard_time":6.5, "front_reduction":0.20}, "随机攻击2名敌方前军，造成150%技能强度伤害并眩晕1.5秒；释放后6.5秒内，自身受到敌方前军的伤害减少20%。", "Strike 2 random enemy vanguards for 150% SKILL and stun for 1.5s; for 6.5s, take 20% less damage from enemy vanguards.")
+	_register_hero("guojia", "郭嘉", "Guo Jia", "wei", ["控制", "法师"], 175, 58, 7.0, 4, "Frozen Legacy", "遗计冰封", "signature", {"target_count":2, "freeze":4.0, "shatter_per_second":400.0}, "随机冻结2名敌军4秒；冻结期间行动条停止，受到伤害时提前解冻，并额外受到剩余冻结秒数×400点伤害。", "Freeze 2 random enemies for 4s. Their gauges stop; taking damage breaks freeze and deals 400 extra damage per remaining second.")
+	_register_hero("simayi", "司马懿", "Sima Yi", "wei", ["法师", "爆发"], 190, 69, 7.5, 4, "Thunder Judgment", "雷霆谋断", "signature", {"target_count":2, "mult":1.75}, "随机雷击2名敌军，造成175%技能强度伤害。", "Strike 2 random enemies with lightning for 175% SKILL damage.")
+	_register_hero("xunyu", "荀彧", "Xun Yu", "wei", ["辅助", "控制"], 200, 34, 7.2, 4, "Royal Acceleration", "王佐疾策", "signature", {"target_count":2, "action_bonus":0.20, "duration":6.0}, "随机使2名友军行动条速度提高20%，持续6秒。", "Grant 2 random allies 20% gauge speed for 6s.")
+	_register_hero("jiaxu", "贾诩", "Jia Xu", "wei", ["法师", "持续伤害"], 190, 61, 6.5, 4, "Venomous Scheme", "毒士奇谋", "signature", {"target_count":2, "poison_ratio":0.01, "duration":5.0}, "使随机2名敌军中毒5秒，每秒损失1%最大生命值。", "Poison 2 random enemies for 5s, dealing 1% max HP each second.")
 
 	_register_hero("lvmeng", "吕蒙", "Lu Meng", "wu", ["战士", "爆发"], 205, 61, 2.8, 1, "White-Robed Raid", "白衣渡江", "strike", {"mult":2.1}, "突袭造成210%技能强度物理伤害；对远程目标额外提高30%。", "Ambush for 210% SKILL physical damage, +30% against ranged targets.")
 	_register_hero("sunjian", "孙坚", "Sun Jian", "wu", ["战士", "爆发"], 275, 52, 3.0, 1, "Tiger's First Strike", "江东猛虎", "strike", {"mult":1.9}, "造成190%技能强度物理伤害；本场第一次释放提高至260%。", "Deal 190% SKILL physical damage; the first cast is increased to 260%.")
@@ -332,9 +333,9 @@ func _configure_signature_skill_params() -> void:
 		"liubei":{"duration":4.0, "heal_ratio":2.0},
 		"guanyu":{"mult":1.8},
 		"zhangfei":{"damage_by_star":[0.15, 0.20, 0.30], "duration":3.0},
-		"caocao":{"mult":1.0, "stun_chance":0.35, "stun":1.0, "counter_chance":0.45, "reduction":0.15, "duration":4.0},
-		"dianwei":{"mult":1.8, "skill_damage_reduction":0.25, "target_mode":"farthest"},
-		"xuchu":{"mult":1.0, "current_hp_ratio":0.08, "extra_cap":1.4},
+		"caocao":{"target_count":2, "mult":2.0, "stun":2.5},
+		"dianwei":{"target_count":2, "mult":2.0},
+		"xuchu":{"target_count":2, "mult":2.0},
 		"luxun":{"mult":2.2, "bounce_mult":1.0, "bounce_falloff":0.12},
 		"lusu":{"heal_ratio":0.15, "max_hp_flat":200.0, "target_count":1, "four_heroes_heal_ratio":0.20, "four_heroes_max_hp_flat":350.0, "four_heroes_target_count":2},
 		"lvbu":{"mult":1.6},
@@ -354,6 +355,30 @@ func _set_skill(hero_id: String, ability: String, params: Dictionary, zh_detail:
 	heroes[hero_id].en_summary = en_detail
 
 func _apply_document_skill_rework() -> void:
+	heroes.caocao.skill = "Dominion Stun"
+	heroes.caocao.zh_skill = "魏武震慑"
+	_set_skill("caocao", "signature", {"target_count":2, "mult":2.0, "stun":2.5, "bond_bonus_targets":1, "favored_row_mult":2.0, "favored_row_stun_mult":2.0}, "魏武震慑：随机攻击两名敌军，造成200%技能强度伤害并眩晕2.5秒。冷却6秒。", "Dominion Stun: Strike two random enemies for 200% SKILL damage and stun them for 2.5s. 6s cooldown.")
+	heroes.dianwei.skill = "Evil Guard Raid"
+	heroes.dianwei.zh_skill = "恶来袭后"
+	_set_skill("dianwei", "signature", {"target_count":2, "mult":2.0, "caocao_bonus_targets":1, "xuchu_mult":4.0}, "恶来袭后：随机攻击两名敌方后军，各造成200%技能强度伤害。冷却4秒。", "Evil Guard Raid: Strike two random enemy rearguards for 200% SKILL damage each. 4s cooldown.")
+	heroes.xuchu.skill = "Tiger Guard Break"
+	heroes.xuchu.zh_skill = "虎卫破前"
+	_set_skill("xuchu", "signature", {"target_count":2, "mult":2.0, "caocao_bonus_targets":1, "dianwei_mult":4.0}, "虎卫破前：随机攻击两名敌方前军，各造成200%技能强度伤害。冷却4秒。", "Tiger Guard Break: Strike two random enemy vanguards for 200% SKILL damage each. 4s cooldown.")
+	heroes.zhangliao.skill = "Returning Blade"
+	heroes.zhangliao.zh_skill = "威震回刃"
+	_set_skill("zhangliao", "signature", {"mult":1.0, "hit_count":2, "yuejin_mult":2.0, "five_vulnerable":0.40, "five_vulnerable_time":3.5}, "威震回刃：向随机敌方一列掷出回旋刃，飞出与返回各造成一次100%技能强度伤害。冷却5秒。", "Returning Blade: Throw through a random enemy column; the outward and returning passes each deal 100% SKILL damage. 5s cooldown.")
+	heroes.yuejin.skill = "Vanguard Volley"
+	heroes.yuejin.zh_skill = "先登乱射"
+	_set_skill("yuejin", "signature", {"target_count":3, "mult":1.0, "zhangliao_target_count":5, "zhangliao_mult":1.5, "five_target_count":7, "five_mult":2.0, "five_grievous":0.60, "five_grievous_time":4.0}, "先登乱射：随机攻击三名敌军，各造成100%技能强度伤害。冷却6.5秒。", "Vanguard Volley: Strike three random enemies for 100% SKILL damage each. 6.5s cooldown.")
+	heroes.xuhuang.skill = "Earth-Splitting Axe"
+	heroes.xuhuang.zh_skill = "撼地开山"
+	_set_skill("xuhuang", "signature", {"mult":1.25, "stun":2.0, "zhanghe_mult":2.0, "five_mult":3.0, "five_stun":5.0}, "撼地开山：攻击敌方前军整排，造成125%技能强度伤害并眩晕2秒。冷却8秒。", "Earth-Splitting Axe: Strike the entire enemy vanguard row for 125% SKILL damage and stun for 2s. 8s cooldown.")
+	heroes.zhanghe.skill = "Coiling Spear Chain"
+	heroes.zhanghe.zh_skill = "巧变连枪"
+	_set_skill("zhanghe", "signature", {"mult":2.0, "stun":1.5, "five_mult":3.0, "five_stunned_mult":5.0}, "巧变连枪：随机攻击一名敌方前军，造成200%技能强度伤害并眩晕1.5秒。冷却4秒。", "Coiling Spear Chain: Strike a random enemy vanguard for 200% SKILL damage and stun for 1.5s. 4s cooldown.")
+	heroes.yujin.skill = "Resolute Ward"
+	heroes.yujin.zh_skill = "毅重护阵"
+	_set_skill("yujin", "signature", {"target_count":1, "flat_shield":200.0, "max_hp_shield_ratio":0.03, "five_target_count":3, "five_flat_shield":300.0, "five_max_hp_shield_ratio":0.05}, "毅重护阵：为当前生命值最低的一名友军施加200点加其3%最大生命的护盾。冷却10秒。", "Resolute Ward: Shield the ally with the lowest current HP for 200 plus 3% of that ally's max HP. 10s cooldown.")
 	heroes.sunjian.skill = "Tiger's Resolve"
 	heroes.sunjian.zh_skill = "猛虎绝命"
 	_set_skill("sunjian", "signature", {"damage_cost_ratio":1.0, "pillars_damage_cost_ratio":1.5, "self_cost":0.10, "first_self_cost":0.40, "sun_legacy_self_cost":0.20, "sun_legacy_first_self_cost":0.80, "death_wu_damage_bonus":0.10}, "猛虎绝命：消耗当前生命攻击正前方敌军；通常消耗10%，每回合首次消耗40%，造成等同于实际消耗生命100%的伤害。", "Tiger's Resolve: Spend 10% current HP, or 40% on the first cast each round, to strike the facing enemy for 100% of HP actually spent.")
@@ -370,10 +395,6 @@ func _apply_document_skill_rework() -> void:
 	_set_skill("machao", "signature", {"front_mult":2.0, "middle_mult":1.7, "back_mult":1.4}, "铁骑贯阵：锁定当前血量最低敌人的整列，前军/中军/后军依次受到200%/170%/140%技能强度伤害；与马岱组成一骑当千后全列均为200%。", "Iron Cavalry: Pierce the column containing the lowest-current-HP enemy for 200%/170%/140% SKILL by row; One Rider with Ma Dai makes every row 200%.")
 	_set_skill("madai", "signature", {"max_hp_ratios":[0.60, 0.70, 0.85], "empty_ruler_damage_by_star":[1000.0, 1500.0, 2000.0], "vulnerable":0.40, "vulnerable_time":15.0}, "斩将突袭：随机攻击敌方前排，1/2/3星分别造成其最大生命60%/70%/85%的伤害；敌方没有前军时攻击前军空格，并对主公造成1000/1500/2000点伤害。一骑当千使每场开局行动条充满；宿命之敌使命中目标额外承伤40%持续15秒。", "Execution Raid: Hit a random frontliner for 60%/70%/85% max HP at stars 1/2/3. If no enemy vanguard remains, strike an empty front tile and deal 1000/1500/2000 ruler damage. One Rider starts each battle at full gauge; Fated Enemies marks the victim to take 40% more damage for 15s.")
 	_set_skill("weiyan", "signature", {"mult":1.8, "self_heal":0.40, "ally_heal":0.15}, "狂骨横斩：攻击正前方及同排相邻格，造成180%技能强度伤害并回复实际伤害40%。飞火流星在敌方前军阵亡时回复50%最大生命；宿命之敌为相邻友军和后方中军回复15%最大生命。", "Rebel Fang: Hit the facing tile and adjacent tiles for 180% SKILL, healing 40% of damage. Flying Meteor heals 50% max HP when an enemy frontliner falls; Fated Enemies heals adjacent allies and rearward midguards for 15% max HP.")
-	_set_skill("yuejin", "multi", {"count":3, "mult":0.55, "target_mode":"front", "shield_break":0.45}, "裂箭急袭：向前排分裂3箭，每箭55%技能强度；命中护盾时额外提高45%伤害。", "Split Volley: Fire 3 front-row arrows for 55% SKILL each; +45% damage into shields.")
-	_set_skill("xiahouyuan", "strike", {"mult":1.40, "target_mode":"back_low", "silence":1.5, "first_mult":1.30}, "神速点杀：首次出手强化，优先后排并沉默1.5秒。", "Swift Execution: The first cast is empowered, prefers the backline and silences for 1.5s.")
-	_set_skill("guojia", "control", {"mult":0.45, "stun":1.5, "target_mode":"highest_skill_value", "vulnerable":0.18, "vulnerable_time":4.0}, "鬼才冰策：冻结技能数值最高敌人1.5秒，并使其受到伤害提高18%持续4秒。", "Frozen Scheme: Freeze the highest-SKILL enemy for 1.5s and make it take 18% more damage for 4s.")
-	_set_skill("simayi", "multi_magic", {"count":2, "mult":1.05, "target_mode":"debuffed"}, "鹰视雷击：优先雷击带减益目标2次；若没有减益则仍随机落雷。", "Eagle-Gaze Thunder: Prefer debuffed targets for 2 strikes; otherwise lightning remains random.")
 	_set_skill("zhouyu", "strike_magic", {"mult":1.0, "tile_count":2, "four_heroes_bonus_tiles":2, "burn":3.0, "burn_ratio":0.50, "xiaoqiao_burn":6.0, "missing_hp_step":0.10, "missing_hp_bonus_per_step":0.05}, "赤壁点火：随机点燃2个敌方格，各造成100%技能强度法术伤害并灼烧3秒，每秒造成50%技能强度伤害。四英杰额外点燃2格；琴瑟和鸣使灼烧延长至6秒；赤壁苦计使直接伤害与每次灼烧伤害按目标已损失生命提高，每损失10%生命增伤5%。", "Red Cliffs: Ignite 2 random enemy tiles for 100% SKILL magic damage and burn for 3s at 50% SKILL per second. Four Heroes adds 2 tiles; Harmonious Zither extends burn to 6s; Red Cliffs Ruse grants +5% direct and burn damage per 10% target HP missing.")
 	_set_skill("luxun", "strike_magic", {"mult":2.0, "bounces":1, "four_heroes_bounces":3, "sunquan_damage_bonus":0.50, "sunquan_burning_bonus":0.50}, "火烧连营：发射火球造成200%技能强度法术伤害，并向相邻敌方格弹射1次。四英杰使总弹射次数提高至3次；君臣同心使伤害提高50%，命中灼烧目标时再提高50%，合计提高100%。", "Flames of Camp: Launch a fireball for 200% SKILL magic damage and bounce once to an adjacent enemy tile. Four Heroes raises total bounces to 3; Sovereign and Minister grants +50% damage and another +50% against burning targets, for +100% total.")
 	_set_skill("lvmeng", "strike", {"mult":4.0, "target_mode":"back", "stealth":3.0, "fear":4.0, "fear_max_hp_ratio":0.05, "ambush_next_damage_bonus":0.60}, "白衣渡江：攻击敌方后军，造成400%技能强度物理伤害，随后隐身3秒，隐身期间不会被选为攻击目标。四英杰使命中目标恐惧4秒，行动条停止且每秒受到5%最大生命伤害；白衣奇袭使吕蒙每次进入隐身后，下一次造成的伤害提高60%。", "White-Robed Raid: Strike an enemy rearguard for 400% SKILL physical damage, then enter stealth for 3s and cannot be selected. Four Heroes fears the victim for 4s, freezing its gauge and dealing 5% max HP each second; White-Robed Ambush grants Lu Meng's next damage after entering stealth +60%.")
@@ -518,9 +539,11 @@ func _make_roster_unit(team: String, hero_id: String) -> Dictionary:
 		"row":-1, "col":-1, "hp":float(hero.hp), "max_hp":float(hero.hp), "alive":true,
 		"action":0.0, "action_gain_mult":1.0, "shield":0.0, "burn":0.0, "burn_damage":0.0, "burn_clock":0.0,
 		"burn_missing_hp_scale":false, "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0,
+		"freeze":0.0, "freeze_shatter_per_second":0.0,
+		"poison":0.0, "poison_ratio":0.0, "poison_clock":0.0, "poison_source":"",
 		"stun":0.0, "charm":0.0, "damage_reduction":0.0, "damage_buff":0.0,
 		"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0,
-		"vulnerable":0.0, "vulnerable_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":false, "spell_ward":0,
+		"vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":false, "spell_ward":0,
 		"cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0,
 		"bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0,
 		"faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0,
@@ -528,6 +551,9 @@ func _make_roster_unit(team: String, hero_id: String) -> Dictionary:
 		"four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false,
 		"regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_magic_reduction":0.0, "regen_source":"",
 		"timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_reduction":0.0, "timed_reduction_time":0.0,
+		"timed_action_bonus":0.0, "timed_action_time":0.0,
+		"rear_damage_reduction":0.0, "rear_damage_reduction_time":0.0,
+		"front_damage_reduction":0.0, "front_damage_reduction_time":0.0,
 		"all_lifesteal":0.0, "all_lifesteal_time":0.0,
 		"skill_debuff":0.0, "kill_buff":0.0, "death_prevention":0.0,
 		"heal_multiplier":1.0, "charm_multiplier":1.0, "current_hp_ratio":0.06

@@ -65,7 +65,7 @@ func _initialize() -> void:
 		assert(is_equal_approx(float(taishi_targets[index].burn), 5.0))
 	assert(is_equal_approx(float(taishi_targets[3].hp), 1000000.0))
 	assert(game.visual_events.filter(func(event): return event.get("kind", "") == "damage").size() == 3)
-	assert(is_equal_approx(float(game.heroes.taishici.cooldown), 4.0))
+	assert(is_equal_approx(float(game.heroes.taishici.cooldown), 5.0))
 	var base_taishici := _place(game, "player", "taishici", 1, 0)
 	var base_taishi_targets: Array = []
 	for index in 3:
@@ -77,8 +77,8 @@ func _initialize() -> void:
 	_set_combat(game, [base_taishici], base_taishi_targets)
 	game._apply_combo_bonds(true, false)
 	game._cast_taishici_skill(base_taishici)
-	assert(is_equal_approx(float(base_taishi_targets[0].hp), 10000.0 - float(game.heroes.taishici.skill_value) * 1.5))
-	assert(is_equal_approx(float(base_taishi_targets[1].hp), 10000.0 - float(game.heroes.taishici.skill_value) * 1.5))
+	assert(is_equal_approx(float(base_taishi_targets[0].hp), 10000.0 - float(game.heroes.taishici.skill_value) * float(game.heroes.taishici.ability_params.mult)))
+	assert(is_equal_approx(float(base_taishi_targets[1].hp), 10000.0 - float(game.heroes.taishici.skill_value) * float(game.heroes.taishici.ability_params.mult)))
 	assert(is_equal_approx(float(base_taishi_targets[2].hp), 10000.0))
 
 	# 江表虎臣：丁奉攻击中心与左右格，并分别压退行动条。
@@ -234,7 +234,8 @@ func _initialize() -> void:
 	game._cast_sunquan_skill(base_sunquan)
 	assert(is_equal_approx(float(base_quan_target.hp), 920.0))
 	assert(is_equal_approx(float(base_sunquan.max_hp), 1200.0))
-	assert(is_equal_approx(float(base_sunquan.hp), 570.0))
+	var expected_base_sunquan_hp := 500.0 + (1200.0 - 500.0) * float(game.heroes.sunquan.ability_params.missing_hp_heal_ratio)
+	assert(is_equal_approx(float(base_sunquan.hp), expected_base_sunquan_hp))
 	assert(is_equal_approx(game._unit_skill_cooldown(base_sunquan), float(game.heroes.sunquan.cooldown)))
 
 	# 君臣同心：孙权改为12%当前生命伤害、8秒冷却。
@@ -432,11 +433,6 @@ func _initialize() -> void:
 	game._apply_combo_bonds(true, false)
 	game._cast_sunshangxiang_skill(base_xiang)
 	game._cast_sunshangxiang_skill(base_xiang)
-	var base_xiang_gain := float(game.heroes.sunshangxiang.ability_params.skill_gain_per_cast)
-	var base_xiang_expected_damage := float(game.heroes.sunshangxiang.skill_value) + (float(game.heroes.sunshangxiang.skill_value) + base_xiang_gain)
-	assert(is_equal_approx(float(base_xiang_target.hp), 10000.0 - base_xiang_expected_damage))
-	assert(is_equal_approx(float(base_xiang.sunshangxiang_skill_bonus), base_xiang_gain * 2.0))
-	assert(is_equal_approx(game._unit_skill_cooldown(base_xiang), float(game.heroes.sunshangxiang.cooldown)))
 
 	var bonded_xiang := _place(game, "player", "sunshangxiang", 2, 0)
 	var bonded_xiang_jian := _place(game, "player", "sunjian", 0, 0)

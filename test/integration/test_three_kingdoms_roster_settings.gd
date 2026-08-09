@@ -4,14 +4,14 @@ func _initialize() -> void:
 	var game = load("res://ThreeKingdom/ThreeKingdom.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
-	assert(game.heroes.size() == 58)
-	var faction_sizes := {"shu":15, "wei":14, "wu":15, "qun":14}
+	assert(game.heroes.size() == 59)
+	var faction_sizes := {"shu":15, "wei":15, "wu":15, "qun":14}
 	for faction in faction_sizes:
 		assert(game.heroes.values().filter(func(hero): return hero.f == faction).size() == faction_sizes[faction])
 	assert(game._portrait_texture("zhaoyun") != null)
 	assert(game._portrait_source_texture("dailaidongzhu").resource_path.ends_with("/pic/dailaidongzhu.png"))
 	assert(game.heroes.dailaidongzhu.zh_skill == "蛮骨狼袭")
-	assert(game.heroes.dailaidongzhu.cooldown == 8.0)
+	assert(game.heroes.dailaidongzhu.cooldown == 7.0)
 	game.pause_during_actions = true
 	game._toggle_pause_setting()
 	assert(not game.pause_during_actions)
