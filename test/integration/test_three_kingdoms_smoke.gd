@@ -19,7 +19,7 @@ func _initialize() -> void:
 	game._toggle_language()
 	assert(game.language == "en")
 	game._toggle_language()
-	assert(game.choices.size() == 2)
+	assert(game.choices.size() == 3)
 	game._choose_hero(game.choices[0])
 	assert(game.phase == "draft")
 	assert(game.draft_picks_remaining == 2)
@@ -27,20 +27,20 @@ func _initialize() -> void:
 	game._choose_hero(game.choices[0])
 	assert(game.phase == "placement")
 	assert(game.player_units.size() == 3)
-	assert(game.enemy_units.size() == 2)
+	assert(game.enemy_units.size() == 3)
 	game.auto_button.emit_signal("pressed")
 	assert(game._can_start_battle())
 	game.battle_button.emit_signal("pressed")
 	game.tick_timer.stop()
 	for unit in game.combat_units: unit.stun = 999.0
-	game.battle_time = 29.8
+	game.battle_time = 299.8
 	game._battle_tick()
 	assert(game.phase == "draft")
 	assert(game.round_number == 2)
 	assert(game.ROUND_LIMIT == 15)
 	assert(game.player_units.size() == 3)
-	assert(game.enemy_units.size() == 4)
-	assert(game.choices.size() == 2)
+	assert(game.enemy_units.size() == 6)
+	assert(game.choices.size() == 3)
 	assert(game.draft_picks_remaining == 3)
 	game.round_number = 15
 	game.phase = "combat"

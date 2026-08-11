@@ -6,7 +6,13 @@ func _initialize() -> void:
 	await process_frame
 	game.tick_timer.stop()
 	assert(is_instance_valid(game.balance_lab_overlay))
-	assert(game.balance_editor_hero_list.item_count == 59)
+	assert(game.balance_editor_hero_list.item_count == 60)
+	assert(is_instance_valid(game.balance_editor_hero_detail))
+	assert(is_instance_valid(game.balance_editor_scroll))
+	assert(game.balance_editor_hero_detail.text.contains("SKILL") or game.balance_editor_hero_detail.text.contains("技能"))
+	assert(is_instance_valid(game.balance_github_token) and game.balance_github_token.secret)
+	assert(is_instance_valid(game.balance_github_gist_id))
+	assert(game.BALANCE_GITHUB_GIST_FILENAME == "hero_balance_overrides.json")
 	assert(game.lab_player_board.get_child_count() == 15)
 	assert(game.lab_enemy_board.get_child_count() == 15)
 	assert(int(game.lab_player_board.get_child(0).board_row) == 0)
@@ -52,18 +58,16 @@ func _initialize() -> void:
 			assert(game.balance_editor_cooldown.value == float(cooldown_case[1]))
 			break
 
-	# Quick lineup editing filters by faction, auto-places, and updates duplicates.
+	# Quick lineup editing filters by faction and keeps duplicate heroes independent.
 	game.lab_player_lineup.clear()
 	game.lab_player_faction.select(1) # Shu
 	game._refresh_lab_hero_option(true)
 	assert(game.lab_player_hero.item_count == 15)
-	game.lab_player_star.select(2)
 	game._add_lab_unit(true)
 	assert(game.lab_player_lineup.size() == 1)
-	assert(game.lab_player_lineup[0].level == 3)
-	game.lab_player_star.select(0)
+	assert(game.lab_player_lineup[0].level == 1)
 	game._add_lab_unit(true)
-	assert(game.lab_player_lineup.size() == 1)
+	assert(game.lab_player_lineup.size() == 2)
 	assert(game.lab_player_lineup[0].level == 1)
 	assert(game.lab_player_lineup[0].row in game._preferred_lab_rows(game.lab_player_lineup[0].hero_id))
 	var original_row: int = game.lab_player_lineup[0].row
@@ -82,7 +86,7 @@ func _initialize() -> void:
 	assert(game.heroes.xusheng.skill_value == 77)
 	assert(game.heroes.xusheng.cooldown == 0.0)
 	assert(game.balance_editor_cooldown.min_value == game._minimum_skill_cooldown(game.balance_editor_selected_id))
-	assert(game.heroes.xusheng.ability_params.base_value == round(77.0 * float(params.mult)))
+	assert(game.heroes.xusheng.ability_params.base_value == round(float(game.heroes.xusheng.skill_output_base) * float(params.mult)))
 	game.heroes.xusheng = old_hero
 
 	# Signature heroes expose their real multipliers and mechanics through the same JSON editor.
@@ -101,7 +105,7 @@ func _initialize() -> void:
 	game.combat_units = [signature_actor, signature_target]
 	var target_hp_before := float(signature_target.hp)
 	game._cast_dianwei_skill(signature_actor)
-	assert(is_equal_approx(target_hp_before - float(signature_target.hp), 80.0 * 2.25))
+	assert(is_equal_approx(target_hp_before - float(signature_target.hp), float(game.heroes.dianwei.skill_output_base) * 0.80 * 2.25))
 	game.heroes.dianwei = old_dianwei
 
 	# Live battle uses the selected formation, locks deployment, supports speed,
@@ -121,8 +125,8 @@ func _initialize() -> void:
 	assert(is_instance_valid(game.lab_live_pause_button))
 	assert(game.lab_live_pause_button.text == "暂停" or game.lab_live_pause_button.text == "PAUSE")
 	assert(game.player_units.size() == 1 and game.enemy_units.size() == 1)
-	assert(game.player_units[0].hero_id == "guanyu" and game.player_units[0].level == 2)
-	assert(game.enemy_units[0].hero_id == "caocao" and game.enemy_units[0].level == 3)
+	assert(game.player_units[0].hero_id == "guanyu" and game.player_units[0].level == 1)
+	assert(game.enemy_units[0].hero_id == "caocao" and game.enemy_units[0].level == 1)
 	var enemy_front_live_cell: Control = game.tile_cell_refs["enemy:0:3"]
 	assert(enemy_front_live_cell == game.enemy_board.get_child((game.BOARD_ROWS - 1) * game.BOARD_COLUMNS + 3))
 	assert(game.player_board.get_child(0).disabled)
@@ -165,7 +169,7 @@ func _initialize() -> void:
 	assert(JSON.stringify(game.player_units) == saved_player_units)
 	assert(JSON.stringify(game.enemy_units) == saved_enemy_units)
 
-	# Fast battle uses real combat stats and accepts explicit stars/positions.
+	# Fast battle accepts legacy level fields but normalizes every unit to level 1.
 	var player := [{"hero_id":"guanyu", "level":2, "row":0, "col":0}]
 	var enemy := [{"hero_id":"caocao", "level":1, "row":0, "col":0}]
 	var result: Dictionary = game._simulate_fast_battle(player, enemy, 20260723)

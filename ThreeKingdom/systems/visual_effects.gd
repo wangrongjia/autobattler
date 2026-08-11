@@ -15,11 +15,38 @@ func _play_visual_events(events: Array) -> void:
 				if not str(candidate.get("group_style", "")).is_empty():
 					group_style = str(candidate.group_style)
 					break
-			if group_style in ["row_burn", "tile_burn", "burn_tick", "fireball_chain"] or grouped_events.any(func(candidate): return str(candidate.get("kind", "")) in ["damage", "empty"]):
+			if group_style == "simultaneous":
+				processed_groups[visual_group] = true
+				await _play_grouped_auxiliary(grouped_events)
+				continue
+			if group_style in ["row_burn", "tile_burn", "burn_tick", "poison_tick", "poison_apply", "weak_apply", "fear_tick", "fireball_chain"] or grouped_events.any(func(candidate): return str(candidate.get("kind", "")) in ["damage", "empty"]):
 				processed_groups[visual_group] = true
 				await _play_grouped_damage(grouped_events)
 				continue
 		await _play_single_visual_event(event)
+
+func _play_grouped_auxiliary(grouped_events: Array) -> void:
+	var speed_scale := 1.0 / game_speed
+	var last_tween: Tween
+	for event in grouped_events:
+		var target: Control = unit_cell_refs.get(str(event.get("target_id", "")))
+		if not is_instance_valid(target): continue
+		var kind := str(event.get("kind", ""))
+		if kind in ["heal", "regen", "regen_apply"]:
+			var healed_unit = _find_by_id(combat_units, str(event.get("target_id", "")))
+			var health_bar: ProgressBar = health_bar_refs.get(str(event.get("target_id", "")))
+			if healed_unit != null and is_instance_valid(health_bar): health_bar.value = float(healed_unit.hp)
+			_floating_text(target, "+" + str(event.get("amount", 0)), Color("#77ff9c"))
+			last_tween = create_tween()
+			last_tween.tween_property(target, "modulate", Color("#77ff9c"), 0.10 * speed_scale)
+			last_tween.tween_property(target, "modulate", Color.WHITE, 0.18 * speed_scale)
+		elif kind == "skill":
+			last_tween = create_tween()
+			last_tween.tween_property(target, "scale", Vector2(1.10, 1.10), 0.10 * speed_scale)
+			last_tween.parallel().tween_property(target, "modulate", Color("#d58dff"), 0.10 * speed_scale)
+			last_tween.tween_property(target, "scale", Vector2.ONE, 0.16 * speed_scale)
+			last_tween.parallel().tween_property(target, "modulate", Color.WHITE, 0.16 * speed_scale)
+	if last_tween != null: await last_tween.finished
 
 func _play_single_visual_event(event: Dictionary) -> void:
 	var actor: Control = unit_cell_refs.get(event.get("source_id", ""))
@@ -77,7 +104,7 @@ func _play_single_visual_event(event: Dictionary) -> void:
 
 func _play_grouped_damage(grouped_events: Array) -> void:
 	var damage_events: Array = grouped_events.filter(func(event): return event.get("kind", "") == "damage")
-	var impact_events: Array = grouped_events.filter(func(event): return str(event.get("kind", "")) in ["damage", "empty"])
+	var impact_events: Array = grouped_events.filter(func(event): return str(event.get("kind", "")) in ["damage", "empty", "skill"])
 	var group_style := ""
 	for event in grouped_events:
 		if not str(event.get("group_style", "")).is_empty():
@@ -92,7 +119,7 @@ func _play_grouped_damage(grouped_events: Array) -> void:
 	var targets: Array = []
 	for event in impact_events:
 		var target: Control
-		if event.get("kind", "") == "damage":
+		if event.get("kind", "") in ["damage", "skill"]:
 			target = unit_cell_refs.get(event.get("target_id", ""))
 		else:
 			target = tile_cell_refs.get(str(event.team) + ":" + str(event.row) + ":" + str(event.col))
@@ -101,6 +128,8 @@ func _play_grouped_damage(grouped_events: Array) -> void:
 	var custom_impacts := false
 	if group_style in ["row_burn", "tile_burn", "burn_tick"]:
 		await _play_grouped_burn(grouped_events, speed_scale)
+	elif group_style in ["poison_tick", "poison_apply", "weak_apply", "fear_tick"]:
+		await _play_grouped_status_flare(grouped_events, speed_scale, group_style)
 	elif group_style == "fireball_chain" and is_instance_valid(actor):
 		await _play_fireball_chain(actor, impact_events, speed_scale)
 	elif group_style == "spear_rapid" and is_instance_valid(actor) and not targets.is_empty():
@@ -144,6 +173,33 @@ func _play_grouped_damage(grouped_events: Array) -> void:
 		if not is_instance_valid(target): continue
 		last_death_tween = _start_death_ghost(target, str(event.get("target_id", "")), speed_scale)
 	if last_death_tween != null: await last_death_tween.finished
+
+func _play_grouped_status_flare(grouped_events: Array, speed_scale: float, group_style: String) -> void:
+	var is_poison := group_style in ["poison_tick", "poison_apply"]
+	var icon_path := "res://ThreeKingdom/animations/poisoning.png" if is_poison else "res://ThreeKingdom/animations/weak.png"
+	var tint := Color("#63e67a") if is_poison else Color("#c9b8d8")
+	var last_tween: Tween
+	for event in grouped_events:
+		if str(event.get("kind", "")) not in ["damage", "skill"]: continue
+		var target: Control = unit_cell_refs.get(str(event.get("target_id", "")))
+		if not is_instance_valid(target): continue
+		var icon := TextureRect.new()
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.z_index = 150
+		icon.texture = load(icon_path)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.size = Vector2(34, 34)
+		icon.position = Vector2(target.size.x * 0.5 - 17.0, target.size.y * 0.5 - 17.0)
+		icon.pivot_offset = icon.size * 0.5
+		target.add_child(icon)
+		last_tween = create_tween()
+		last_tween.tween_property(icon, "scale", Vector2(1.35, 1.35), 0.10 * speed_scale).set_trans(Tween.TRANS_BACK)
+		last_tween.parallel().tween_property(target, "modulate", tint, 0.10 * speed_scale)
+		last_tween.tween_property(icon, "modulate:a", 0.0, 0.18 * speed_scale)
+		last_tween.parallel().tween_property(target, "modulate", Color.WHITE, 0.18 * speed_scale)
+		last_tween.tween_callback(icon.queue_free)
+	if last_tween != null: await last_tween.finished
 
 func _play_column_spear_thrust(actor: Control, targets: Array, profile: Dictionary, speed_scale: float) -> void:
 	if not is_instance_valid(actor) or targets.is_empty(): return
@@ -583,7 +639,7 @@ void fragment() {
 	return fire_effect_cutout_material
 
 func _hero_fx(hero_id: String) -> Dictionary:
-	var glyphs := {"liubei":"仁", "guanyu":"龍", "zhangfei":"吼", "zhaoyun":"胆", "huangzhong":"穿", "machao":"骑", "liushan":"汉", "zhugeliang":"卦", "jiangwei":"伐", "menghuo":"蛮", "zhurong":"焰", "dailaidongzhu":"兽", "weiyan":"骨", "madai":"羽", "pangtong":"链", "caocao":"魏", "dianwei":"戟", "xuchu":"锤", "zhangliao":"威", "yuejin":"矢", "zhanghe":"变", "xuhuang":"斧", "yujin":"阵", "xiahouyuan":"速", "caoren":"城", "xiahoudun":"烈", "guojia":"冰", "simayi":"雷", "xunyu":"佐", "jiaxu":"毒", "zhouyu":"赤", "luxun":"炎", "lusu":"盟", "lvmeng":"袭", "sunjian":"虎", "sunce":"霸", "sunquan":"衡", "sunshangxiang":"弩", "daqiao":"花", "xiaoqiao":"风", "taishici":"义", "dingfeng":"雪", "xusheng":"潮", "ganning":"锦", "huanggai":"苦", "lvbu":"无", "diaochan":"魅", "dongzhuo":"暴", "gaoshun":"陷", "chengong":"谋", "yanliang":"猛", "wenchou":"返", "qunzhanghe":"幕", "gaolan":"策", "huatuo":"医", "yuji":"妖", "zhangjiao":"黄", "yuanshao":"盟", "yuanshu":"帝"}
+	var glyphs := {"liubei":"仁", "guanyu":"龍", "zhangfei":"吼", "zhaoyun":"胆", "huangzhong":"穿", "machao":"骑", "liushan":"汉", "zhugeliang":"卦", "jiangwei":"伐", "menghuo":"蛮", "zhurong":"焰", "dailaidongzhu":"兽", "weiyan":"骨", "madai":"羽", "pangtong":"链", "caocao":"魏", "dianwei":"戟", "xuchu":"锤", "zhangliao":"威", "yuejin":"矢", "zhanghe":"变", "xuhuang":"斧", "yujin":"阵", "xiahouyuan":"速", "caoren":"城", "xiahoudun":"烈", "guojia":"冰", "simayi":"雷", "xunyu":"佐", "jiaxu":"毒", "zhouyu":"赤", "luxun":"炎", "lusu":"盟", "lvmeng":"袭", "sunjian":"虎", "sunce":"霸", "sunquan":"衡", "sunshangxiang":"弩", "daqiao":"花", "xiaoqiao":"风", "taishici":"义", "dingfeng":"雪", "xusheng":"潮", "ganning":"锦", "huanggai":"苦", "lvbu":"无", "diaochan":"魅", "dongzhuo":"暴", "gaoshun":"陷", "chengong":"谋", "yanliang":"猛", "wenchou":"返", "qunzhanghe":"幕", "gaolan":"策", "huatuo":"医", "yuji":"毒", "zuoci":"仙", "zhangjiao":"雷", "zhangliang":"弱", "zhangbao":"爆"}
 	var weapons := {
 		"liubei":"双股剑", "guanyu":"青龙偃月刀", "zhangfei":"丈八蛇矛", "zhaoyun":"龙胆亮银枪", "huangzhong":"落日弓",
 		"machao":"虎头湛金枪", "weiyan":"鬼头刀", "madai":"斩马刀", "liushan":"细剑", "zhugeliang":"七星卧龙扇",
@@ -609,7 +665,7 @@ func _hero_fx(hero_id: String) -> Dictionary:
 		"zhurong":"res://ThreeKingdom/weapon/huofenglieyanren.png",
 		"dailaidongzhu":"res://ThreeKingdom/weapon/mangulangyabang.png"
 	}
-	var arrows := ["huangzhong", "madai", "yuejin", "xiahouyuan", "sunshangxiang", "taishici", "chengong", "yuanshao"]
+	var arrows := ["huangzhong", "madai", "yuejin", "xiahouyuan", "sunshangxiang", "taishici", "chengong"]
 	var hammers := ["zhangfei", "xuchu", "xuhuang", "menghuo", "dailaidongzhu", "dongzhuo", "huanggai"]
 	var spears := ["zhaoyun", "machao", "jiangwei", "dianwei", "zhangliao", "zhanghe", "lvmeng", "ganning", "gaoshun", "yanliang"]
 	var element := "blade"
@@ -617,10 +673,11 @@ func _hero_fx(hero_id: String) -> Dictionary:
 	elif hammers.has(hero_id): element = "hammer"
 	elif spears.has(hero_id): element = "spear"
 	elif hero_id in ["zhouyu", "luxun", "zhurong"]: element = "fire"
-	elif hero_id in ["simayi", "zhangjiao", "yuji"]: element = "lightning"
+	elif hero_id in ["simayi", "zhangjiao", "zuoci", "zhangbao"]: element = "lightning"
 	elif hero_id in ["guojia", "xiaoqiao"]: element = "frost"
 	elif hero_id in ["liubei", "lusu", "daqiao", "huatuo"]: element = "heal"
-	elif hero_id in ["zhugeliang", "pangtong", "xunyu", "jiaxu", "diaochan", "gaolan", "yuanshu"]: element = "arcane"
+	elif hero_id in ["yuji", "zhangliang"]: element = "arcane"
+	elif hero_id in ["zhugeliang", "pangtong", "xunyu", "jiaxu", "diaochan", "gaolan"]: element = "arcane"
 	var faction := str(heroes.get(hero_id, {}).get("f", "qun"))
 	var base: Color = FACTION_COLORS.get(faction, Color("#d8b060")).lightened(0.20)
 	var hue := fmod(abs(float(hash(hero_id))) / 997.0, 1.0)

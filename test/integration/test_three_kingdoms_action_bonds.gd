@@ -59,9 +59,12 @@ func _initialize() -> void:
 	var qun := _build_team(game, ["lvbu", "diaochan", "dongzhuo"])
 	game.combat_units = qun
 	game._apply_combo_bonds()
-	assert(qun[0].ghost_bond)
-	assert(qun[1].charm_multiplier == 1.5)
-	assert(qun[2].current_hp_ratio == 0.12)
+	assert(not qun[0].ghost_bond)
+	assert(qun[1].charm_multiplier == 1.0)
+	assert(is_equal_approx(float(qun[2].max_hp), float(game.heroes.dongzhuo.hp) * 1.50))
+	var dongzhuo_bond_hp := float(qun[2].max_hp)
+	game._apply_combo_bonds()
+	assert(is_equal_approx(float(qun[2].max_hp), dongzhuo_bond_hp))
 
 	# Five Tigers accelerates every allied vanguard/midguard by 15%.
 	var five_tigers := _build_team(game, ["guanyu", "zhangfei", "zhaoyun", "huangzhong", "machao"])
@@ -93,7 +96,7 @@ func _initialize() -> void:
 	game._cast_guanyu_skill(base_guanyu)
 	var base_guanyu_hits: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(base_guanyu_hits.size() == game.BOARD_ROWS)
-	assert(base_guanyu_hits.all(func(event): return int(event.amount) == roundi(float(game.heroes.guanyu.skill_value) * 1.80)))
+	assert(base_guanyu_hits.all(func(event): return int(event.amount) == roundi(game._unit_skill_output_base(base_guanyu) * 1.80)))
 
 	var five_only_team := _build_team(game, ["guanyu", "zhangfei", "zhaoyun", "huangzhong", "machao"])
 	var five_guanyu: Dictionary = five_only_team.filter(func(unit): return unit.hero_id == "guanyu")[0]
@@ -102,7 +105,7 @@ func _initialize() -> void:
 	game._cast_guanyu_skill(five_guanyu)
 	var five_guanyu_hits: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(five_guanyu_hits.size() == game.BOARD_ROWS)
-	assert(five_guanyu_hits.all(func(event): return int(event.amount) == roundi(float(game.heroes.guanyu.skill_value) * 3.0)))
+	assert(five_guanyu_hits.all(func(event): return int(event.amount) == roundi(game._unit_skill_output_base(five_guanyu) * 3.0)))
 
 	# Peach Garden keeps the 180% cleave and heals Guan Yu for 30% of actual damage.
 	var peach_only_team := _build_team(game, ["liubei", "guanyu", "zhangfei"])
@@ -122,7 +125,7 @@ func _initialize() -> void:
 		peach_targets_hp_after += float(target.hp)
 	var peach_guanyu_damage: float = peach_targets_hp_before - peach_targets_hp_after
 	assert(peach_guanyu_hits.size() == game.BOARD_ROWS)
-	assert(peach_guanyu_hits.all(func(event): return int(event.amount) == roundi(float(game.heroes.guanyu.skill_value) * 1.80)))
+	assert(peach_guanyu_hits.all(func(event): return int(event.amount) == roundi(game._unit_skill_output_base(peach_guanyu) * 1.80)))
 	assert(is_equal_approx(peach_guanyu.hp - peach_guanyu_hp_before, peach_guanyu_damage * 0.30))
 
 	# Zhao Yun uses one target for five rapid spear thrusts.
@@ -140,7 +143,7 @@ func _initialize() -> void:
 	var base_zhao_hits: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(base_zhao_hits.size() == 5)
 	assert(base_zhao_hits.all(func(event): return event.target_id == base_zhao_target.id and event.group_style == "spear_rapid"))
-	assert(base_zhao_hits.all(func(event): return int(event.amount) == roundi(float(game.heroes.zhaoyun.skill_value) * 0.50)))
+	assert(base_zhao_hits.all(func(event): return int(event.amount) == roundi(game._unit_skill_output_base(base_zhao) * 0.50)))
 
 	# Normal Zhao Yun randomly locks one reachable target instead of secretly prioritizing lowest HP.
 	var random_targets: Array = []
@@ -179,7 +182,7 @@ func _initialize() -> void:
 	assert(five_zhao_hits.size() == 5)
 	var five_zhao_mults := [0.50, 0.70, 0.90, 1.10, 1.30]
 	for index in five_zhao_hits.size():
-		assert(int(five_zhao_hits[index].amount) == roundi(float(game.heroes.zhaoyun.skill_value) * float(five_zhao_mults[index])))
+		assert(int(five_zhao_hits[index].amount) == roundi(game._unit_skill_output_base(five_zhao) * float(five_zhao_mults[index])))
 
 	# Seven Charges alone overrides range, forces the rear target, and strikes 7 times at 50%.
 	var seven_zhao: Dictionary = game._make_roster_unit("player", "zhaoyun")
@@ -203,7 +206,7 @@ func _initialize() -> void:
 	var seven_zhao_hits: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(seven_zhao_hits.size() == 7)
 	assert(seven_zhao_hits.all(func(event): return event.target_id == forced_rear.id and int(event.rapid_hits) == 7))
-	assert(seven_zhao_hits.all(func(event): return int(event.amount) == roundi(float(game.heroes.zhaoyun.skill_value) * 0.50)))
+	assert(seven_zhao_hits.all(func(event): return int(event.amount) == roundi(game._unit_skill_output_base(seven_zhao) * 0.50)))
 	assert(tempting_front.hp == 1.0)
 
 	# Liu Shan's side of Seven Charges grants the empowered ally 30% omnivamp for 4 seconds.
@@ -246,7 +249,7 @@ func _initialize() -> void:
 	assert(both_zhao_hits.size() == 7)
 	assert(both_zhao_hits.all(func(event): return event.target_id == both_rear.id and int(event.rapid_hits) == 7))
 	for index in both_zhao_hits.size():
-		assert(int(both_zhao_hits[index].amount) == roundi(float(game.heroes.zhaoyun.skill_value) * float(both_zhao_mults[index])))
+		assert(int(both_zhao_hits[index].amount) == roundi(game._unit_skill_output_base(five_zhao) * float(both_zhao_mults[index])))
 
 	# Ma Chao targets the lowest-current-HP enemy's column and pierces 200/170/140%.
 	var machao: Dictionary = game._make_roster_unit("player", "machao")
@@ -270,7 +273,7 @@ func _initialize() -> void:
 	game._cast_machao_pierce(machao)
 	var machao_mults := [2.0, 1.7, 1.4]
 	for row in 3:
-		assert(is_equal_approx(float(machao_hp_before[row]) - float(machao_targets[row].hp), float(game.heroes.machao.skill_value) * float(machao_mults[row])))
+		assert(is_equal_approx(float(machao_hp_before[row]) - float(machao_targets[row].hp), game._unit_skill_output_base(machao) * float(machao_mults[row])))
 	assert(other_target.hp == 85000.0)
 	assert(game.visual_events.filter(func(event): return str(event.get("visual_group", "")).begins_with("machao_column:")).all(func(event): return str(event.get("group_style", "")) == "spear_column"))
 
@@ -286,10 +289,9 @@ func _initialize() -> void:
 	machao_hp_before = machao_targets.map(func(target): return float(target.hp))
 	game._cast_machao_pierce(machao)
 	for row in 3:
-		assert(is_equal_approx(float(machao_hp_before[row]) - float(machao_targets[row].hp), float(game.heroes.machao.skill_value) * 2.0))
+		assert(is_equal_approx(float(machao_hp_before[row]) - float(machao_targets[row].hp), game._unit_skill_output_base(machao) * 2.0))
 
-	# Ma Dai's max-HP damage scales by star: 60% / 70% / 85%.
-	var madai_ratios := [0.60, 0.70, 0.85]
+	# Legacy level fields do not change Ma Dai's fixed level-1 baseline.
 	for level in [1, 2, 3]:
 		var star_madai: Dictionary = game._make_roster_unit("player", "madai")
 		star_madai.level = level
@@ -301,7 +303,7 @@ func _initialize() -> void:
 		star_target.hp = star_target.max_hp
 		game.combat_units = [star_madai, star_target]
 		game._cast_madai_execution(star_madai)
-		assert(is_equal_approx(float(star_target.hp), 100000.0 * (1.0 - float(madai_ratios[level - 1]))))
+		assert(is_equal_approx(float(star_target.hp), 60000.0))
 
 	# Fated Enemies still marks Ma Dai's victim for 15 seconds.
 	var weiyan: Dictionary = game._make_roster_unit("player", "weiyan")
@@ -315,7 +317,7 @@ func _initialize() -> void:
 	game.combat_units = [madai, weiyan, madai_target]
 	game._apply_combo_bonds(true, false)
 	game._cast_madai_execution(madai)
-	assert(is_equal_approx(madai_target.hp, 40000.0))
+	assert(is_equal_approx(madai_target.hp, 60000.0))
 	assert(is_equal_approx(madai_target.vulnerable, 0.40))
 	assert(is_equal_approx(madai_target.vulnerable_time, 15.0))
 
@@ -343,7 +345,7 @@ func _initialize() -> void:
 	var adjacent_hp_before := float(adjacent.hp)
 	var rearward_hp_before := float(rearward_midguard.hp)
 	game._cast_weiyan_cleave(weiyan)
-	var cleave_damage := float(game.heroes.weiyan.skill_value) * 1.8
+	var cleave_damage: float = game._unit_skill_output_base(weiyan) * 1.8
 	for target in cleave_targets:
 		assert(is_equal_approx(100000.0 - float(target.hp), cleave_damage))
 	assert(is_equal_approx(float(weiyan.hp) - weiyan_hp_before, cleave_damage * 3.0 * 0.40))
@@ -375,7 +377,7 @@ func _initialize() -> void:
 	game._cast_huangzhong_skill(huangzhong)
 	var huangzhong_critical_hits: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(huangzhong_critical_hits.size() == 1)
-	assert(int(huangzhong_critical_hits[0].amount) == roundi(float(game.heroes.huangzhong.skill_value) * 2.0 * 2.0))
+	assert(int(huangzhong_critical_hits[0].amount) == roundi(game._unit_skill_output_base(huangzhong) * 2.0 * 2.0))
 
 	# Flying Meteor separately heals Wei Yan when an enemy frontliner dies.
 	var doomed_front: Dictionary = game._make_roster_unit("enemy", "caocao")
@@ -394,13 +396,12 @@ func _initialize() -> void:
 	for _i in 4:
 		copies.append(game._make_roster_unit("player", "guanyu"))
 		game._try_upgrade(copies, "guanyu")
-	assert(copies.size() == 1)
-	assert(copies[0].level == 3)
-	assert(copies[0].stat_mult == 2.25)
+	assert(copies.size() == 4)
+	assert(copies.all(func(unit): return int(unit.level) == 1 and float(unit.stat_mult) == 1.0))
 	var healer: Dictionary = game._make_roster_unit("player", "liubei")
 	game.combat_units = [healer]
 	game.player_ruler_hp = 4000
-	game._heal_weakest_fixed(healer, float(game.heroes.liubei.skill_value) * 1.8, 0.20)
+	game._heal_weakest_fixed(healer, game._unit_skill_output_base(healer) * 1.8, 0.20)
 	assert(game.player_ruler_hp > 4000)
 	game.tick_timer.stop()
 	quit()

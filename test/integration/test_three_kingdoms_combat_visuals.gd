@@ -115,7 +115,7 @@ func _initialize() -> void:
 	game._process_statuses(0.2)
 	var burn_tick_damage: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(burn_tick_damage.size() == 2)
-	assert(burn_tick_damage.all(func(event): return str(event.visual_group) == row_group and str(event.group_style) == "burn_tick"))
+	assert(burn_tick_damage.all(func(event): return str(event.visual_group).begins_with("status_burn:") and str(event.group_style) == "burn_tick"))
 
 	# Sparse boards still animate both randomly chosen cells. Empty selected
 	# cells burn the ground and route direct and periodic damage to the ruler.

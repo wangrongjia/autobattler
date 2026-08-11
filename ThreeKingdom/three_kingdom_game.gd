@@ -9,6 +9,8 @@ func _ready() -> void:
 	_scale_hero_health()         # 第4步:所有武将基础血量 ×12（相对原配置翻倍）
 	_finalize_skill_values()     # 第5步:从技能基础数值预计算伤害/治疗/护盾
 	_load_balance_overrides()    # 载入平衡实验室保存的项目数值覆盖
+	_normalize_all_skill_strengths() # 全员技能强度统一为100，保留原一星实战输出基准
+	balance_default_heroes = heroes.duplicate(true)
 	_load_settings()             # 读取持久化设置(速度、暂停选项、阵营过滤)
 	_build_ui()                  # 构建整个游戏界面(纯代码创建所有 UI 元素)
 	_new_game()                  # 开始新游戏(进入第 1 关选将阶段)

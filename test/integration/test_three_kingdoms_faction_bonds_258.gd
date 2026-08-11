@@ -20,7 +20,7 @@ func _initialize() -> void:
 	await process_frame
 	game.tick_timer.stop()
 
-	# Ma Dai strikes an empty enemy front tile for fixed ruler damage by star.
+	# Legacy level fields no longer change Ma Dai's empty-tile ruler damage.
 	for level in [1, 2, 3]:
 		var madai: Dictionary = game._make_roster_unit("player", "madai")
 		madai.row = 2
@@ -34,7 +34,7 @@ func _initialize() -> void:
 		game.enemy_ruler_hp = game.RULER_MAX_HP
 		game.visual_events.clear()
 		game._cast_madai_execution(madai)
-		assert(game.RULER_MAX_HP - game.enemy_ruler_hp == [1000, 1500, 2000][level - 1])
+		assert(game.RULER_MAX_HP - game.enemy_ruler_hp == 1000)
 		assert(game.visual_events.any(func(event): return event.kind == "empty" and int(event.row) == 0))
 
 	# Shu: 8% base reduction, then +2% per damage instance up to 14%;

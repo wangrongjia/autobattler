@@ -1,24 +1,31 @@
 {
-	"caocao": {"ability_params": {"target_count": 2, "mult": 2.0, "stun": 1.4, "bond_bonus_targets": 1, "favored_row_mult": 2.0, "favored_row_stun_mult": 2.0}, "cooldown": 10.25, "skill_value": 46},
-	"caoren": {"ability_params": {"target_count": 2, "mult": 1.5, "stun": 1.4, "guard_time": 6.0, "rear_reduction": 0.2}, "cooldown": 9.0, "skill_value": 34},
-	"dianwei": {"ability_params": {"target_count": 2, "mult": 2.0, "caocao_bonus_targets": 1, "xuchu_mult": 4.0}, "cooldown": 7.25, "skill_value": 52},
-	"guojia": {"ability_params": {"target_count": 2, "freeze": 2.1, "shatter_per_second": 400.0}, "cooldown": 12.25},
-	"jiaxu": {"ability_params": {"target_count": 2, "poison_ratio": 0.0058, "duration": 5.0}, "cooldown": 10.25},
-	"simayi": {"ability_params": {"target_count": 2, "mult": 1.75}, "cooldown": 10.25, "skill_value": 44},
-	"xiahoudun": {"ability_params": {"target_count": 2, "mult": 1.5, "stun": 1.4, "guard_time": 6.5, "front_reduction": 0.2}, "cooldown": 10.0, "skill_value": 40},
-	"xiahouyuan": {"ability_params": {"target_count": 2, "mult": 1.75, "stunned_mult": 2.5, "stun": 1.4}, "cooldown": 8.5, "skill_value": 48},
-	"xuchu": {"ability_params": {"target_count": 2, "mult": 2.0, "caocao_bonus_targets": 1, "dianwei_mult": 4.0}, "cooldown": 7.25, "skill_value": 60},
-	"xuhuang": {"ability_params": {"mult": 1.25, "stun": 1.4, "zhanghe_mult": 2.0, "five_mult": 3.0, "five_stun": 2.5}, "cooldown": 12.25, "skill_value": 42},
-	"xunyu": {"cooldown": 9.0},
-	"yuejin": {"ability_params": {"target_count": 3, "mult": 1.0, "zhangliao_target_count": 5, "zhangliao_mult": 1.5, "five_target_count": 7, "five_mult": 2.0, "five_grievous": 0.3, "five_grievous_time": 2.0}, "cooldown": 10.25, "skill_value": 45},
-	"zhanghe": {"ability_params": {"mult": 2.0, "stun": 1.1, "five_mult": 3.0, "five_stunned_mult": 4.0}, "cooldown": 7.25, "skill_value": 47},
-	"zhangliao": {"ability_params": {"mult": 1.0, "hit_count": 2, "yuejin_mult": 2.0, "five_vulnerable": 0.4, "five_vulnerable_time": 3.5}, "cooldown": 8.25, "skill_value": 53},
-	"dailaidongzhu": {"cooldown": 7.0, "skill_value": 53},
-	"jiangwei": {"cooldown": 6.5, "skill_value": 53},
-	"guanyu": {"skill_value": 64},
-	"dingfeng": {"cooldown": 6.8, "skill_value": 72},
-	"xusheng": {"cooldown": 7.3, "skill_value": 72},
-	"luxun": {"ability_params": {"mult": 2.35, "bounces": 1, "four_heroes_bounces": 3, "sunquan_damage_bonus": 0.5, "sunquan_burning_bonus": 0.5}, "cooldown": 8.5, "skill_value": 51},
+	"caocao": {
+		"ability_params": {
+			"bond_bonus_targets": 1.0,
+			"favored_row_mult": 2.0,
+			"favored_row_stun_mult": 2.0,
+			"mult": 2.0,
+			"stun": 1.4,
+			"target_count": 2.0
+		},
+		"cooldown": 10.25,
+		"skill_value": 46.0
+	},
+	"caoren": {
+		"ability_params": {
+			"guard_time": 6.0,
+			"mult": 1.5,
+			"rear_reduction": 0.2,
+			"stun": 1.4,
+			"target_count": 2.0
+		},
+		"cooldown": 9.0,
+		"skill_value": 34.0
+	},
+	"dailaidongzhu": {
+		"cooldown": 7.0,
+		"skill_value": 53.0
+	},
 	"daqiao": {
 		"ability_params": {
 			"bond_heal_bonus_per_step": 0.04,
@@ -27,9 +34,23 @@
 			"mult": 1.25
 		},
 		"cooldown": 9.4,
-		"hp": 2760,
-		"range": 3,
-		"skill_value": 33
+		"hp": 2760.0,
+		"range": 3.0,
+		"skill_value": 33.0
+	},
+	"dianwei": {
+		"ability_params": {
+			"caocao_bonus_targets": 1.0,
+			"mult": 2.0,
+			"target_count": 2.0,
+			"xuchu_mult": 4.0
+		},
+		"cooldown": 7.25,
+		"skill_value": 52.0
+	},
+	"dingfeng": {
+		"cooldown": 6.8,
+		"skill_value": 72.0
 	},
 	"ganning": {
 		"ability_params": {
@@ -42,6 +63,17 @@
 		"range": 2.0,
 		"skill_value": 72.0
 	},
+	"guanyu": {
+		"skill_value": 64.0
+	},
+	"guojia": {
+		"ability_params": {
+			"freeze": 2.1,
+			"shatter_per_second": 400.0,
+			"target_count": 2.0
+		},
+		"cooldown": 12.25
+	},
 	"huangzhong": {
 		"ability_params": {
 			"active_mult": 2.0,
@@ -53,6 +85,18 @@
 		"hp": 2960.0,
 		"range": 3.0,
 		"skill_value": 51.0
+	},
+	"jiangwei": {
+		"cooldown": 6.5,
+		"skill_value": 53.0
+	},
+	"jiaxu": {
+		"ability_params": {
+			"duration": 5.0,
+			"poison_ratio": 0.0058,
+			"target_count": 2.0
+		},
+		"cooldown": 10.25
 	},
 	"liubei": {
 		"ability_params": {
@@ -89,9 +133,20 @@
 			"target_count": 1.0
 		},
 		"cooldown": 9.4,
-		"hp": 3120,
-		"range": 3,
-		"skill_value": 36
+		"hp": 3120.0,
+		"range": 3.0,
+		"skill_value": 36.0
+	},
+	"luxun": {
+		"ability_params": {
+			"bounces": 1.0,
+			"four_heroes_bounces": 3.0,
+			"mult": 2.35,
+			"sunquan_burning_bonus": 0.5,
+			"sunquan_damage_bonus": 0.5
+		},
+		"cooldown": 8.5,
+		"skill_value": 51.0
 	},
 	"lvmeng": {
 		"ability_params": {
@@ -121,14 +176,10 @@
 	"madai": {
 		"ability_params": {
 			"empty_ruler_damage_by_star": [
-				1000.0,
-				1500.0,
-				2000.0
+				1000.0
 			],
 			"max_hp_ratios": [
-				0.6,
-				0.7,
-				0.85
+				0.4
 			],
 			"vulnerable": 0.4,
 			"vulnerable_time": 15.0
@@ -160,6 +211,14 @@
 		"range": 3.0,
 		"skill_value": 42.0
 	},
+	"simayi": {
+		"ability_params": {
+			"mult": 1.75,
+			"target_count": 2.0
+		},
+		"cooldown": 10.25,
+		"skill_value": 44.0
+	},
 	"sunquan": {
 		"ability_params": {
 			"current_hp_damage_ratio": 0.08,
@@ -180,14 +239,14 @@
 	},
 	"sunshangxiang": {
 		"ability_params": {
-			"ally_death_skill_gain": 10.0,
+			"ally_death_skill_gain": 3.0,
 			"hit_count": 1.0,
 			"mult": 1.0,
-			"skill_gain_per_cast": 3.0,
+			"skill_gain_per_cast": 1.0,
 			"sun_legacy_cooldown": 5.0,
 			"sun_legacy_hit_count": 2.0,
 			"sun_legacy_mult": 1.5,
-			"sun_legacy_skill_gain_per_cast": 6.0
+			"sun_legacy_skill_gain_per_cast": 1.0
 		},
 		"cooldown": 7.0,
 		"hp": 2760.0,
@@ -219,6 +278,27 @@
 		"range": 1.0,
 		"skill_value": 55.0
 	},
+	"xiahoudun": {
+		"ability_params": {
+			"front_reduction": 0.2,
+			"guard_time": 6.5,
+			"mult": 1.5,
+			"stun": 1.4,
+			"target_count": 2.0
+		},
+		"cooldown": 10.0,
+		"skill_value": 40.0
+	},
+	"xiahouyuan": {
+		"ability_params": {
+			"mult": 1.75,
+			"stun": 1.4,
+			"stunned_mult": 2.5,
+			"target_count": 2.0
+		},
+		"cooldown": 8.5,
+		"skill_value": 48.0
+	},
 	"xiaoqiao": {
 		"ability_params": {
 			"daqiao_slow": 0.45,
@@ -233,6 +313,48 @@
 		"range": 3.0,
 		"skill_value": 35.0
 	},
+	"xuchu": {
+		"ability_params": {
+			"caocao_bonus_targets": 1.0,
+			"dianwei_mult": 4.0,
+			"mult": 2.0,
+			"target_count": 2.0
+		},
+		"cooldown": 7.25,
+		"skill_value": 60.0
+	},
+	"xuhuang": {
+		"ability_params": {
+			"five_mult": 3.0,
+			"five_stun": 2.5,
+			"mult": 1.25,
+			"stun": 1.4,
+			"zhanghe_mult": 2.0
+		},
+		"cooldown": 12.25,
+		"skill_value": 42.0
+	},
+	"xunyu": {
+		"cooldown": 9.0
+	},
+	"xusheng": {
+		"cooldown": 7.3,
+		"skill_value": 72.0
+	},
+	"yuejin": {
+		"ability_params": {
+			"five_grievous": 0.3,
+			"five_grievous_time": 2.0,
+			"five_mult": 2.0,
+			"five_target_count": 7.0,
+			"mult": 1.0,
+			"target_count": 3.0,
+			"zhangliao_mult": 1.5,
+			"zhangliao_target_count": 5.0
+		},
+		"cooldown": 10.25,
+		"skill_value": 45.0
+	},
 	"zhangfei": {
 		"ability_params": {
 			"damage_by_star": [
@@ -246,6 +368,27 @@
 		"hp": 4680.0,
 		"range": 2.0,
 		"skill_value": 44.0
+	},
+	"zhanghe": {
+		"ability_params": {
+			"five_mult": 3.0,
+			"five_stunned_mult": 4.0,
+			"mult": 2.0,
+			"stun": 1.1
+		},
+		"cooldown": 7.25,
+		"skill_value": 47.0
+	},
+	"zhangliao": {
+		"ability_params": {
+			"five_vulnerable": 0.4,
+			"five_vulnerable_time": 3.5,
+			"hit_count": 2.0,
+			"mult": 1.0,
+			"yuejin_mult": 2.0
+		},
+		"cooldown": 8.25,
+		"skill_value": 53.0
 	},
 	"zhaoyun": {
 		"ability_params": {

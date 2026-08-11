@@ -4,27 +4,20 @@ const BOARD_COLUMNS := 5           # 棋盘列数(横向 5 格)
 const BOARD_ROWS := 3              # 棋盘行数(纵向 3 行:前排 row0/中排 row1/后排 row2)
 const RULER_MAX_HP := 50000        # 主公最大血量(主公血量归零则游戏结束)
 const ROUND_LIMIT := 15            # 总关卡数(15 关备战 + 1 场最终决战)
-const BATTLE_LIMIT := 30.0         # 每关战斗时长(秒),最终决战无此限制
+const BATTLE_LIMIT := 300.0        # 每关战斗时长(秒),最终决战无此限制
 const TICK := 0.2                  # 战斗循环间隔:每 0.2 秒"走一步"(推进行动条)
 const ACTION_MAX := 100.0          # 行动条上限:从 0 涨到 100 时武将行动一次
 const FACTION_BOND_TIERS: Array[int] = [2, 5, 8] # 四阵营统一羁绊档位
 const DEFAULT_SKILL_COOLDOWN := 8.5 # 未单独配置武将的初始冷却；不是均衡实验室的调整下限
 const COOLDOWN_INPUT_MIN := 0.0     # 均衡实验室允许设置为 0，战斗计算处另行防止除零
-const HERO_COOLDOWN_DEFAULTS := {"liubei":4.0, "liushan":4.0, "zhangfei":6.5, "zhaoyun":4.5, "huangzhong":4.0, "machao":6.0, "zhugeliang":4.0, "dailaidongzhu":8.0, "weiyan":5.0, "madai":20.0, "sunquan":10.0, "sunshangxiang":8.0, "taishici":4.0, "ganning":8.0, "huanggai":10.0, "caocao":6.0, "dianwei":4.0, "xuchu":4.0, "zhangliao":5.0, "yuejin":6.5, "xuhuang":8.0, "zhanghe":4.0, "yujin":10.0, "xiahouyuan":5.5, "caoren":6.0, "xiahoudun":6.5, "simayi":7.5, "guojia":7.0, "xunyu":7.2, "jiaxu":6.5}
+const HERO_COOLDOWN_DEFAULTS := {"liubei":4.0, "liushan":4.0, "zhangfei":6.5, "zhaoyun":4.5, "huangzhong":4.0, "machao":6.0, "zhugeliang":4.0, "dailaidongzhu":8.0, "weiyan":5.0, "madai":20.0, "sunquan":10.0, "sunshangxiang":8.0, "taishici":4.0, "ganning":8.0, "huanggai":10.0, "caocao":6.0, "dianwei":4.0, "xuchu":4.0, "zhangliao":5.0, "yuejin":6.5, "xuhuang":8.0, "zhanghe":4.0, "yujin":10.0, "xiahouyuan":5.5, "caoren":6.0, "xiahoudun":6.5, "simayi":7.5, "guojia":7.0, "xunyu":7.2, "jiaxu":6.5, "lvbu":6.4, "dongzhuo":5.5, "diaochan":7.0, "chengong":0.0, "gaoshun":6.2, "yanliang":4.0, "wenchou":4.0, "gaolan":0.0, "qunzhanghe":5.6, "huatuo":6.0, "yuji":6.6, "zuoci":6.0, "zhangjiao":6.0, "zhangliang":5.0, "zhangbao":0.0}
 const HEALTH_SCALE := 12.0         # 全体基础血量由原来的 ×6 提高到 ×12，最终获得双倍血量
 const RESERVE_LIMIT := 9           # 备战区(棋盘下方的替补区)最多放 9 名武将
 const BOARD_LIMIT := BOARD_COLUMNS * BOARD_ROWS  # 棋盘总格数 = 15
 const SAVE_PATH := "user://three_kingdoms_save.json"        # 存档文件路径(user:// 是玩家存档目录)
 const SETTINGS_PATH := "user://three_kingdoms_settings.cfg" # 设置文件路径
-const DRAFT_SIZE := 2              # 每次选将显示 2 名候选
-const PICKS_PER_ROUND := 3         # 每关连续进行 3 轮二选一
-const ENEMY_WAVES := [             # 15 关每关固定出现的敌方武将(每关 2 名)
-	["zhaoyun", "huangzhong"], ["zhangliao", "yuejin"], ["lvmeng", "ganning"],
-	["gaoshun", "chengong"], ["guanyu", "zhangfei"], ["simayi", "guojia"],
-	["daqiao", "xiaoqiao"], ["yanliang", "wenchou"], ["menghuo", "zhurong"],
-	["sunjian", "sunce"], ["zhanghe", "xuhuang"], ["yuji", "zhangjiao"],
-	["zhugeliang", "pangtong"], ["sunquan", "sunshangxiang"], ["lvbu", "dongzhuo"]
-]
+const DRAFT_SIZE := 3              # 每次选将固定显示前军/中军/后军各 1 名
+const PICKS_PER_ROUND := 3         # 每关连续进行 3 轮三选一
 const SHU_WEAPON_CODEX := [
 	{"id":"liubei", "owner_zh":"刘备", "owner_en":"Liu Bei", "name_zh":"双股剑", "name_en":"Twin Swords", "path":"res://ThreeKingdom/weapon/shuanggujian.png"},
 	{"id":"guanyu", "owner_zh":"关羽", "owner_en":"Guan Yu", "name_zh":"青龙偃月刀", "name_en":"Green Dragon Crescent Blade", "path":"res://ThreeKingdom/weapon/qinglongyanyuedao.png"},
@@ -50,13 +43,13 @@ var player_ruler_hp := RULER_MAX_HP  # 我方主公当前血量
 var enemy_ruler_hp := RULER_MAX_HP   # 敌方主公当前血量
 var player_units: Array = []       # 我方所有武将单位列表(包括棋盘上和备战区的)
 var enemy_units: Array = []        # 敌方所有武将单位列表
-var choices: Array = []            # 当前一轮二选一的候选武将 ID
+var choices: Array = []            # 当前一轮三选一的候选武将 ID
 var pending_unit_ids: Array[String] = []  # 待上阵的单位 ID(选完后需要玩家拖到棋盘上)
 var chosen_this_round: Array[String] = [] # 本关三轮已经锁定的武将 ID
 var draft_roster_baseline: Array = []     # 保留用于兼容旧存档
 var draft_picks_remaining := PICKS_PER_ROUND  # 本关还能选几次(初始 3)
-var refresh_charges := 0           # 保留用于兼容旧存档；二选一候选现在可独立免费刷新
-var draft_refresh_available: Array[bool] = [true, true] # 当前二选一的每个位置各可刷新一次
+var refresh_charges := 0           # 保留用于兼容旧存档；三个候选位每轮可各自刷新一次
+var draft_refresh_available: Array[bool] = [true, true, true] # 当前三选一的每个位置各可刷新一次
 var selected_unit := ""            # 当前在备战区被选中(准备拖拽上阵)的单位 ID
 var combat_units: Array = []       # 战斗中参与战斗的单位列表(只有上阵的,row>=0)
 var battle_time := 0.0             # 当前战斗已经进行的秒数
@@ -139,7 +132,7 @@ var encyclopedia_star_filter_buttons: Array[Button] = []
 var encyclopedia_content_scroll: ScrollContainer
 var encyclopedia_bond_graph: GraphEdit
 var encyclopedia_faction := "shu"  # 图鉴当前查看的阵营
-var encyclopedia_star_level := 1   # 图鉴当前查看的星级(1/2/3 星)
+var encyclopedia_star_level := 1   # 兼容旧界面数据；现版本只有一星
 var encyclopedia_bond_label: Label # 图鉴顶部的阵营羁绊说明
 var encyclopedia_preview_overlay: Control # 图鉴武将放大预览层
 var encyclopedia_preview_portrait: TextureRect # 放大预览中的完整武将立绘
@@ -149,6 +142,11 @@ var encyclopedia_preview_name: Label # 放大预览中的武将名
 var encyclopedia_preview_counter: Label # 放大预览中的当前位置
 var encyclopedia_preview_hero_ids: Array[String] = [] # 当前阵营可左右切换的武将
 var encyclopedia_preview_index := 0 # 当前放大预览索引
+
+var unit_inspector_overlay: Control # 战斗武将实时状态弹层
+var unit_inspector_title: Button
+var unit_inspector_detail: RichTextLabel
+var unit_inspector_unit_id := ""
 
 var menu_overlay: Control          # 主菜单覆盖层(z_index=1000,盖住一切)
 var continue_button: Button        # 继续游戏按钮
@@ -161,8 +159,10 @@ var settings_overlay: Control      # 设置覆盖层
 var pause_setting_button: Button   # "行动期间暂停"开关按钮
 var speed_setting_button: Button   # 速度设置按钮
 var hero_codex_images_setting_button: Button # 武将图鉴图片显示开关
-var faction_setting_options: OptionButton  # 测试阵营过滤下拉框
-var draft_faction_filter := ""     # 选将阵营过滤(空=全部, 或 shu/wei/wu/qun)
+var faction_setting_options: OptionButton  # 我方选将阵营过滤
+var enemy_faction_setting_options: OptionButton # 敌方随机阵营过滤
+var draft_faction_filter := ""     # 我方选将阵营过滤(空=全部, 或 shu/wei/wu/qun)
+var enemy_faction_filter := ""     # 敌方随机武将阵营过滤
 
 var heroes := {
 	"liubei": {"zh":"刘备", "en":"Liu Bei", "f":"shu", "roles":["治疗", "辅助"], "hp":260, "skill_value":32, "cooldown":4.0, "range":4, "skill":"Benevolent Rule", "zh_skill":"仁德", "summary":"治疗生命最低的友军，并赋予减伤。", "en_summary":"Heals the weakest ally and grants damage reduction."},
@@ -247,7 +247,7 @@ func _add_extended_roster() -> void:
 	_register_hero("jiangwei", "姜维", "Jiang Wei", "shu", ["坦克", "法师"], 300, 48, 3.0, 1, "Northern Expedition", "北伐", "strike_magic", {"mult":1.60, "reduction":0.15, "bond_reduction":0.30, "reduction_duration":5.0, "diagonal_mult":0.80, "diagonal_count":2}, "造成160%技能强度魔法伤害，并获得15%减伤，持续5秒。", "Deal 160% SKILL magic damage and gain 15% damage reduction for 5s.")
 	_register_hero("menghuo", "孟获", "Meng Huo", "shu", ["坦克"], 360, 43, 3.6, 1, "Barbarian King", "蛮王震地", "row", {"mult":1.05, "stun":0.8, "aftershock_mult":0.60, "burning_damage_mult":1.40, "burning_stun":1.20, "bond_action_reduction":20.0}, "震击随机敌排，造成105%技能强度物理伤害并眩晕0.8秒。", "Strike a random row for 105% SKILL physical damage and stun for 0.8s.")
 	_register_hero("zhurong", "祝融", "Zhurong", "shu", ["战士", "灼烧"], 215, 51, 3.2, 4, "Flame Blade", "火神飞刃", "strike_magic", {"mult":1.45, "burn":4.0, "burn_ratio":0.30, "bounce_mult":0.70, "bond_burn":6.0, "bond_burn_ratio":0.40}, "造成145%技能强度魔法伤害并灼烧4秒，每秒造成30%技能强度伤害。", "Deal 145% SKILL magic damage and burn for 4s at 30% SKILL per second.")
-	_register_hero("dailaidongzhu", "带来洞主", "Dailai Dongzhu", "shu", ["坦克", "控制"], 320, 48, 8.0, 2, "Savage-Bone Wolf Assault", "蛮骨狼袭", "signature", {"mult":1.8, "action_reduction_by_star":[25.0, 35.0, 50.0], "target_mode":"highest_action", "column_splash_mult":0.90, "splash_action_reduction":15.0, "burning_damage_mult":1.20, "bond_burn":4.0, "bond_burn_ratio":0.30}, "锁定可攻击范围内行动条最高的敌人，造成180%技能强度物理伤害，并按1/2/3星使其行动条降低25%/35%/50%。冷却8秒。", "Lock the reachable enemy with the highest gauge, deal 180% SKILL physical damage, and reduce its gauge by 25%/35%/50% at stars 1/2/3. 8s cooldown.")
+	_register_hero("dailaidongzhu", "带来洞主", "Dailai Dongzhu", "shu", ["坦克", "控制"], 320, 48, 8.0, 2, "Savage-Bone Wolf Assault", "蛮骨狼袭", "signature", {"mult":1.8, "action_reduction_by_star":[25.0], "target_mode":"highest_action", "column_splash_mult":0.90, "splash_action_reduction":15.0, "burning_damage_mult":1.20, "bond_burn":4.0, "bond_burn_ratio":0.30}, "锁定可攻击范围内行动条最高的敌人，造成180%技能强度物理伤害，并使其行动条降低25%。冷却8秒。", "Lock the reachable enemy with the highest gauge, deal 180% SKILL physical damage, and reduce its gauge by 25%. 8s cooldown.")
 	_register_hero("weiyan", "魏延", "Wei Yan", "shu", ["坦克", "收割"], 315, 50, 2.9, 1, "Rebel Fang", "狂骨", "drain", {"mult":1.5, "heal":0.35}, "造成150%技能强度物理伤害，并回复实际伤害的35%。", "Deal 150% SKILL physical damage and heal for 35% of actual damage.")
 	_register_hero("madai", "马岱", "Ma Dai", "shu", ["战士", "爆发"], 215, 55, 3.0, 4, "Hidden Arrow", "潜袭冷箭", "strike", {"mult":1.75}, "造成175%技能强度物理伤害；对已受伤目标提高至225%。", "Deal 175% SKILL physical damage, increased to 225% against wounded targets.")
 	_register_hero("pangtong", "庞统", "Pang Tong", "shu", ["法师", "控制"], 185, 62, 3.8, 4, "Chain Scheme", "连环计", "control", {"stun":2.0, "mult":0.8, "bond_mult":1.0, "bond_stun":2.5}, "造成80%技能强度魔法伤害并锁住目标行动条2秒。", "Deal 80% SKILL magic damage and freeze the target's gauge for 2s.")
@@ -269,7 +269,7 @@ func _add_extended_roster() -> void:
 	_register_hero("sunjian", "孙坚", "Sun Jian", "wu", ["战士", "爆发"], 275, 52, 3.0, 1, "Tiger's First Strike", "江东猛虎", "strike", {"mult":1.9}, "造成190%技能强度物理伤害；本场第一次释放提高至260%。", "Deal 190% SKILL physical damage; the first cast is increased to 260%.")
 	_register_hero("sunce", "孙策", "Sun Ce", "wu", ["战士", "收割"], 310, 59, 2.9, 1, "Little Conqueror", "小霸王", "drain", {"mult":1.55, "heal":0.40}, "造成155%技能强度物理伤害并回复实际伤害40%。生命越低，羁绊强化越高。", "Deal 155% SKILL physical damage and heal for 40%. Bonds scale as HP falls.")
 	_register_hero("sunquan", "孙权", "Sun Quan", "wu", ["辅助", "战士"], 285, 44, 10.0, 3, "Jiangdong Balance", "江东制衡", "signature", {"current_hp_damage_ratio":0.08, "max_hp_gain":200.0, "max_hp_cap_mult":2.0, "missing_hp_heal_ratio":0.10}, "随机对一名敌军造成其当前生命8%的伤害，提高自身最大生命并恢复已损生命。", "Damage a random enemy based on current HP, then grow max HP and restore missing HP.")
-	_register_hero("sunshangxiang", "孙尚香", "Sun Shangxiang", "wu", ["战士", "爆发"], 180, 80, 8.0, 4, "Heroine's Growing Volley", "枭姬叠势", "signature", {"hit_count":1, "mult":1.0, "skill_gain_per_cast":1.0, "ally_death_skill_gain":5.0}, "随机攻击一名敌军；每次施法和友军阵亡都会永久提高自身技能强度。", "Strike a random enemy; casts and allied deaths permanently increase SKILL.")
+	_register_hero("sunshangxiang", "孙尚香", "Sun Shangxiang", "wu", ["战士", "爆发"], 180, 80, 8.0, 4, "Heroine's Growing Volley", "枭姬叠势", "signature", {"hit_count":1, "mult":1.0, "skill_gain_per_cast":1.0, "ally_death_skill_gain":3.0}, "随机攻击一名敌军；每次施法和友军阵亡都会永久提高自身技能强度。", "Strike a random enemy; casts and allied deaths permanently increase SKILL.")
 	_register_hero("daqiao", "大乔", "Da Qiao", "wu", ["治疗", "辅助"], 175, 33, 3.7, 4, "River Blossom", "国色流离", "heal", {"mult":1.5, "flat":95.0, "bond_missing_hp_step":0.10, "bond_heal_bonus_per_step":0.04}, "治疗当前生命比例最低的友军。与孙策组成江东佳偶后，目标每损失10%生命，本次受到的治疗提高4%。", "Heal the lowest-HP-ratio ally. With Sun Ce, the target gains 4% healing received per 10% HP missing.")
 	_register_hero("xiaoqiao", "小乔", "Xiao Qiao", "wu", ["辅助", "控制"], 165, 35, 3.5, 4, "Gentle Breeze", "天香缓阵", "signature", {"target_count":2, "slow":0.35, "slow_time":6.0}, "随机选择两名敌方后军，使其行动条速度降低35%，持续6秒。", "Slow two random enemy rearguards by 35% for 6s.")
 	_register_hero("taishici", "太史慈", "Taishi Ci", "wu", ["战士", "爆发"], 250, 52, 4.0, 2, "Blazing Twin Halberds", "神亭烈戟", "signature", {"target_count":2, "mult":1.50, "burn":5.0, "burn_ratio":0.20, "sunce_target_count":3, "ganning_burning_mult":3.0}, "攻击射程内行动条最高的两名敌人，造成150%技能强度伤害并施加5秒灼烧。", "Strike the two reachable enemies with the highest gauges for 150% SKILL and burn them for 5s.")
@@ -284,11 +284,12 @@ func _add_extended_roster() -> void:
 	_register_hero("wenchou", "文丑", "Wen Chou", "qun", ["坦克", "反击"], 325, 49, 3.1, 1, "Reflected Edge", "返锋", "shield_single", {"mult":1.30, "flat":35.0}, "为当前生命比例最低的友军提供130%技能强度+35点护盾。", "Shield the lowest-HP ally for 130% SKILL + 35.")
 	_register_hero("qunzhanghe", "群张郃", "Zhang He (Qun)", "qun", ["辅助", "坦克"], 300, 41, 3.2, 1, "Purple Ward", "紫盾", "shield_column", {"mult":1.20, "flat":30.0}, "为自身同列友军提供120%技能强度+30点护盾。", "Shield allies in his column for 120% SKILL + 30.")
 	_register_hero("gaolan", "高览", "Gao Lan", "qun", ["辅助", "法师"], 245, 50, 3.0, 3, "Arcane Blades", "法刃加持", "buff_row_melee", {"damage":0.20}, "使自身同排的近战友军伤害提高20%。", "Increase damage of melee allies in his row by 20%.")
-	_register_hero("huatuo", "华佗", "Hua Tuo", "qun", ["治疗", "辅助"], 190, 32, 3.8, 4, "Green Remedy", "青囊济世", "heal_team", {"ratio":0.10}, "治疗全体友军各自最大生命10%，并清除技能伤害降低效果。", "Heal all allies for 10% max HP and remove skill-damage reduction.")
-	_register_hero("yuji", "于吉", "Yu Ji", "qun", ["法师", "收割"], 215, 59, 3.7, 4, "Fallen Detonation", "亡魂爆破", "row_magic", {"mult":1.35}, "对随机敌排造成135%技能强度魔法伤害；每名已阵亡友军使伤害+15%。", "Deal 135% SKILL magic damage to a row; +15% per fallen ally.")
-	_register_hero("zhangjiao", "张角", "Zhang Jiao", "qun", ["法师", "辅助"], 230, 62, 4.0, 4, "Yellow Heaven", "苍天已死", "multi_magic", {"count":3, "mult":0.75}, "召唤3道雷击，每道造成75%技能强度魔法伤害。", "Call 3 lightning strikes for 75% SKILL magic damage each.")
-	_register_hero("yuanshao", "袁绍", "Yuan Shao", "qun", ["战士", "辅助"], 210, 54, 3.0, 4, "Coalition Banner", "诸侯盟主", "buff_self", {"damage":0.10, "faction_scale":true}, "每存在一个至少2人的阵营，自身伤害提高10%，最多40%。", "For each faction with at least 2 units, increase his own damage by 10%, up to 40%.")
-	_register_hero("yuanshu", "袁术", "Yuan Shu", "qun", ["法师", "爆发"], 205, 57, 3.6, 4, "Imperial Volley", "伪帝连珠", "multi_magic", {"count":4, "mult":0.65}, "发射4枚法术弹，每枚造成65%技能强度魔法伤害并随机选格。", "Fire 4 magic bolts, each targeting a random tile for 65% SKILL magic damage.")
+	_register_hero("huatuo", "华佗", "Hua Tuo", "qun", ["治疗", "辅助"], 190, 32, 6.0, 4, "Threefold Remedy", "青囊三济", "signature", {"target_count":3, "heal_mult":1.0}, "治疗当前生命最低的三名友军，各恢复100%技能强度生命。", "Heal the three allies with the lowest current HP for 100% SKILL each.")
+	_register_hero("yuji", "于吉", "Yu Ji", "qun", ["法师", "持续伤害"], 215, 59, 6.6, 4, "Venomous Immortal Art", "蛊毒仙术", "signature", {"target_count":2, "poison_ratio":0.005, "duration":4.0}, "随机使两名敌军中毒4秒，每秒损失0.5%最大生命。", "Poison two random enemies for 4s, dealing 0.5% max HP each second.")
+	_register_hero("zuoci", "左慈", "Zuo Ci", "qun", ["治疗", "法师"], 200, 60, 6.0, 4, "Immortal Aid", "遁甲济世", "signature", {"target_count":2, "heal_mult":1.5, "thunder_mult":1.5}, "治疗当前生命最低的两名友军，各恢复150%技能强度生命。", "Heal the two allies with the lowest current HP for 150% SKILL each.")
+	_register_hero("zhangjiao", "张角", "Zhang Jiao", "qun", ["法师", "爆发"], 230, 62, 6.0, 4, "Yellow Sky Thunder", "黄天雷引", "signature", {"target_count":2, "mult":2.0, "zhangliang_bonus_mult":0.5, "zhangbao_bonus_targets":1, "zhangbao_stun_chance":0.5, "zhangbao_stun":1.0}, "召唤雷电随机攻击两名敌军，各造成200%技能强度伤害。", "Call lightning on two random enemies for 200% SKILL damage each.")
+	_register_hero("zhangliang", "张梁", "Zhang Liang", "qun", ["辅助", "削弱"], 210, 45, 5.0, 4, "Yellow Sky Weakening", "人公虚弱", "signature", {"target_count":2, "duration":5.0, "skill_reduction":0.5, "bond_bonus_targets":1}, "随机使两名敌军虚弱5秒，技能强度降低50%。", "Weaken two random enemies for 5s, reducing SKILL by 50%.")
+	_register_hero("zhangbao", "张宝", "Zhang Bao", "qun", ["自爆", "复生"], 130, 65, 0.0, 1, "Earth General Detonation", "地公雷爆", "passive", {"target_count":2, "death_mult":2.0, "base_revives":1, "zhangjiao_splash_mult":0.5, "zhangliang_bonus_revives":1}, "阵亡时随机攻击两名敌军，各造成200%技能强度伤害，随后可满血复生一次。", "On death, strike two random enemies for 200% SKILL, then revive once at full HP.")
 
 func _register_hero(id: String, zh: String, en: String, faction: String, roles: Array, hp: int, skill_value: int, cooldown: float, range_tier: int, skill: String, zh_skill: String, ability: String, params: Dictionary, detail_zh: String, detail_en: String) -> void:
 	heroes[id] = {"zh":zh, "en":en, "f":faction, "roles":roles, "hp":hp, "skill_value":skill_value, "cooldown":maxf(COOLDOWN_INPUT_MIN, cooldown), "range":range_tier, "skill":skill, "zh_skill":zh_skill, "summary":detail_zh, "en_summary":detail_en, "ability":ability, "ability_params":params, "detail_zh":detail_zh, "detail_en":detail_en}
@@ -332,15 +333,15 @@ func _configure_signature_skill_params() -> void:
 	var signature_params := {
 		"liubei":{"duration":4.0, "heal_ratio":2.0},
 		"guanyu":{"mult":1.8},
-		"zhangfei":{"damage_by_star":[0.15, 0.20, 0.30], "duration":3.0},
+		"zhangfei":{"damage_by_star":[0.15], "duration":3.0},
 		"caocao":{"target_count":2, "mult":2.0, "stun":2.5},
 		"dianwei":{"target_count":2, "mult":2.0},
 		"xuchu":{"target_count":2, "mult":2.0},
 		"luxun":{"mult":2.2, "bounce_mult":1.0, "bounce_falloff":0.12},
 		"lusu":{"heal_ratio":0.15, "max_hp_flat":200.0, "target_count":1, "four_heroes_heal_ratio":0.20, "four_heroes_max_hp_flat":350.0, "four_heroes_target_count":2},
-		"lvbu":{"mult":1.6},
-		"diaochan":{"duration":1.5, "target_mode":"highest_skill_value"},
-		"dongzhuo":{"mult":1.0, "current_hp_ratio":0.06, "extra_cap":8.0}
+		"lvbu":{"mult":1.75, "dongzhuo_heal":0.40, "missing_hp_step":0.10, "diaochan_bonus_per_step":0.04, "chengong_repeat_chance":0.50},
+		"diaochan":{"duration":3.0, "dongzhuo_duration":6.0, "forced_attack_interval":1.0, "forced_attack_mult":1.0, "target_mode":"random"},
+		"dongzhuo":{"current_hp_ratio":0.07, "lvbu_current_hp_ratio":0.15, "diaochan_max_hp_bonus":0.50}
 	}
 	for hero_id in signature_params:
 		heroes[hero_id].ability = "signature"
@@ -389,11 +390,11 @@ func _apply_document_skill_rework() -> void:
 	heroes.sunquan.zh_skill = "江东制衡"
 	_set_skill("sunquan", "signature", {"current_hp_damage_ratio":0.08, "max_hp_gain":200.0, "max_hp_cap_mult":2.0, "missing_hp_heal_ratio":0.10, "sun_legacy_max_hp_gain":400.0, "sun_legacy_missing_hp_cap_gain_ratio":0.10, "sun_legacy_max_hp_cap_mult":4.0, "sun_legacy_missing_hp_heal_ratio":0.15, "luxun_damage_ratio":0.12, "luxun_cooldown":8.0}, "江东制衡：随机对一名敌军造成其当前生命8%的伤害；自身最大生命提高200（不超过初始最大生命的2倍），再恢复10%已损失生命。孙氏之志使最大生命提高400并额外提高等同于当前已损失生命10%的上限（总上限改为初始最大生命4倍），再恢复15%已损失生命；君臣同心使伤害提高至目标当前生命12%，冷却缩短至8秒。基础冷却10秒。", "Jiangdong Balance: Deal 8% of a random enemy's current HP, gain 200 max HP up to 2x initial max HP, then restore 10% missing HP. Sun Legacy grants 400 plus 10% missing HP as max HP, raises the cap to 4x, and restores 15% missing HP. Sovereign and Minister raises damage to 12% current HP and shortens cooldown to 8s. Base cooldown 10s.")
 	_set_skill("zhaoyun", "signature", {"hit_mults":[0.50, 0.50, 0.50, 0.50, 0.50], "five_tiger_mults":[0.50, 0.70, 0.90, 1.10, 1.30], "seven_base_mults":[0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50], "seven_charge_mults":[0.50, 0.70, 0.90, 1.10, 1.30, 1.50, 1.70]}, "龙胆连刺：随机选择一名射程内敌人并快速攻击同一目标5次，每次造成50%技能强度伤害。五虎上将使五次伤害递增为50%/70%/90%/110%/130%；单独七进七出改为随机锁定一名敌方后军并进行7次50%连刺，同时激活五虎时七次伤害递增至170%。", "Dragon Spear: Randomly select an enemy in range and rapidly strike that target 5 times for 50% SKILL each. Five Tigers changes the hits to 50%/70%/90%/110%/130%. Seven Charges alone randomly locks an enemy rearguard for 7 hits at 50%; with Five Tigers also active, the 7 hits escalate to 170%.")
-	_set_skill("liushan", "buff_column", {"damage_by_star":[0.25, 0.35, 0.55], "duration":4.0, "seven_lifesteal":0.30}, "蜀主鼓舞：强化同列前军4秒；1/2/3星增伤25%/35%/55%。七进七出额外使被强化友军获得30%全能吸血。冷却4秒。", "Royal Encouragement: Empower the allied vanguard in the same column for 4s; stars grant 25%/35%/55% damage. Seven Charges also grants the empowered ally 30% omnivamp. 4s cooldown.")
+	_set_skill("liushan", "buff_column", {"damage_by_star":[0.25], "duration":4.0, "seven_lifesteal":0.30}, "蜀主鼓舞：强化同列前军4秒，使其伤害提高25%。七进七出额外使被强化友军获得30%全能吸血。冷却4秒。", "Royal Encouragement: Empower the allied vanguard in the same column with +25% damage for 4s. Seven Charges also grants 30% omnivamp. 4s cooldown.")
 	_set_skill("huangzhong", "strike", {"mult":1.45, "active_mult":2.0, "target_mode":"back_low", "focus":true}, "百步穿杨：优先后排低血目标，连续锁定同一目标会逐步提高暴击率，换目标后清空。", "Piercing Arrow: Prefer a low-HP backliner. Repeated shots build critical chance, reset on target change.")
 	_set_skill("zhugeliang", "row_magic", {"mult":2.0, "menghuo_damage_bonus":0.20, "fire_mark_bonus":0.30, "liubei_extra_target_bonus":0.10}, "八阵奇谋：随机选择敌方格子，对目标及同列相邻格造成200%技能强度法术伤害，冷却4秒。庞统使同排相邻格也受击；姜维使四个斜对角相邻格也受击；孟获使伤害提高20%并施加火攻标记，已标记者再次受到诸葛亮伤害时额外提高30%；刘备使本次每多命中一名武将，所有受击格伤害提高10%。", "Eight-Formation Stratagem: Choose a random enemy tile and deal 200% SKILL magic damage to it and its vertical neighbors. 4s cooldown. Pang Tong adds horizontal neighbors; Jiang Wei adds all four diagonals; Meng Huo grants +20% damage and applies Fire Assault, causing Zhuge Liang's later hits to deal +30%; Liu Bei grants +10% damage to every affected tile per additional enemy hit.")
 	_set_skill("machao", "signature", {"front_mult":2.0, "middle_mult":1.7, "back_mult":1.4}, "铁骑贯阵：锁定当前血量最低敌人的整列，前军/中军/后军依次受到200%/170%/140%技能强度伤害；与马岱组成一骑当千后全列均为200%。", "Iron Cavalry: Pierce the column containing the lowest-current-HP enemy for 200%/170%/140% SKILL by row; One Rider with Ma Dai makes every row 200%.")
-	_set_skill("madai", "signature", {"max_hp_ratios":[0.60, 0.70, 0.85], "empty_ruler_damage_by_star":[1000.0, 1500.0, 2000.0], "vulnerable":0.40, "vulnerable_time":15.0}, "斩将突袭：随机攻击敌方前排，1/2/3星分别造成其最大生命60%/70%/85%的伤害；敌方没有前军时攻击前军空格，并对主公造成1000/1500/2000点伤害。一骑当千使每场开局行动条充满；宿命之敌使命中目标额外承伤40%持续15秒。", "Execution Raid: Hit a random frontliner for 60%/70%/85% max HP at stars 1/2/3. If no enemy vanguard remains, strike an empty front tile and deal 1000/1500/2000 ruler damage. One Rider starts each battle at full gauge; Fated Enemies marks the victim to take 40% more damage for 15s.")
+	_set_skill("madai", "signature", {"max_hp_ratios":[0.40], "empty_ruler_damage_by_star":[1000.0], "vulnerable":0.40, "vulnerable_time":15.0}, "斩将突袭：随机攻击敌方前军，造成40%最大生命伤害；无前军时攻击空格并对主公造成1000点伤害。一骑当千使开局行动条充满；宿命之敌使目标额外承伤40%，持续15秒。", "Execution Raid: Hit a random enemy vanguard for 40% max HP; if none remains, strike an empty tile and deal 1000 ruler damage. One Rider starts ready; Fated Enemies applies 40% vulnerability for 15s.")
 	_set_skill("weiyan", "signature", {"mult":1.8, "self_heal":0.40, "ally_heal":0.15}, "狂骨横斩：攻击正前方及同排相邻格，造成180%技能强度伤害并回复实际伤害40%。飞火流星在敌方前军阵亡时回复50%最大生命；宿命之敌为相邻友军和后方中军回复15%最大生命。", "Rebel Fang: Hit the facing tile and adjacent tiles for 180% SKILL, healing 40% of damage. Flying Meteor heals 50% max HP when an enemy frontliner falls; Fated Enemies heals adjacent allies and rearward midguards for 15% max HP.")
 	_set_skill("zhouyu", "strike_magic", {"mult":1.0, "tile_count":2, "four_heroes_bonus_tiles":2, "burn":3.0, "burn_ratio":0.50, "xiaoqiao_burn":6.0, "missing_hp_step":0.10, "missing_hp_bonus_per_step":0.05}, "赤壁点火：随机点燃2个敌方格，各造成100%技能强度法术伤害并灼烧3秒，每秒造成50%技能强度伤害。四英杰额外点燃2格；琴瑟和鸣使灼烧延长至6秒；赤壁苦计使直接伤害与每次灼烧伤害按目标已损失生命提高，每损失10%生命增伤5%。", "Red Cliffs: Ignite 2 random enemy tiles for 100% SKILL magic damage and burn for 3s at 50% SKILL per second. Four Heroes adds 2 tiles; Harmonious Zither extends burn to 6s; Red Cliffs Ruse grants +5% direct and burn damage per 10% target HP missing.")
 	_set_skill("luxun", "strike_magic", {"mult":2.0, "bounces":1, "four_heroes_bounces":3, "sunquan_damage_bonus":0.50, "sunquan_burning_bonus":0.50}, "火烧连营：发射火球造成200%技能强度法术伤害，并向相邻敌方格弹射1次。四英杰使总弹射次数提高至3次；君臣同心使伤害提高50%，命中灼烧目标时再提高50%，合计提高100%。", "Flames of Camp: Launch a fireball for 200% SKILL magic damage and bounce once to an adjacent enemy tile. Four Heroes raises total bounces to 3; Sovereign and Minister grants +50% damage and another +50% against burning targets, for +100% total.")
@@ -412,12 +413,54 @@ func _apply_document_skill_rework() -> void:
 	heroes.sunshangxiang.skill = "Heroine's Growing Volley"
 	heroes.sunshangxiang.zh_skill = "枭姬叠势"
 	heroes.sunshangxiang.skill_value = 80
-	_set_skill("sunshangxiang", "signature", {"mult":1.0, "hit_count":1, "skill_gain_per_cast":1.0, "ally_death_skill_gain":5.0, "sun_legacy_mult":1.5, "sun_legacy_hit_count":2, "sun_legacy_skill_gain_per_cast":2.0, "sun_legacy_cooldown":6.0}, "枭姬叠势：随机攻击一名敌军，造成100%技能强度伤害；每次释放后自身技能强度永久提高1点。孙氏之志使冷却缩短至6秒，每次连续释放2击，每击造成150%技能强度伤害，且每次释放后技能强度提高2点。任意友军阵亡时，孙尚香技能强度提高5点。基础技能强度80，冷却8秒。", "Heroine's Growing Volley: Strike a random enemy for 100% SKILL, then permanently gain 1 SKILL. Sun Legacy shortens cooldown to 6s, fires twice for 150% SKILL each, and grants 2 SKILL after each cast. Whenever an ally falls, gain 5 SKILL. Base SKILL 80; cooldown 8s.")
+	_set_skill("sunshangxiang", "signature", {"mult":1.0, "hit_count":1, "skill_gain_per_cast":1.0, "ally_death_skill_gain":3.0, "sun_legacy_mult":1.5, "sun_legacy_hit_count":2, "sun_legacy_skill_gain_per_cast":1.0, "sun_legacy_cooldown":6.0}, "枭姬叠势：随机攻击一名敌军，造成100%技能强度伤害；每次释放后自身技能强度永久提高1点。孙氏之志使冷却缩短至6秒并连续释放2击，每击150%技能强度伤害。任意友军阵亡时，技能强度提高3点。", "Heroine's Growing Volley: Strike a random enemy for 100% SKILL and permanently gain 1 SKILL after every cast. Sun Legacy shortens cooldown to 6s and fires twice for 150% SKILL each. Gain 3 SKILL whenever an ally falls.")
 	_set_skill("xusheng", "row_magic", {"mult":0.65, "stun":0.8, "slow":0.20, "slow_time":4.0}, "宿卫水阵：冲击一排并留下4秒水阵，使该排行动速度降低20%。", "Guardian Water Formation: Strike a row and leave a 4s water field that slows gauge gain by 20%.")
-	_set_skill("wenchou", "shield_single", {"mult":1.0, "flat":28.0, "spell_reflect":0.35}, "反弹恶斗：为最低生命友军施加小型护盾；自身有35%概率反弹指向性技能。", "Reflected Duel: Give a small shield to the weakest ally; Wen Chou has 35% chance to reflect targeted skills.")
-	_set_skill("qunzhanghe", "shield_column", {"mult":0.75, "flat":20.0, "spell_ward":1}, "紫幕护法：为同列友军施加小型护盾，并各抵挡下一次主动技能伤害。", "Purple Ward: Give column allies a small shield and block their next active-skill hit.")
-	_set_skill("yuji", "row_magic", {"mult":0.95, "fallen_scale":0.18, "target_mode":"back_low"}, "妖术祭雷：轰击后排；每名阵亡友军使本次雷击强化18%。", "Sacrificial Thunder: Strike the backline; each fallen ally empowers the cast by 18%.")
-	_set_skill("zhangjiao", "multi_magic", {"count":2, "mult":0.60, "summon_on_death":0.45}, "黄天起义：降下2道雷击；友军阵亡时有45%概率触发一次小型天雷。", "Yellow Heaven: Call 2 lightning strikes; allied deaths have 45% chance to trigger a minor thunderbolt.")
+	heroes.lvbu.skill = "Peerless Sweep"
+	heroes.lvbu.zh_skill = "无双横扫"
+	_set_skill("lvbu", "signature", {"mult":1.75, "dongzhuo_heal":0.40, "missing_hp_step":0.10, "diaochan_bonus_per_step":0.04, "chengong_repeat_chance":0.50}, "无双横扫：攻击正前方敌方前军及其左右相邻格，造成175%技能强度伤害。", "Peerless Sweep: Strike the facing enemy vanguard and its left/right neighbors for 175% SKILL damage.")
+	heroes.dongzhuo.skill = "Tyrant's Might"
+	heroes.dongzhuo.zh_skill = "暴君横征"
+	_set_skill("dongzhuo", "signature", {"current_hp_ratio":0.07, "lvbu_current_hp_ratio":0.15, "diaochan_max_hp_bonus":0.50}, "暴君横征：对正前方敌军造成自身当前生命值7%的物理伤害。", "Tyrant's Might: Deal physical damage equal to 7% of Dong Zhuo's current HP to the facing enemy.")
+	heroes.dongzhuo.range = 2
+	heroes.diaochan.skill = "Beauty's Scheme"
+	heroes.diaochan.zh_skill = "美人离间"
+	_set_skill("diaochan", "signature", {"duration":3.0, "dongzhuo_duration":6.0, "forced_attack_interval":1.0, "forced_attack_mult":1.0, "target_mode":"random"}, "美人离间：随机魅惑一名敌军3秒，使其行动条停止。", "Beauty's Scheme: Charm a random enemy for 3s, stopping its action gauge.")
+	heroes.chengong.skill = "Measured Formation"
+	heroes.chengong.zh_skill = "智迟谋速"
+	_set_skill("chengong", "passive", {"cooldown_reduction":1.0, "lvbu_bonus_reduction":1.0, "gaoshun_bonus_reduction":1.0}, "智迟谋速（被动）：陈宫及其同列友军的技能冷却减少1秒。", "Measured Formation (Passive): Chen Gong and allies in his column reduce skill cooldowns by 1s.")
+	heroes.gaoshun.skill = "Formation Resolve"
+	heroes.gaoshun.zh_skill = "陷阵之志"
+	_set_skill("gaoshun", "signature", {"target_count":2, "mult":1.50, "vulnerable":0.40, "vulnerable_time":3.0, "lvbu_bonus_targets":2, "chengong_bonus_duration":3.0}, "陷阵之志：随机攻击两名敌军，造成150%技能强度伤害，并施加3秒易碎，使其受到的伤害提高40%。", "Formation Resolve: Strike 2 random enemies for 150% SKILL and make them Fragile for 3s, increasing damage taken by 40%.")
+	heroes.yanliang.skill = "Hebei Fierce Assault"
+	heroes.yanliang.zh_skill = "河北猛袭"
+	_set_skill("yanliang", "signature", {"target_count":2, "wenchou_bonus_targets":2, "mult":1.75, "hit_bonus":0.15, "hit_bonus_cap":3.0}, "河北猛袭：随机攻击两名敌方中军或后军，造成175%技能强度伤害。", "Hebei Fierce Assault: Strike 2 random enemy midguards or rearguards for 175% SKILL damage.")
+	heroes.wenchou.skill = "Hebei Breakthrough"
+	heroes.wenchou.zh_skill = "河北破阵"
+	_set_skill("wenchou", "signature", {"target_count":2, "yanliang_bonus_targets":2, "max_hp_ratio":0.02, "hit_bonus":0.15, "hit_bonus_cap":3.0}, "河北破阵：随机攻击两名敌方前军或中军，造成其最大生命值2%的伤害。", "Hebei Breakthrough: Strike 2 random enemy vanguards or midguards for 2% of each target's max HP.")
+	heroes.gaolan.skill = "Column Valor"
+	heroes.gaolan.zh_skill = "列阵扬威"
+	_set_skill("gaolan", "passive", {"skill_bonus":20.0, "zhanghe_skill_bonus":40.0, "four_pillars_skill_bonus":40.0}, "列阵扬威（被动）：高览同列友军的技能强度增加20点。", "Column Valor (Passive): Allies in Gao Lan's column gain 20 SKILL.")
+	heroes.qunzhanghe.skill = "Hebei Ward"
+	heroes.qunzhanghe.zh_skill = "河北护阵"
+	_set_skill("qunzhanghe", "signature", {"target_count":2, "gaolan_bonus_targets":2, "four_pillars_bonus_targets":2, "shield_mult":2.0, "four_pillars_shield_mult":4.0}, "河北护阵：为当前生命值最低的两名友军施加可抵消200%技能强度伤害的护盾。", "Hebei Ward: Shield the 2 allies with the lowest current HP for 200% SKILL.")
+	heroes.huatuo.skill = "Threefold Remedy"
+	heroes.huatuo.zh_skill = "青囊三济"
+	_set_skill("huatuo", "signature", {"target_count":3, "heal_mult":1.0, "zuoci_bonus_mult":0.5}, "青囊三济：治疗当前生命值最低的三名友军，各恢复100%技能强度生命。", "Threefold Remedy: Heal the three allies with the lowest current HP for 100% SKILL each.")
+	heroes.yuji.skill = "Venomous Immortal Art"
+	heroes.yuji.zh_skill = "蛊毒仙术"
+	_set_skill("yuji", "signature", {"target_count":2, "poison_ratio":0.005, "duration":4.0, "bond_bonus_targets":1, "bond_bonus_duration":1.0}, "蛊毒仙术：随机使两名敌军中毒4秒，每秒损失0.5%最大生命。", "Venomous Immortal Art: Poison two random enemies for 4s, dealing 0.5% max HP each second.")
+	heroes.zuoci.skill = "Immortal Aid"
+	heroes.zuoci.zh_skill = "遁甲济世"
+	_set_skill("zuoci", "signature", {"target_count":2, "heal_mult":1.5, "huatuo_bonus_mult":0.5, "thunder_mult":1.5}, "遁甲济世：治疗当前生命值最低的两名友军，各恢复150%技能强度生命。", "Immortal Aid: Heal the two allies with the lowest current HP for 150% SKILL each.")
+	heroes.zhangjiao.skill = "Yellow Sky Thunder"
+	heroes.zhangjiao.zh_skill = "黄天雷引"
+	_set_skill("zhangjiao", "signature", {"target_count":2, "mult":2.0, "zhangliang_bonus_mult":0.5, "zhangbao_bonus_targets":1, "zhangbao_stun_chance":0.5, "zhangbao_stun":1.0}, "黄天雷引：召唤雷电随机攻击两名敌军，各造成200%技能强度伤害。", "Yellow Sky Thunder: Call lightning on two random enemies for 200% SKILL damage each.")
+	heroes.zhangliang.skill = "Yellow Sky Weakening"
+	heroes.zhangliang.zh_skill = "人公虚弱"
+	_set_skill("zhangliang", "signature", {"target_count":2, "duration":5.0, "skill_reduction":0.5, "bond_bonus_targets":1}, "人公虚弱：随机使两名敌军虚弱5秒，技能强度降低50%。", "Yellow Sky Weakening: Weaken two random enemies for 5s, reducing SKILL by 50%.")
+	heroes.zhangbao.skill = "Earth General Detonation"
+	heroes.zhangbao.zh_skill = "地公雷爆"
+	_set_skill("zhangbao", "passive", {"target_count":2, "death_mult":2.0, "base_revives":1, "zhangjiao_splash_mult":0.5, "zhangliang_bonus_revives":1}, "地公雷爆（被动）：阵亡时随机攻击两名敌军，各造成200%技能强度伤害，随后可满血复生一次。", "Earth General Detonation (Passive): On death, strike two random enemies for 200% SKILL, then revive once at full HP.")
 
 func _configure_combat_profiles() -> void:
 	for hero_id in HERO_COOLDOWN_DEFAULTS:
@@ -449,11 +492,22 @@ func _finalize_skill_values() -> void:
 	for hero_id in heroes:
 		_finalize_hero_skill_values(hero_id)
 
+func _normalize_all_skill_strengths() -> void:
+	# skill_output_base preserves the current one-star combat output while the
+	# public/editable SKILL stat is normalized to 100 for every hero.
+	for hero_id in heroes:
+		var hero: Dictionary = heroes[hero_id]
+		if not hero.has("skill_output_base"):
+			hero.skill_output_base = maxf(0.0, float(hero.get("skill_value", 100.0)))
+			hero.skill_value = 100.0
+		heroes[hero_id] = hero
+		_finalize_hero_skill_values(str(hero_id))
+
 func _finalize_hero_skill_values(hero_id: String) -> void:
 	if not heroes.has(hero_id): return
 	var hero: Dictionary = heroes[hero_id]
 	var params: Dictionary = hero.get("ability_params", {})
-	var skill_value: float = float(hero.skill_value)
+	var skill_value: float = float(hero.get("skill_output_base", hero.skill_value))
 	var mult: float = float(params.get("mult", 1.0))
 	var ability: String = hero.get("ability", "")
 	for derived_key in ["base_value", "base_heal", "base_shield", "burn_per_sec"]:
@@ -476,10 +530,10 @@ func t(zh: String, en: String) -> String:
 	return zh if language == "zh" else en
 
 func _star_stat_multiplier(level: int) -> float:
-	return [1.0, 1.5, 2.25][clampi(level, 1, 3) - 1]
+	return 1.0
 
 func _star_effect_multiplier(level: int) -> float:
-	return [1.0, 1.25, 1.50][clampi(level, 1, 3) - 1]
+	return 1.0
 
 func _unit_effect_multiplier(unit: Dictionary) -> float:
 	return _star_effect_multiplier(int(unit.get("level", 1)))
@@ -527,10 +581,10 @@ func _roster_has_all(units: Array, ids: Array) -> bool:
 	return true
 
 func _roster_has_count(units: Array, ids: Array, required: int) -> bool:
-	var count := 0
+	var present := {}
 	for unit in units:
-		if unit.alive and unit.row >= 0 and ids.has(unit.hero_id): count += 1
-	return count >= required
+		if unit.alive and unit.row >= 0 and ids.has(unit.hero_id): present[str(unit.hero_id)] = true
+	return present.size() >= required
 
 func _make_roster_unit(team: String, hero_id: String) -> Dictionary:
 	var hero: Dictionary = heroes[hero_id]
@@ -556,7 +610,10 @@ func _make_roster_unit(team: String, hero_id: String) -> Dictionary:
 		"front_damage_reduction":0.0, "front_damage_reduction_time":0.0,
 		"all_lifesteal":0.0, "all_lifesteal_time":0.0,
 		"skill_debuff":0.0, "kill_buff":0.0, "death_prevention":0.0,
-		"heal_multiplier":1.0, "charm_multiplier":1.0, "current_hp_ratio":0.06
+		"heal_multiplier":1.0, "charm_multiplier":1.0, "current_hp_ratio":0.06,
+		"skill_value_bonus":0.0, "four_pillars":false, "hebei_damage_stacks":0,
+		"charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0,
+		"skill_debuff_time":0.0, "zhangbao_revives_used":0
 	}
 
 func _can_unit_use_row(unit: Dictionary, row: int) -> bool:

@@ -352,6 +352,183 @@ func _build_ui() -> void:
 	tick_timer.timeout.connect(_battle_tick)
 	add_child(tick_timer)
 	_build_draft_layer()
+	_build_unit_inspector()
+
+func _build_unit_inspector() -> void:
+	unit_inspector_overlay = ColorRect.new()
+	unit_inspector_overlay.color = Color(0.015, 0.02, 0.025, 0.86)
+	unit_inspector_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	unit_inspector_overlay.z_index = 1400
+	unit_inspector_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	unit_inspector_overlay.gui_input.connect(_on_unit_inspector_backdrop_input)
+	add_child(unit_inspector_overlay)
+	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_PASS
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var side_margin := 28 if _is_mobile_ui() else 250
+	margin.add_theme_constant_override("margin_left", side_margin)
+	margin.add_theme_constant_override("margin_right", side_margin)
+	margin.add_theme_constant_override("margin_top", 24 if _is_mobile_ui() else 70)
+	margin.add_theme_constant_override("margin_bottom", 24 if _is_mobile_ui() else 70)
+	unit_inspector_overlay.add_child(margin)
+	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_style(panel, Color("#15191df8"), 16, Color("#b98a4f"), 2)
+	margin.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	unit_inspector_title = _button("")
+	unit_inspector_title.custom_minimum_size.y = 56
+	unit_inspector_title.add_theme_font_size_override("font_size", 23 if _is_mobile_ui() else 20)
+	unit_inspector_title.tooltip_text = t("再次点击此处关闭", "Tap here again to close")
+	unit_inspector_title.pressed.connect(_hide_unit_inspector)
+	box.add_child(unit_inspector_title)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_enable_touch_scroll(scroll, false, true)
+	box.add_child(scroll)
+	unit_inspector_detail = RichTextLabel.new()
+	unit_inspector_detail.bbcode_enabled = true
+	unit_inspector_detail.fit_content = true
+	unit_inspector_detail.scroll_active = false
+	unit_inspector_detail.selection_enabled = true
+	unit_inspector_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	unit_inspector_detail.add_theme_font_size_override("normal_font_size", 17 if _is_mobile_ui() else 15)
+	unit_inspector_detail.add_theme_constant_override("line_separation", 5)
+	unit_inspector_detail.mouse_filter = Control.MOUSE_FILTER_PASS
+	unit_inspector_detail.gui_input.connect(_on_unit_inspector_content_input)
+	scroll.add_child(unit_inspector_detail)
+	unit_inspector_overlay.hide()
+
+func _on_unit_inspector_backdrop_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_hide_unit_inspector()
+	elif event is InputEventScreenTouch and event.pressed:
+		_hide_unit_inspector()
+
+func _on_unit_inspector_content_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_hide_unit_inspector()
+	elif event is InputEventScreenTouch:
+		if event.pressed:
+			unit_inspector_overlay.set_meta("touch_origin", event.position)
+			unit_inspector_overlay.set_meta("touch_dragged", false)
+		elif not bool(unit_inspector_overlay.get_meta("touch_dragged", false)) and event.position.distance_to(unit_inspector_overlay.get_meta("touch_origin", event.position)) < 14.0:
+			_hide_unit_inspector()
+	elif event is InputEventScreenDrag:
+		unit_inspector_overlay.set_meta("touch_dragged", true)
+
+func _toggle_unit_inspector(unit_id: String) -> void:
+	if is_instance_valid(unit_inspector_overlay) and unit_inspector_overlay.visible and unit_inspector_unit_id == unit_id:
+		_hide_unit_inspector()
+		return
+	unit_inspector_unit_id = unit_id
+	_refresh_unit_inspector()
+	if is_instance_valid(unit_inspector_overlay):
+		unit_inspector_overlay.show()
+
+func _hide_unit_inspector() -> void:
+	unit_inspector_unit_id = ""
+	if is_instance_valid(unit_inspector_overlay):
+		unit_inspector_overlay.hide()
+
+func _inspector_number(value: float) -> String:
+	return str(roundi(value)) if is_equal_approx(value, roundf(value)) else ("%.1f" % value)
+
+func _inspector_unit() -> Variant:
+	for unit in combat_units:
+		if str(unit.get("id", "")) == unit_inspector_unit_id:
+			return unit
+	return null
+
+func _inspector_bond_state(unit: Dictionary) -> String:
+	var allies: Array = combat_units.filter(func(other): return other.team == unit.team and other.alive and int(other.row) >= 0)
+	var hero_id := str(unit.hero_id)
+	var faction := str(heroes[hero_id].f)
+	var faction_hero_ids := {}
+	for other in allies:
+		if str(heroes[other.hero_id].f) == faction: faction_hero_ids[str(other.hero_id)] = true
+	var faction_count := faction_hero_ids.size()
+	var tier := 0
+	for threshold in [2, 5, 8]:
+		if faction_count >= threshold: tier = threshold
+	var graph := _bond_graph_data(faction)
+	var lines: Array[String] = []
+	var faction_name := t(str(graph.faction[1]), str(graph.faction[2]))
+	lines.append(("[color=#f3d27a]✓ " if tier > 0 else "[color=#777b80]○ ") + faction_name + "  " + str(faction_count) + "/8[/color]")
+	for bond in graph.bonds:
+		var members: Array = bond[3]
+		if not members.has(hero_id): continue
+		var current := 0
+		for member in members:
+			if allies.any(func(other): return str(other.hero_id) == str(member)):
+				current += 1
+		var active := current == members.size()
+		var bond_name := t(str(bond[1]), str(bond[2]))
+		lines.append(("[color=#8fe39b]✓ " if active else "[color=#777b80]○ ") + bond_name + "  " + str(current) + "/" + str(members.size()) + "[/color]")
+	return "\n".join(lines)
+
+func _inspector_buffs(unit: Dictionary) -> String:
+	var lines: Array[String] = []
+	if float(unit.get("shield", 0.0)) > 0.0: lines.append(t("护盾 ", "Shield ") + _inspector_number(float(unit.shield)))
+	if float(unit.get("damage_buff", 0.0)) > 0.0: lines.append(t("永久增伤 ", "Damage bonus ") + _inspector_number(float(unit.damage_buff) * 100.0) + "%")
+	if float(unit.get("timed_damage_buff", 0.0)) > 0.0: lines.append(t("临时增伤 ", "Timed damage ") + _inspector_number(float(unit.timed_damage_buff) * 100.0) + "% · " + _inspector_number(float(unit.get("timed_damage_time", 0.0))) + "s")
+	if float(unit.get("damage_reduction", 0.0)) > 0.0: lines.append(t("伤害减免 ", "Damage reduction ") + _inspector_number(float(unit.damage_reduction) * 100.0) + "%")
+	if float(unit.get("faction_damage_reduction", 0.0)) > 0.0: lines.append(t("阵营减伤 ", "Faction reduction ") + _inspector_number(float(unit.faction_damage_reduction) * 100.0) + "%")
+	if float(unit.get("timed_reduction", 0.0)) > 0.0: lines.append(t("临时减伤 ", "Timed reduction ") + _inspector_number(float(unit.timed_reduction) * 100.0) + "% · " + _inspector_number(float(unit.get("timed_reduction_time", 0.0))) + "s")
+	if float(unit.get("timed_action_bonus", 0.0)) > 0.0: lines.append(t("行动条加速 ", "Gauge haste ") + _inspector_number(float(unit.timed_action_bonus) * 100.0) + "% · " + _inspector_number(float(unit.get("timed_action_time", 0.0))) + "s")
+	if float(unit.get("skill_value_bonus", 0.0)) != 0.0: lines.append(t("技能强度加成 ", "SKILL bonus ") + _inspector_number(float(unit.skill_value_bonus)))
+	if float(unit.get("all_lifesteal", 0.0)) > 0.0: lines.append(t("全能吸血 ", "Omnivamp ") + _inspector_number(float(unit.all_lifesteal) * 100.0) + "% · " + _inspector_number(float(unit.get("all_lifesteal_time", 0.0))) + "s")
+	if float(unit.get("regen_time", 0.0)) > 0.0: lines.append(t("回春 ", "Regeneration ") + _inspector_number(float(unit.regen_time)) + "s")
+	if float(unit.get("stealth", 0.0)) > 0.0: lines.append(t("隐身 ", "Stealth ") + _inspector_number(float(unit.stealth)) + "s")
+	if int(unit.get("zhangbao_revives_used", 0)) >= 0 and str(unit.hero_id) == "zhangbao":
+		var total_revives := 1 + (1 if _pair_active(str(unit.team), "zhangliang", "zhangbao") else 0)
+		lines.append(t("剩余复生 ", "Revives left ") + str(maxi(0, total_revives - int(unit.zhangbao_revives_used))))
+	return t("无", "None") if lines.is_empty() else "\n".join(lines)
+
+func _inspector_debuffs(unit: Dictionary) -> String:
+	var lines: Array[String] = []
+	if float(unit.get("burn", 0.0)) > 0.0: lines.append(t("灼烧 ", "Burn ") + _inspector_number(float(unit.burn)) + "s · " + t("每秒 ", "per second ") + _inspector_number(float(unit.get("burn_damage", 0.0))))
+	if float(unit.get("poison", 0.0)) > 0.0: lines.append(t("中毒 ", "Poison ") + _inspector_number(float(unit.poison)) + "s · " + _inspector_number(float(unit.get("poison_ratio", 0.0)) * 100.0) + "% Max HP/s")
+	if float(unit.get("stun", 0.0)) > 0.0: lines.append(t("眩晕 ", "Stun ") + _inspector_number(float(unit.stun)) + "s")
+	if float(unit.get("charm", 0.0)) > 0.0: lines.append(t("魅惑 ", "Charm ") + _inspector_number(float(unit.charm)) + "s")
+	if float(unit.get("fear", 0.0)) > 0.0: lines.append(t("恐惧 ", "Fear ") + _inspector_number(float(unit.fear)) + "s")
+	if float(unit.get("freeze", 0.0)) > 0.0: lines.append(t("冻结 ", "Freeze ") + _inspector_number(float(unit.freeze)) + "s")
+	if float(unit.get("silence", 0.0)) > 0.0: lines.append(t("沉默 ", "Silence ") + _inspector_number(float(unit.silence)) + "s")
+	if float(unit.get("slow_time", 0.0)) > 0.0: lines.append(t("减速 ", "Slow ") + _inspector_number(float(unit.get("slow_amount", 0.0)) * 100.0) + "% · " + _inspector_number(float(unit.slow_time)) + "s")
+	if float(unit.get("vulnerable_time", 0.0)) > 0.0: lines.append(t("易损 ", "Vulnerable ") + _inspector_number(float(unit.get("vulnerable", 0.0)) * 100.0) + "% · " + _inspector_number(float(unit.vulnerable_time)) + "s")
+	if float(unit.get("grievous_time", 0.0)) > 0.0: lines.append(t("重伤 ", "Grievous ") + _inspector_number(float(unit.get("grievous", 0.0)) * 100.0) + "% · " + _inspector_number(float(unit.grievous_time)) + "s")
+	if float(unit.get("skill_debuff_time", 0.0)) > 0.0: lines.append(t("虚弱：技能强度降低 ", "Weakened: SKILL -") + _inspector_number(float(unit.get("skill_debuff", 0.0)) * 100.0) + "% · " + _inspector_number(float(unit.skill_debuff_time)) + "s")
+	if bool(unit.get("zhuge_fire_mark", false)): lines.append(t("火攻标记", "Fire Assault mark"))
+	if float(unit.get("strategy_mark", 0.0)) > 0.0: lines.append(t("谋略标记 ", "Strategy mark ") + _inspector_number(float(unit.strategy_mark)) + "s")
+	return t("无", "None") if lines.is_empty() else "\n".join(lines)
+
+func _refresh_unit_inspector() -> void:
+	if unit_inspector_unit_id.is_empty() or not is_instance_valid(unit_inspector_detail): return
+	var unit = _inspector_unit()
+	if unit == null:
+		_hide_unit_inspector()
+		return
+	var hero: Dictionary = heroes[unit.hero_id]
+	var cooldown_text := t("被动技能", "Passive") if not _unit_has_active_skill(unit) else _inspector_number(_unit_skill_cooldown(unit)) + "s"
+	unit_inspector_title.text = _hero_name(unit.hero_id) + t("  · 点击关闭", "  · Tap to close")
+	var state_text := t("存活", "Alive") if bool(unit.alive) else t("已阵亡", "Fallen")
+	var body := "[color=#f0c77a][font_size=22][b]" + t("战斗状态", "COMBAT STATUS") + "[/b][/font_size][/color]\n"
+	body += t("阵营：", "Faction: ") + _faction_name(hero.f) + "  ·  " + _hero_army_name(unit.hero_id) + "  ·  " + state_text + "\n"
+	body += "[b]HP[/b]  " + _inspector_number(maxf(0.0, float(unit.hp))) + " / " + _inspector_number(float(unit.max_hp)) + "\n"
+	body += "[b]" + t("技能强度", "SKILL") + "[/b]  " + _inspector_number(_unit_skill_stat_value(unit) * maxf(0.0, 1.0 - float(unit.get("skill_debuff", 0.0)))) + t("（面板基础 ", " (base ") + _inspector_number(float(hero.skill_value)) + t("）", ")") + "\n"
+	body += t("冷却：", "Cooldown: ") + cooldown_text + t("  ·  行动条：", "  ·  Gauge: ") + _inspector_number(float(unit.get("action", 0.0))) + "/100\n\n"
+	body += "[color=#f0c77a][font_size=20][b]" + str(hero.zh_skill if language == "zh" else hero.skill) + "[/b][/font_size][/color]\n" + _skill_detail(str(unit.hero_id)) + "\n\n"
+	body += "[color=#f0c77a][font_size=20][b]" + t("羁绊状态", "BOND STATUS") + "[/b][/font_size][/color]\n" + _inspector_bond_state(unit) + "\n\n"
+	body += "[b]" + t("本武将羁绊具体效果", "Hero-specific bond effects") + "[/b]\n" + _hero_bond_detail(str(unit.hero_id)) + "\n\n"
+	body += "[color=#8fe39b][font_size=20][b]" + t("当前增益", "CURRENT BUFFS") + "[/b][/font_size][/color]\n" + _inspector_buffs(unit) + "\n\n"
+	body += "[color=#ef8a79][font_size=20][b]" + t("当前减益", "CURRENT DEBUFFS") + "[/b][/font_size][/color]\n" + _inspector_debuffs(unit)
+	unit_inspector_detail.text = body
 
 func _ruler_card(is_player: bool) -> PanelContainer:
 	var panel := PanelContainer.new()
@@ -449,7 +626,7 @@ func _build_draft_layer() -> void:
 	box.add_theme_constant_override("separation", 12)
 	panel.add_child(box)
 	var header := HBoxContainer.new()
-	var title := _label(t("本轮招募 · 三轮二选一", "ROUND RECRUITMENT · THREE PICK-ONE-OF-TWO ROUNDS"), 25, Color("#f0c77a"))
+	var title := _label(t("本轮招募 · 三轮三选一", "ROUND RECRUITMENT · THREE PICK-ONE-OF-THREE ROUNDS"), 25, Color("#f0c77a"))
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	var close := _button(t("暂时隐藏", "HIDE"))
@@ -588,6 +765,13 @@ func _build_settings_overlay() -> void:
 		faction_setting_options.add_item(_faction_name(faction), faction_setting_options.get_item_count())
 	faction_setting_options.item_selected.connect(_set_draft_faction_filter)
 	box.add_child(faction_setting_options)
+	enemy_faction_setting_options = OptionButton.new()
+	enemy_faction_setting_options.custom_minimum_size = Vector2(360, 48)
+	enemy_faction_setting_options.add_item(t("敌方阵营：全部", "Enemy faction: All"), 0)
+	for faction in ["shu", "wei", "wu", "qun"]:
+		enemy_faction_setting_options.add_item(_faction_name(faction), enemy_faction_setting_options.get_item_count())
+	enemy_faction_setting_options.item_selected.connect(_set_enemy_faction_filter)
+	box.add_child(enemy_faction_setting_options)
 	var close := _button(t("保存并返回", "SAVE & BACK"))
 	close.custom_minimum_size = Vector2(240, 48)
 	close.pressed.connect(_close_settings)
@@ -630,6 +814,9 @@ func _refresh_settings_ui() -> void:
 	if is_instance_valid(faction_setting_options):
 		var factions := ["", "shu", "wei", "wu", "qun"]
 		faction_setting_options.select(factions.find(draft_faction_filter))
+	if is_instance_valid(enemy_faction_setting_options):
+		var factions := ["", "shu", "wei", "wu", "qun"]
+		enemy_faction_setting_options.select(factions.find(enemy_faction_filter))
 
 func _set_draft_faction_filter(index: int) -> void:
 	var factions := ["", "shu", "wei", "wu", "qun"]
@@ -639,15 +826,23 @@ func _set_draft_faction_filter(index: int) -> void:
 	_refresh_settings_ui()
 	_render()
 
+func _set_enemy_faction_filter(index: int) -> void:
+	var factions := ["", "shu", "wei", "wu", "qun"]
+	enemy_faction_filter = factions[clampi(index, 0, factions.size() - 1)]
+	_save_settings()
+	_refresh_settings_ui()
+
 func _load_settings() -> void:
 	var config := ConfigFile.new()
 	if config.load(SETTINGS_PATH) == OK:
 		pause_during_actions = bool(config.get_value("battle", "pause_during_actions", true))
 		game_speed = float(config.get_value("battle", "speed", 1.0))
 		draft_faction_filter = str(config.get_value("battle", "draft_faction_filter", ""))
+		enemy_faction_filter = str(config.get_value("battle", "enemy_faction_filter", ""))
 		show_hero_codex_images = bool(config.get_value("interface", "show_hero_codex_images", false))
 		if game_speed not in [1.0, 2.0, 4.0]: game_speed = 1.0
 		if draft_faction_filter not in ["", "shu", "wei", "wu", "qun"]: draft_faction_filter = ""
+		if enemy_faction_filter not in ["", "shu", "wei", "wu", "qun"]: enemy_faction_filter = ""
 	battle_speed = game_speed
 
 func _save_settings() -> void:
@@ -655,6 +850,7 @@ func _save_settings() -> void:
 	config.set_value("battle", "pause_during_actions", pause_during_actions)
 	config.set_value("battle", "speed", game_speed)
 	config.set_value("battle", "draft_faction_filter", draft_faction_filter)
+	config.set_value("battle", "enemy_faction_filter", enemy_faction_filter)
 	config.set_value("interface", "show_hero_codex_images", show_hero_codex_images)
 	config.save(SETTINGS_PATH)
 
@@ -706,13 +902,6 @@ func _build_encyclopedia() -> void:
 	var filter_spacer := Control.new()
 	filter_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	encyclopedia_hero_filters.add_child(filter_spacer)
-	for level in [1, 2, 3]:
-		var star_button := _button("★".repeat(level))
-		star_button.custom_minimum_size = Vector2(70, 42)
-		star_button.tooltip_text = t("查看%d星属性与技能数值" % level, "View %d-star stats and skill values" % level)
-		star_button.pressed.connect(_set_encyclopedia_star.bind(level))
-		encyclopedia_hero_filters.add_child(star_button)
-		encyclopedia_star_filter_buttons.append(star_button)
 	encyclopedia_bond_reset_button = _button(t("重置布局", "RESET LAYOUT"))
 	encyclopedia_bond_reset_button.custom_minimum_size = Vector2(120, 42)
 	encyclopedia_bond_reset_button.pressed.connect(_render_encyclopedia_bond_graph)
@@ -771,7 +960,7 @@ func _set_encyclopedia_faction(faction: String) -> void:
 	_render_encyclopedia()
 
 func _set_encyclopedia_star(level: int) -> void:
-	encyclopedia_star_level = clampi(level, 1, 3)
+	encyclopedia_star_level = 1
 	_render_encyclopedia()
 
 func _build_encyclopedia_preview() -> void:
@@ -947,7 +1136,7 @@ func _refresh_encyclopedia_preview() -> void:
 	encyclopedia_preview_separator.visible = show_hero_codex_images
 	encyclopedia_preview_portrait.texture = _portrait_source_texture(hero_id) if show_hero_codex_images else null
 	encyclopedia_preview_portrait.material = null
-	encyclopedia_preview_name.text = _hero_name(hero_id) + "  " + "★".repeat(encyclopedia_star_level)
+	encyclopedia_preview_name.text = _hero_name(hero_id)
 	encyclopedia_preview_name.add_theme_color_override("font_color", FACTION_COLORS[hero.f].lightened(0.32))
 	var stat_mult := _star_stat_multiplier(encyclopedia_star_level)
 	encyclopedia_preview_detail.text = (
@@ -987,9 +1176,9 @@ func _star_skill_values(hero_id: String, level: int) -> String:
 	var hero: Dictionary = heroes[hero_id]
 	var params: Dictionary = hero.get("ability_params", {})
 	var ability: String = hero.get("ability", "")
-	var stat_mult := _star_stat_multiplier(level)
-	var effect_mult := _star_effect_multiplier(level)
-	var skill_base := float(hero.skill_value) * stat_mult
+	var stat_mult := 1.0
+	var effect_mult := maxf(0.0, float(hero.skill_value) / 100.0)
+	var skill_base := float(hero.get("skill_output_base", hero.skill_value)) * effect_mult
 	var values: Array[String] = []
 	if hero_id == "liubei":
 		var heal_ratio := float(params.get("heal_ratio", 2.0))
@@ -998,7 +1187,7 @@ func _star_skill_values(hero_id: String, level: int) -> String:
 	elif hero_id == "zhangfei":
 		var damage_by_star: Array = params.get("damage_by_star", [0.15, 0.20, 0.30])
 		if damage_by_star.is_empty(): damage_by_star = [0.15, 0.20, 0.30]
-		var damage_bonus := float(damage_by_star[clampi(level, 1, mini(3, damage_by_star.size())) - 1]) * 100.0
+		var damage_bonus := float(damage_by_star[0]) * effect_mult * 100.0
 		values.append(t("前排增伤%.0f%%，持续%.1f秒" % [damage_bonus, float(params.get("duration", 3.0))], "Front row +%.0f%% damage for %.1fs" % [damage_bonus, float(params.get("duration", 3.0))]))
 	elif hero_id == "guanyu": values.append(t("整列每名敌人受到%d真实伤害" % round(skill_base * float(params.get("mult", 1.8))), "Each enemy in the column takes %d true damage" % round(skill_base * float(params.get("mult", 1.8)))))
 	elif hero_id == "zhaoyun":
@@ -1006,28 +1195,28 @@ func _star_skill_values(hero_id: String, level: int) -> String:
 		values.append(t("基础连刺5次，每次%d伤害，总计%d" % [hit_damage, hit_damage * 5], "5 base thrusts for %d each, %d total" % [hit_damage, hit_damage * 5]))
 	elif hero_id == "liushan":
 		var damage_by_star: Array = params.get("damage_by_star", [0.25, 0.35, 0.55])
-		values.append(t("同列前军增伤%.0f%%，持续4秒" % (float(damage_by_star[clampi(level, 1, damage_by_star.size()) - 1]) * 100.0), "Same-column vanguard gains %.0f%% damage for 4s" % (float(damage_by_star[clampi(level, 1, damage_by_star.size()) - 1]) * 100.0)))
+		values.append(t("同列前军增伤%.0f%%，持续4秒" % (float(damage_by_star[0]) * effect_mult * 100.0), "Same-column vanguard gains %.0f%% damage for 4s" % (float(damage_by_star[0]) * effect_mult * 100.0)))
 	elif hero_id == "huangzhong": values.append(t("大招造成%d真实伤害" % round(skill_base * float(params.get("active_mult", 2.0))), "Active deals %d true damage" % round(skill_base * float(params.get("active_mult", 2.0)))))
 	elif hero_id == "machao":
 		values.append(t("贯穿同列：前军%d / 中军%d / 后军%d伤害" % [round(skill_base * float(params.get("front_mult", 2.0))), round(skill_base * float(params.get("middle_mult", 1.7))), round(skill_base * float(params.get("back_mult", 1.4)))], "Column pierce: front %d / middle %d / rear %d damage" % [round(skill_base * float(params.get("front_mult", 2.0))), round(skill_base * float(params.get("middle_mult", 1.7))), round(skill_base * float(params.get("back_mult", 1.4)))]))
 	elif hero_id == "madai":
 		var ratios: Array = params.get("max_hp_ratios", [0.60, 0.70, 0.85])
-		values.append(t("随机前军受到其最大生命%.0f%%伤害" % (float(ratios[clampi(level, 1, ratios.size()) - 1]) * 100.0), "A random frontliner takes %.0f%% of its max HP" % (float(ratios[clampi(level, 1, ratios.size()) - 1]) * 100.0)))
+		values.append(t("随机前军受到其最大生命%.0f%%伤害" % (float(ratios[0]) * effect_mult * 100.0), "A random frontliner takes %.0f%% of its max HP" % (float(ratios[0]) * effect_mult * 100.0)))
 	elif hero_id == "weiyan":
 		values.append(t("每个目标%d伤害；自身回复实际伤害40%%" % round(skill_base * float(params.get("mult", 1.8))), "%d damage per target; self-heal 40%% of actual damage" % round(skill_base * float(params.get("mult", 1.8)))))
-	elif hero_id == "caocao": values.append(t("随机2人各%d伤害；眩晕%.2f秒" % [round(skill_base * float(params.get("mult", 2.0))), float(params.get("stun", 2.5)) * effect_mult], "2 random enemies take %d each; %.2fs stun" % [round(skill_base * float(params.get("mult", 2.0))), float(params.get("stun", 2.5)) * effect_mult]))
+	elif hero_id == "caocao": values.append(t("随机2人各%d伤害；眩晕%.2f秒" % [round(skill_base * float(params.get("mult", 2.0))), float(params.get("stun", 2.5))], "2 random enemies take %d each; %.2fs stun" % [round(skill_base * float(params.get("mult", 2.0))), float(params.get("stun", 2.5))]))
 	elif hero_id == "dianwei": values.append(t("随机2名后军各%d物理伤害" % round(skill_base * float(params.get("mult", 2.0))), "2 random rearguards take %d physical damage each" % round(skill_base * float(params.get("mult", 2.0)))))
 	elif hero_id == "xuchu": values.append(t("随机2名前军各%d物理伤害" % round(skill_base * float(params.get("mult", 2.0))), "2 random vanguards take %d physical damage each" % round(skill_base * float(params.get("mult", 2.0)))))
 	elif hero_id == "zhangliao": values.append(t("同列每个格子往返各%d伤害" % round(skill_base * float(params.get("mult", 1.0))), "Each tile in the column takes %d on both passes" % round(skill_base * float(params.get("mult", 1.0)))))
 	elif hero_id == "yuejin": values.append(t("随机3人各%d物理伤害" % round(skill_base * float(params.get("mult", 1.0))), "3 random enemies take %d physical damage each" % round(skill_base * float(params.get("mult", 1.0)))))
-	elif hero_id == "xuhuang": values.append(t("前军整排每格%d伤害；眩晕%.2f秒" % [round(skill_base * float(params.get("mult", 1.25))), float(params.get("stun", 2.0)) * effect_mult], "Enemy vanguard row takes %d per tile; %.2fs stun" % [round(skill_base * float(params.get("mult", 1.25))), float(params.get("stun", 2.0)) * effect_mult]))
-	elif hero_id == "zhanghe": values.append(t("前军目标%d伤害；眩晕%.2f秒" % [round(skill_base * float(params.get("mult", 2.0))), float(params.get("stun", 1.5)) * effect_mult], "Vanguard target takes %d; %.2fs stun" % [round(skill_base * float(params.get("mult", 2.0))), float(params.get("stun", 1.5)) * effect_mult]))
+	elif hero_id == "xuhuang": values.append(t("前军整排每格%d伤害；眩晕%.2f秒" % [round(skill_base * float(params.get("mult", 1.25))), float(params.get("stun", 2.0))], "Enemy vanguard row takes %d per tile; %.2fs stun" % [round(skill_base * float(params.get("mult", 1.25))), float(params.get("stun", 2.0))]))
+	elif hero_id == "zhanghe": values.append(t("前军目标%d伤害；眩晕%.2f秒" % [round(skill_base * float(params.get("mult", 2.0))), float(params.get("stun", 1.5))], "Vanguard target takes %d; %.2fs stun" % [round(skill_base * float(params.get("mult", 2.0))), float(params.get("stun", 1.5))]))
 	elif hero_id == "yujin": values.append(t("最低当前生命友军获得200+3%%最大生命护盾", "Lowest-current-HP ally gains 200 + 3%% max-HP shield"))
-	elif hero_id == "xiahouyuan": values.append(t("随机2人各%d伤害；已眩晕目标%d伤害；眩晕%.2f秒" % [round(skill_base * 1.75), round(skill_base * 2.50), 1.5 * effect_mult], "2 random enemies take %d each, or %d if stunned; %.2fs stun" % [round(skill_base * 1.75), round(skill_base * 2.50), 1.5 * effect_mult]))
-	elif hero_id == "caoren": values.append(t("随机2名后军各%d伤害；眩晕%.2f秒；后军减伤20%%持续6秒" % [round(skill_base * 1.50), 1.5 * effect_mult], "2 rearguards take %d each; %.2fs stun; 20%% rear reduction for 6s" % [round(skill_base * 1.50), 1.5 * effect_mult]))
-	elif hero_id == "xiahoudun": values.append(t("随机2名前军各%d伤害；眩晕%.2f秒；前军减伤20%%持续6.5秒" % [round(skill_base * 1.50), 1.5 * effect_mult], "2 vanguards take %d each; %.2fs stun; 20%% front reduction for 6.5s" % [round(skill_base * 1.50), 1.5 * effect_mult]))
+	elif hero_id == "xiahouyuan": values.append(t("随机2人各%d伤害；已眩晕目标%d伤害；眩晕1.5秒" % [round(skill_base * 1.75), round(skill_base * 2.50)], "2 random enemies take %d each, or %d if stunned; 1.5s stun" % [round(skill_base * 1.75), round(skill_base * 2.50)]))
+	elif hero_id == "caoren": values.append(t("随机2名后军各%d伤害；眩晕1.5秒；后军减伤%.0f%%持续6秒" % [round(skill_base * 1.50), 20.0 * effect_mult], "2 rearguards take %d each; 1.5s stun; %.0f%% rear reduction for 6s" % [round(skill_base * 1.50), 20.0 * effect_mult]))
+	elif hero_id == "xiahoudun": values.append(t("随机2名前军各%d伤害；眩晕1.5秒；前军减伤%.0f%%持续6.5秒" % [round(skill_base * 1.50), 20.0 * effect_mult], "2 vanguards take %d each; 1.5s stun; %.0f%% front reduction for 6.5s" % [round(skill_base * 1.50), 20.0 * effect_mult]))
 	elif hero_id == "simayi": values.append(t("随机2人各%d雷击伤害" % round(skill_base * 1.75), "2 random enemies take %d lightning damage each" % round(skill_base * 1.75)))
-	elif hero_id == "guojia": values.append(t("随机冻结2人%.2f秒；破冰伤害=剩余秒数×400" % (4.0 * effect_mult), "Freeze 2 enemies for %.2fs; shatter = remaining seconds × 400" % (4.0 * effect_mult)))
+	elif hero_id == "guojia": values.append(t("随机冻结2人4秒；破冰伤害=剩余秒数×%d" % round(400.0 * effect_mult), "Freeze 2 enemies for 4s; shatter = remaining seconds × %d" % round(400.0 * effect_mult)))
 	elif hero_id == "xunyu": values.append(t("随机2名友军行动条速度+20%%，持续6秒", "2 random allies gain +20%% gauge speed for 6s"))
 	elif hero_id == "jiaxu": values.append(t("随机2人中毒5秒，每秒损失1%%最大生命", "Poison 2 enemies for 5s at 1%% max HP per second"))
 	elif hero_id == "sunjian": values.append(t("伤害等于实际消耗生命的100%%；通常消耗当前生命10%%，首次40%%", "Damage equals 100%% of HP spent; normally costs 10%% current HP, 40%% on the first cast"))
@@ -1042,9 +1231,21 @@ func _star_skill_values(hero_id: String, level: int) -> String:
 	elif hero_id == "lvmeng": values.append(t("后军目标%d物理伤害；隐身%.1f秒" % [round(float(params.get("base_value", skill_base * 4.0)) * stat_mult), float(params.get("stealth", 3.0))], "%d physical damage to rearguard; %.1fs stealth" % [round(float(params.get("base_value", skill_base * 4.0)) * stat_mult), float(params.get("stealth", 3.0))]))
 	elif hero_id == "lusu": values.append(t("最低当前生命友军：恢复%.0f%%最大生命，最大生命+%d" % [float(params.get("heal_ratio", 0.15)) * 100.0, round(float(params.get("max_hp_flat", 200.0)))], "Lowest-current-HP ally: restore %.0f%% max HP, max HP +%d" % [float(params.get("heal_ratio", 0.15)) * 100.0, round(float(params.get("max_hp_flat", 200.0)))]))
 	elif hero_id == "xiaoqiao": values.append(t("随机%d名后军：减速%.0f%%，持续%.1f秒" % [int(params.get("target_count", 2)), float(params.get("slow", 0.35)) * 100.0, float(params.get("slow_time", 6.0))], "Random %d rearguards: %.0f%% slow for %.1fs" % [int(params.get("target_count", 2)), float(params.get("slow", 0.35)) * 100.0, float(params.get("slow_time", 6.0))]))
-	elif hero_id == "lvbu": values.append(t("目标排每人约%d物理伤害" % round(skill_base * float(params.get("mult", 1.6))), "About %d physical damage to each unit in the row" % round(skill_base * float(params.get("mult", 1.6)))))
-	elif hero_id == "diaochan": values.append(t("魅惑%.2f秒" % (float(params.get("duration", 1.5)) * effect_mult), "Charm for %.2fs" % (float(params.get("duration", 1.5)) * effect_mult)))
-	elif hero_id == "dongzhuo": values.append(t("技能造成%d伤害，追加当前生命比例伤害" % round(skill_base * float(params.get("mult", 1.0))), "Skill deals %d damage plus current-HP damage" % round(skill_base * float(params.get("mult", 1.0)))))
+	elif hero_id == "lvbu": values.append(t("正面三格每格约%d物理伤害" % round(skill_base * float(params.get("mult", 1.75))), "About %d physical damage to each of the 3 facing tiles" % round(skill_base * float(params.get("mult", 1.75)))))
+	elif hero_id == "diaochan": values.append(t("随机魅惑%.2f秒" % float(params.get("duration", 3.0)), "Random charm for %.2fs" % float(params.get("duration", 3.0))))
+	elif hero_id == "dongzhuo": values.append(t("正前方受到董卓当前生命%.0f%%伤害" % (float(params.get("current_hp_ratio", 0.07)) * 100.0), "Facing enemy takes %.0f%% of Dong Zhuo's current HP" % (float(params.get("current_hp_ratio", 0.07)) * 100.0)))
+	elif hero_id == "chengong": values.append(t("同列友军技能冷却减少%.1f秒", "Column allies reduce cooldown by %.1fs") % float(params.get("cooldown_reduction", 1.0)))
+	elif hero_id == "gaoshun": values.append(t("随机%d人各受到%d伤害并易碎%.1f秒" % [int(params.get("target_count", 2)), round(skill_base * float(params.get("mult", 1.5))), float(params.get("vulnerable_time", 3.0))], "%d random enemies take %d damage and become Fragile for %.1fs" % [int(params.get("target_count", 2)), round(skill_base * float(params.get("mult", 1.5))), float(params.get("vulnerable_time", 3.0))]))
+	elif hero_id == "yanliang": values.append(t("随机%d名中/后军各受到%d伤害" % [int(params.get("target_count", 2)), round(skill_base * float(params.get("mult", 1.75)))], "%d random mid/rearguards each take %d damage" % [int(params.get("target_count", 2)), round(skill_base * float(params.get("mult", 1.75)))]))
+	elif hero_id == "wenchou": values.append(t("随机%d名前/中军各受到2%%最大生命伤害" % int(params.get("target_count", 2)), "%d random vanguard/midguards each take 2%% max HP" % int(params.get("target_count", 2))))
+	elif hero_id == "gaolan": values.append(t("同列友军技能强度+%d" % int(params.get("skill_bonus", 20)), "Column allies gain +%d SKILL" % int(params.get("skill_bonus", 20))))
+	elif hero_id == "qunzhanghe": values.append(t("生命最低%d名友军各获得%d护盾" % [int(params.get("target_count", 2)), round(skill_base * float(params.get("shield_mult", 2.0)))], "%d lowest-current-HP allies each gain %d shield" % [int(params.get("target_count", 2)), round(skill_base * float(params.get("shield_mult", 2.0)))]))
+	elif hero_id == "huatuo": values.append(t("生命最低3名友军各恢复%d生命" % round(skill_base), "3 lowest-current-HP allies each restore %d HP" % round(skill_base)))
+	elif hero_id == "yuji": values.append(t("随机2人中毒4秒，每秒损失0.5%%最大生命", "Poison 2 enemies for 4s at 0.5%% max HP per second"))
+	elif hero_id == "zuoci": values.append(t("生命最低2名友军各恢复%d生命" % round(skill_base * 1.5), "2 lowest-current-HP allies each restore %d HP" % round(skill_base * 1.5)))
+	elif hero_id == "zhangjiao": values.append(t("随机2人各受到%d雷击伤害" % round(skill_base * 2.0), "2 random enemies each take %d thunder damage" % round(skill_base * 2.0)))
+	elif hero_id == "zhangliang": values.append(t("随机2人技能强度降低50%%，持续5秒", "2 random enemies lose 50%% SKILL for 5s"))
+	elif hero_id == "zhangbao": values.append(t("每次阵亡随机2人各受到%d伤害；基础复生1次" % round(skill_base * 2.0), "Each death hits 2 random enemies for %d; revive once" % round(skill_base * 2.0)))
 	elif ability in ["strike", "strike_magic", "drain", "control", "row", "row_magic"]:
 		values.append(t("每个命中目标约%d伤害" % round(skill_base * float(params.get("mult", 1.0))), "About %d damage per hit target" % round(skill_base * float(params.get("mult", 1.0)))))
 	elif ability in ["multi", "multi_magic"]:
@@ -1056,9 +1257,9 @@ func _star_skill_values(hero_id: String, level: int) -> String:
 		values.append(t("每个目标获得约%d护盾" % round(skill_base * float(params.get("mult", 1.5)) + float(params.get("flat", 40.0)) * effect_mult), "Each target gains about %d shield" % round(skill_base * float(params.get("mult", 1.5)) + float(params.get("flat", 40.0)) * effect_mult)))
 	elif ability.begins_with("buff_"):
 		values.append(t("增伤%.1f%%；行动加速%.1f%%" % [float(params.get("damage", 0.0)) * effect_mult * 100.0, float(params.get("action", 0.0)) * effect_mult * 100.0], "+%.1f%% damage; +%.1f%% gauge speed" % [float(params.get("damage", 0.0)) * effect_mult * 100.0, float(params.get("action", 0.0)) * effect_mult * 100.0]))
-	if float(params.get("stun", 0.0)) > 0.0: values.append(t("控制%.2f秒" % (float(params.stun) * effect_mult), "Control %.2fs" % (float(params.stun) * effect_mult)))
-	if float(params.get("burn", 0.0)) > 0.0: values.append(t("灼烧%.1f秒" % (float(params.burn) * effect_mult), "Burn %.1fs" % (float(params.burn) * effect_mult)))
-	return t("★%d 实战数值：" % level, "★%d combat values: " % level) + "；".join(values)
+	if float(params.get("stun", 0.0)) > 0.0: values.append(t("控制%.2f秒" % float(params.stun), "Control %.2fs" % float(params.stun)))
+	if float(params.get("burn", 0.0)) > 0.0: values.append(t("灼烧%.1f秒" % float(params.burn), "Burn %.1fs" % float(params.burn)))
+	return t("当前技能数值：", "Current skill values: ") + "；".join(values)
 
 func _render_encyclopedia() -> void:
 	_clear_dynamic_children(encyclopedia_grid)
@@ -1114,7 +1315,7 @@ func _render_encyclopedia() -> void:
 			portrait.tooltip_text = t("点击放大武将立绘", "Click to enlarge hero artwork")
 			portrait.gui_input.connect(_on_encyclopedia_card_input.bind(hero_id))
 			card_box.add_child(portrait)
-		var hero_name := _label(_hero_name(hero_id) + "  " + "★".repeat(encyclopedia_star_level), 24, FACTION_COLORS[hero.f].lightened(0.32))
+		var hero_name := _label(_hero_name(hero_id), 24, FACTION_COLORS[hero.f].lightened(0.32))
 		hero_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_box.add_child(hero_name)
 		var stats := _label(t("生命", "HP") + " " + str(round(float(hero.hp) * stat_mult)) + "\n" + _hero_army_name(hero_id) + "  ·  " + t("每", "Every ") + str(hero.cooldown) + t("秒读条", "s gauge"), 13, Color("#e8e2cf"))
@@ -1197,9 +1398,21 @@ func _bond_graph_data(faction: String) -> Dictionary:
 		"qun":{
 			"faction":["chaos_struggle", "乱世争衡", "Chaos Struggle", "2 / 5 / 8", "全体群雄武将技能冷却缩短3%/8%/15%。8人时，每次释放技能有20%概率连续释放两次。", "All Qun heroes gain 3%/8%/15% skill cooldown reduction. At 8, every cast has a 20% chance to cast twice in succession."],
 			"bonds":[
-				["tyrant_court", "鬼神权倾", "Tyrant's Court", ["lvbu", "diaochan", "dongzhuo"], "3人", "3 heroes", "吕布获得致死保护，貂蝉延长魅惑，董卓强化当前生命追加伤害。", "Lu Bu gains a death ward, Diao Chan extends charm, and Dong Zhuo gains stronger current-HP damage."],
-				["hebei_pillars", "河北四庭柱", "Hebei Pillars", ["yanliang", "wenchou", "qunzhanghe", "gaolan"], "至少3人", "3+ heroes", "成员开场获得紫幕；文丑反弹指向技能，群张郃可补充紫幕。", "Members open with Purple Ward; Wen Chou reflects targeted skills and Qun Zhang He restores wards."],
-				["way_of_heaven", "天道", "Way of Heaven", ["yuji", "zhangjiao"], "2人", "2 heroes", "友军阵亡时有65%概率对随机敌人降下60%技能强度天雷。", "Allied deaths have a 65% chance to strike a random enemy for 60% SKILL thunder."]
+				["tyrant_peerless", "暴虐无双", "Tyrant and Peerless", ["lvbu", "dongzhuo"], "2人", "2 heroes", "吕布按实际伤害的40%回血；董卓伤害提高至自身当前生命15%。", "Lu Bu heals for 40% of actual damage; Dong Zhuo rises to 15% of his current HP."],
+				["hero_beauty", "英雄美人", "Hero and Beauty", ["lvbu", "diaochan"], "2人", "2 heroes", "吕布每损失10%生命增伤4%；被貂蝉魅惑者每秒攻击相邻友军。", "Lu Bu gains 4% damage per 10% HP missing; charmed enemies attack adjacent allies each second."],
+				["peerless_strategy", "谋定无双", "Peerless Strategy", ["lvbu", "chengong"], "2人", "2 heroes", "吕布横扫有50%概率再释放一次；陈宫冷却光环额外减少1秒。", "Lu Bu has 50% chance to sweep twice; Chen Gong's aura reduces another 1s."],
+				["flying_formation", "飞将陷阵", "Flying General Formation", ["lvbu", "gaoshun"], "2人", "2 heroes", "吕布横扫追加中军三格；高顺技能额外攻击2人。", "Lu Bu also sweeps 3 midguard tiles; Gao Shun gains 2 targets."],
+				["tyrant_beauty", "暴君倾城", "Tyrant and Beauty", ["dongzhuo", "diaochan"], "2人", "2 heroes", "董卓最大生命提高50%；貂蝉魅惑延长至6秒。", "Dong Zhuo gains 50% max HP; Diao Chan's charm lasts 6s."],
+				["strategy_formation", "谋陷并驱", "Strategy and Formation", ["chengong", "gaoshun"], "2人", "2 heroes", "陈宫冷却光环额外减少1秒；高顺易碎延长至6秒。", "Chen Gong's aura reduces another 1s; Gao Shun's Fragile lasts 6s."],
+				["hebei_twins", "河北双雄", "Hebei Twin Champions", ["yanliang", "wenchou"], "2人", "2 heroes", "颜良、文丑的技能目标各增加2名。", "Yan Liang and Wen Chou each gain 2 targets."],
+				["hebei_comrades", "河北同袍", "Hebei Comrades", ["gaolan", "qunzhanghe"], "2人", "2 heroes", "高览同列技能强度加成提高至40；群张郃护盾目标增加2名。", "Gao Lan's column aura rises to +40 SKILL; Zhang He gains 2 shield targets."],
+				["hebei_pillars", "河北四庭柱", "Hebei Pillars", ["yanliang", "wenchou", "qunzhanghe", "gaolan"], "4人", "4 heroes", "颜良、文丑受击为下次技能叠加15%伤害，最高300%；高览扩大同排同列40技能强度；群张郃再加2目标且护盾提高至400%。", "Yan Liang and Wen Chou gain 15% next-cast damage per hit up to 300%; Gao Lan grants +40 SKILL across his row and column; Zhang He gains 2 more targets and 400% shields."],
+				["medicine_immortal", "医道同源", "Medicine and Immortality", ["huatuo", "yuji"], "2人", "2 heroes", "华佗治疗同时清除全部减益；于吉中毒目标+1且持续时间+1秒。", "Hua Tuo's healing cleanses all debuffs; Yu Ji gains 1 poison target and +1s duration."],
+				["immortal_healers", "济世仙缘", "Immortal Healers", ["huatuo", "zuoci"], "2人", "2 heroes", "华佗和左慈的治疗倍率各提高50%技能强度。", "Hua Tuo and Zuo Ci each gain +50% SKILL healing ratio."],
+				["fangshi_lineage", "方仙同门", "Immortal Lineage", ["yuji", "zuoci"], "2人", "2 heroes", "于吉中毒目标+1且持续时间+1秒；左慈治疗时追加两道150%天雷。", "Yu Ji gains 1 poison target and +1s duration; Zuo Ci adds two 150% SKILL thunderbolts."],
+				["heaven_man", "天人同道", "Heaven and Man", ["zhangjiao", "zhangliang"], "2人", "2 heroes", "张角雷击倍率提高50%；张梁虚弱目标+1。", "Zhang Jiao gains +50% SKILL ratio; Zhang Liang gains 1 weaken target."],
+				["heaven_earth", "天地雷契", "Heaven and Earth", ["zhangjiao", "zhangbao"], "2人", "2 heroes", "张角雷击目标+1且有50%概率眩晕1秒；张宝自爆波及目标周围八格。", "Zhang Jiao gains 1 target and 50% chance to stun for 1s; Zhang Bao's detonation splashes all eight neighboring tiles."],
+				["earth_man", "地人续命", "Earth and Man", ["zhangliang", "zhangbao"], "2人", "2 heroes", "张梁虚弱目标+1；张宝额外复生一次。", "Zhang Liang gains 1 weaken target; Zhang Bao gains one additional revival."]
 			]
 		}
 	}
@@ -1457,7 +1670,7 @@ func _render_encyclopedia_bond_graph() -> void:
 		"shu":["liubei", "guanyu", "zhangfei", "zhaoyun", "liushan", "zhugeliang", "huangzhong", "weiyan", "madai", "machao", "jiangwei", "pangtong", "menghuo", "zhurong", "dailaidongzhu"],
 		"wei":["caocao", "dianwei", "xuchu", "zhangliao", "yuejin", "zhanghe", "xuhuang", "yujin", "simayi", "guojia", "xiahouyuan", "caoren", "xiahoudun", "xunyu", "jiaxu"],
 		"wu":["zhouyu", "luxun", "lusu", "lvmeng", "sunjian", "sunce", "sunquan", "sunshangxiang", "daqiao", "xiaoqiao", "huanggai", "taishici", "ganning", "dingfeng", "xusheng"],
-		"qun":["lvbu", "diaochan", "dongzhuo", "yanliang", "wenchou", "qunzhanghe", "gaolan", "yuji", "zhangjiao", "gaoshun", "chengong", "huatuo", "yuanshao", "yuanshu"]
+		"qun":["lvbu", "diaochan", "dongzhuo", "yanliang", "wenchou", "qunzhanghe", "gaolan", "gaoshun", "chengong", "huatuo", "yuji", "zuoci", "zhangjiao", "zhangliang", "zhangbao"]
 	}
 	var hero_ids: Array = preferred_order[encyclopedia_faction].duplicate()
 	var layout := _bond_network_layout(hero_ids, graph_data)
@@ -1608,19 +1821,19 @@ func _skill_detail(hero_id: String) -> String:
 	match hero_id:
 		"liubei": return t("仁德回春：为当前生命比例最低的友军施加持续4秒、每秒200%技能强度的治疗；溢出治疗转为主公回血。", "Benevolent Renewal: Heal the lowest-HP-ratio ally for 200% SKILL each second for 4s; overflow restores the ruler.")
 		"guanyu": return t("青龙偃月：劈砍目标整列，每名敌人受到180%技能强度伤害。", "Green Dragon: Cleave the target column for 180% SKILL damage per enemy.")
-		"zhangfei": return t("燕人号令：强化己方前排，1/2/3星分别增伤15%/20%/30%，持续3秒。", "Roar Command: Empower the allied front row for 3s; stars grant 15%/20%/30% damage.")
+		"zhangfei": return t("燕人号令：强化己方前军，增伤15%，持续3秒。", "Roar Command: Grant the allied vanguard +15% damage for 3s.")
 		"zhaoyun": return t("龙胆连刺：随机选择一名射程内敌人，快速攻击同一目标5次，每次造成50%技能强度伤害。", "Dragon Spear: Randomly select an enemy in range and strike it 5 times for 50% SKILL each.")
-		"liushan": return t("蜀主鼓舞：强化同列前军4秒，1/2/3星分别增伤25%/35%/55%。", "Royal Encouragement: Empower the allied vanguard in the same column for 4s; stars grant 25%/35%/55% damage.")
+		"liushan": return t("蜀主鼓舞：强化同列前军4秒，使其伤害提高25%。", "Royal Encouragement: Grant the allied vanguard in the same column +25% damage for 4s.")
 		"huangzhong": return t("百步穿杨：射击随机可攻击格，造成200%技能强度伤害。", "Piercing Arrow: Shoot a random reachable tile for 200% SKILL damage.")
 		"machao": return t("铁骑贯阵：锁定当前血量最低敌人所在列，前军/中军/后军依次受到200%/170%/140%技能强度贯穿伤害。", "Iron Cavalry: Pierce the column containing the lowest-current-HP enemy for 200%/170%/140% SKILL damage by row.")
-		"madai": return t("斩将突袭：随机攻击敌方前军，1/2/3星分别造成目标最大生命60%/70%/85%的伤害；没有敌方前军时攻击空格，对主公造成1000/1500/2000点伤害。", "Execution Raid: Hit a random enemy frontliner for 60%/70%/85% max HP by star; if none remains, strike an empty tile for 1000/1500/2000 ruler damage.")
+		"madai": return t("斩将突袭：随机攻击敌方前军，造成40%最大生命伤害；无前军时攻击空格，对主公造成1000点伤害。", "Execution Raid: Deal 40% max HP to a random enemy vanguard; if none remains, strike an empty tile for 1000 ruler damage.")
 		"weiyan": return t("狂骨横斩：攻击正前方及其同排相邻格，造成180%技能强度伤害，并回复实际伤害40%的生命。", "Rebel Fang: Hit the facing tile and adjacent tiles for 180% SKILL, healing 40% of actual damage.")
 		"zhugeliang": return t("八阵奇谋：随机选择敌方格子，对目标及同列相邻格造成200%技能强度法术伤害。", "Eight-Formation Stratagem: Deal 200% SKILL magic damage to a random enemy tile and its vertical neighbors.")
 		"jiangwei": return t("北伐：对随机可攻击目标造成160%技能强度法术伤害，并获得15%减伤5秒。", "Northern Expedition: Deal 160% SKILL magic damage to a random reachable target and gain 15% reduction for 5s.")
 		"pangtong": return t("连环计：造成80%技能强度法术伤害并锁住目标行动条2秒。", "Chain Scheme: Deal 80% SKILL magic damage and freeze one target's gauge for 2s.")
 		"menghuo": return t("蛮王震地：对可攻击的一整排造成105%技能强度物理伤害并眩晕0.8秒。", "Barbarian Quake: Deal 105% SKILL physical damage to a reachable row and stun for 0.8s.")
 		"zhurong": return t("火神飞刃：造成145%技能强度法术伤害并灼烧4秒，每秒30%技能强度。", "Flame Blade: Deal 145% SKILL magic damage and burn for 4s at 30% SKILL per second.")
-		"dailaidongzhu": return t("蛮骨狼袭：锁定行动条最高的可攻击敌人，造成180%技能强度物理伤害，并按1/2/3星压退25%/35%/50%行动条。", "Savage-Bone Wolf Assault: Strike the reachable enemy with the highest gauge for 180% SKILL and push it back 25%/35%/50% by star.")
+		"dailaidongzhu": return t("蛮骨狼袭：锁定行动条最高的可攻击敌人，造成180%技能强度物理伤害，并压退25%行动条。", "Savage-Bone Wolf Assault: Strike the reachable enemy with the highest gauge for 180% SKILL and push its gauge back 25%.")
 		"caocao": return t("魏武震慑：随机攻击两名敌军，造成200%技能强度伤害并眩晕2.5秒。", "Dominion Stun: Strike two random enemies for 200% SKILL damage and stun for 2.5s.")
 		"dianwei": return t("恶来袭后：随机攻击两名敌方后军，各造成200%技能强度伤害。", "Evil Guard Raid: Strike two random enemy rearguards for 200% SKILL damage each.")
 		"xuchu": return t("虎卫破前：随机攻击两名敌方前军，各造成200%技能强度伤害。", "Tiger Guard Break: Strike two random enemy vanguards for 200% SKILL damage each.")
@@ -1649,9 +1862,21 @@ func _skill_detail(hero_id: String) -> String:
 		"taishici": return t("神亭烈戟：攻击射程内行动条最高的两名敌人，造成150%技能强度伤害，并灼烧5秒，每秒造成20%技能强度伤害。", "Blazing Twin Halberds: Strike the two reachable enemies with the highest gauges for 150% SKILL and burn for 5s at 20% SKILL per second.")
 		"ganning": return t("锦帆并击：自身与同排左侧友军分别攻击一名随机敌方后军，各造成150%自身技能强度的伤害；友军协击不消耗行动条。", "Bell-Raider Twin Assault: Gan Ning and the ally directly to his left each strike a random enemy rearguard for 150% of their own SKILL; the assist costs no gauge.")
 		"huanggai": return t("苦肉焚阵：消耗10%最大生命，对随机敌方一列造成等同于实际消耗生命33%的伤害；生命不足时消耗全部生命并在攻击后阵亡。", "Bitter-Flesh Column: Spend 10% max HP to damage a random enemy column for 33% of HP spent; if HP is insufficient, spend it all and fall after attacking.")
-		"lvbu": return t("无双横扫：随机选择可攻击排，对整排造成160%技能强度伤害；空排则穿透主公。", "Peerless Sweep: Deal 160% SKILL to a random reachable row; an empty row pierces the ruler.")
-		"diaochan": return t("美人离间：魅惑技能数值最高的敌人1.5秒，使其行动条停止。", "Beauty's Scheme: Charm the highest-SKILL enemy for 1.5s, freezing its gauge.")
-		"dongzhuo": return t("暴君横征：造成100%技能强度+min(800%技能强度，当前生命6%)伤害。", "Tyrant's Levy: Deal 100% SKILL + min(800% SKILL, 6% current HP).")
+		"lvbu": return t("无双横扫：对正前方敌方前军及其左右相邻格造成175%技能强度伤害。", "Peerless Sweep: Strike the facing enemy vanguard and its left/right neighbors for 175% SKILL damage.")
+		"diaochan": return t("美人离间：随机魅惑一名敌军3秒，使其行动条停止。", "Beauty's Scheme: Charm a random enemy for 3s, stopping its action gauge.")
+		"dongzhuo": return t("暴君横征：对正前方敌军造成自身当前生命值7%的伤害。", "Tyrant's Might: Deal damage equal to 7% of Dong Zhuo's current HP to the facing enemy.")
+		"chengong": return t("智迟谋速（被动）：陈宫及其同列友军的技能冷却减少1秒。", "Measured Formation (Passive): Chen Gong and allies in his column reduce skill cooldowns by 1s.")
+		"gaoshun": return t("陷阵之志：随机攻击两名敌军，造成150%技能强度伤害并施加3秒易碎，期间受到伤害提高40%。", "Formation Resolve: Strike 2 random enemies for 150% SKILL and inflict 3s Fragile, increasing damage taken by 40%.")
+		"yanliang": return t("河北猛袭：随机攻击两名敌方中军或后军，造成175%技能强度伤害。", "Hebei Fierce Assault: Strike 2 random enemy midguards or rearguards for 175% SKILL damage.")
+		"wenchou": return t("河北破阵：随机攻击两名敌方前军或中军，造成目标最大生命值2%的伤害。", "Hebei Breakthrough: Strike 2 random enemy vanguards or midguards for 2% of each target's max HP.")
+		"gaolan": return t("列阵扬威（被动）：高览同列友军的技能强度增加20点。", "Column Valor (Passive): Allies in Gao Lan's column gain 20 SKILL.")
+		"qunzhanghe": return t("河北护阵：为当前生命值最低的两名友军施加可抵消200%技能强度伤害的护盾。", "Hebei Ward: Shield the 2 allies with the lowest current HP for 200% SKILL.")
+		"huatuo": return t("青囊三济：治疗当前生命值最低的三名友军，各恢复100%技能强度生命。", "Threefold Remedy: Heal the three allies with the lowest current HP for 100% SKILL each.")
+		"yuji": return t("蛊毒仙术：随机使两名敌军中毒4秒，每秒损失0.5%最大生命。", "Venomous Immortal Art: Poison two random enemies for 4s, dealing 0.5% max HP each second.")
+		"zuoci": return t("遁甲济世：治疗当前生命值最低的两名友军，各恢复150%技能强度生命。", "Immortal Aid: Heal the two allies with the lowest current HP for 150% SKILL each.")
+		"zhangjiao": return t("黄天雷引：召唤雷电随机攻击两名敌军，各造成200%技能强度伤害。", "Yellow Sky Thunder: Call lightning on two random enemies for 200% SKILL damage each.")
+		"zhangliang": return t("人公虚弱：随机使两名敌军虚弱5秒，技能强度降低50%。", "Yellow Sky Weakening: Weaken two random enemies for 5s, reducing SKILL by 50%.")
+		"zhangbao": return t("地公雷爆（被动）：阵亡时随机攻击两名敌军，各造成200%技能强度伤害，随后可满血复生一次。", "Earth General Detonation (Passive): On death, strike two random enemies for 200% SKILL, then revive once at full HP.")
 	return _true_damage_text(_skill_detail_legacy(hero_id))
 
 func _bond_entry(name_zh: String, name_en: String, member_ids: Array, effect_zh: String, effect_en: String) -> String:
@@ -1721,7 +1946,14 @@ func _hero_bond_detail(hero_id: String) -> String:
 		[["zhangliao", "yuejin"], "逍遥津先锋", "Hefei Vanguard", {"zhangliao":["回旋刃飞出与返回的每段伤害由100%提高至200%技能强度。", "Both boomerang passes rise from 100% to 200% SKILL."], "yuejin":["目标数由3名提高至5名，伤害由100%提高至150%技能强度。", "Targets rise from 3 to 5 and damage rises from 100% to 150% SKILL."]}],
 		[["zhanghe", "xuhuang"], "巧变开山", "Adaptive Vanguard", {"zhanghe":["巧变连枪命中前军后，再随机攻击一名与其相邻的前军。", "After hitting the vanguard, chain to one random adjacent vanguard."], "xuhuang":["撼地开山的整排伤害由125%提高至200%技能强度。", "Earth-Splitting Axe row damage rises from 125% to 200% SKILL."]}],
 		[["zhouyu", "luxun", "lusu", "lvmeng"], "四英杰", "Four Heroes", {"zhouyu":["赤壁点火额外选择2个格子，总共点燃4格。", "Red Cliffs selects 2 extra tiles, igniting 4 in total."], "luxun":["火球的总弹射次数由1次提高至3次。", "Fireball total bounces increase from 1 to 3."], "lusu":["改为治疗当前生命值总量最低的两名友军，各恢复20%最大生命并使本场战斗最大生命提高350。", "Treat the two allies with the lowest current HP totals, restoring 20% max HP and granting 350 max HP to each for this battle."], "lvmeng":["白衣渡江命中的后军恐惧4秒，行动条停止且每秒受到5%最大生命伤害。", "White-Robed Raid fears the struck rearguard for 4s, freezing its gauge and dealing 5% max HP each second."]}],
-		[["lvbu", "diaochan", "dongzhuo"], "鬼神权倾", "Tyrant's Court", {"lvbu":["释放无双横扫后获得4秒致死保护。", "Gain a 4s death ward after Peerless Sweep."], "diaochan":["魅惑持续时间提高50%，由1.5秒变为2.25秒。", "Charm duration rises 50%, from 1.5s to 2.25s."], "dongzhuo":["当前生命追加比例由6%提高至12%，并在开场获得2秒致死保护。", "Current-HP ratio rises from 6% to 12% and gain a 2s opening death ward."]}],
+		[["lvbu", "dongzhuo"], "暴虐无双", "Tyrant and Peerless", {"lvbu":["按无双横扫对武将造成的实际伤害40%恢复自身生命；护盾和空格伤害不计入。", "Heal for 40% of actual hero HP damage from Peerless Sweep; shield and empty-tile damage do not count."], "dongzhuo":["暴君横征伤害由自身当前生命7%提高至15%。", "Tyrant's Might rises from 7% to 15% of current HP."]}],
+		[["lvbu", "diaochan"], "英雄美人", "Hero and Beauty", {"lvbu":["每损失10%生命，无双横扫伤害提高4%。", "Gain 4% Peerless Sweep damage per 10% HP missing."], "diaochan":["魅惑期间，目标每秒随机攻击一名相邻友军，造成被魅惑者100%技能强度伤害。", "Each second, the charmed target attacks a random adjacent ally for 100% of its own SKILL."]}],
+		[["lvbu", "chengong"], "谋定无双", "Peerless Strategy", {"lvbu":["无双横扫有50%概率连续释放两次。", "Peerless Sweep has a 50% chance to cast twice."], "chengong":["智迟谋速的冷却减少额外增加1秒。", "Measured Formation reduces cooldown by another 1s."]}],
+		[["lvbu", "gaoshun"], "飞将陷阵", "Flying General Formation", {"lvbu":["无双横扫追加攻击正前方敌军对应的中军及其左右相邻格。", "Peerless Sweep also hits the corresponding 3 midguard tiles."], "gaoshun":["陷阵之志的目标额外增加2名。", "Formation Resolve gains 2 targets."]}],
+		[["dongzhuo", "diaochan"], "暴君倾城", "Tyrant and Beauty", {"dongzhuo":["自身最大生命值提高50%。", "Gain 50% max HP."], "diaochan":["美人离间的魅惑持续时间由3秒延长至6秒。", "Beauty's Scheme charm increases from 3s to 6s."]}],
+		[["chengong", "gaoshun"], "谋陷并驱", "Strategy and Formation", {"chengong":["智迟谋速的冷却减少额外增加1秒。", "Measured Formation reduces cooldown by another 1s."], "gaoshun":["陷阵之志的易碎持续时间由3秒延长至6秒。", "Formation Resolve Fragile duration increases from 3s to 6s."]}],
+		[["yanliang", "wenchou"], "河北双雄", "Hebei Twin Champions", {"yanliang":["河北猛袭的技能目标额外增加2名。", "Hebei Fierce Assault gains 2 targets."], "wenchou":["河北破阵的技能目标额外增加2名。", "Hebei Breakthrough gains 2 targets."]}],
+		[["gaolan", "qunzhanghe"], "河北同袍", "Hebei Comrades", {"gaolan":["同列友军的技能强度加成由20点提高至40点。", "The column aura rises from +20 to +40 SKILL."], "qunzhanghe":["河北护阵的目标额外增加2名。", "Hebei Ward gains 2 targets."]}],
 		[["zhangliao", "yuejin", "zhanghe", "xuhuang", "yujin"], "五子良将", "Five Elite Generals", {"zhangliao":["两段回旋刃命中的敌人获得40%易损，持续3.5秒。", "Enemies hit by the two passes take 40% more damage for 3.5s."], "yuejin":["改为攻击7名敌人，造成200%技能强度伤害，并施加4秒重伤，使治疗和自身回复降低60%。", "Target 7 enemies at 200% SKILL and inflict 4s Grievous Wounds, reducing healing and self-recovery by 60%."], "zhanghe":["连锁从两名前军继续扩散至相邻中军和后军；伤害提高至300%，攻击前已眩晕的目标时提高至500%。", "The two-vanguard chain spreads to adjacent midguard and rearguard; damage rises to 300%, or 500% if the target was already stunned."], "xuhuang":["改为攻击随机一整排，伤害提高至300%技能强度，眩晕由2秒延长至5秒。", "Strike a random entire row at 300% SKILL and extend stun from 2s to 5s."], "yujin":["改为保护当前生命最低的3名友军，护盾提高至300点加目标5%最大生命。", "Protect the 3 lowest-current-HP allies for 300 plus 5% of each target's max HP."]}],
 		[["xiahouyuan", "caoren"], "神速镇远", "Swift Bulwark", {"xiahouyuan":["冷却缩短0.5秒，眩晕延长0.5秒。", "Cooldown -0.5s and stun +0.5s."], "caoren":["目标增加1名，眩晕延长0.5秒，后军伤害减免提高10%。", "Gain 1 target, +0.5s stun, and +10% rear damage reduction."]}],
 		[["xiahouyuan", "xiahoudun"], "夏侯同心", "Xiahou Brothers", {"xiahouyuan":["冷却缩短0.5秒，眩晕延长0.5秒。", "Cooldown -0.5s and stun +0.5s."], "xiahoudun":["目标增加1名，眩晕延长0.5秒，前军伤害减免提高10%。", "Gain 1 target, +0.5s stun, and +10% vanguard damage reduction."]}],
@@ -1743,8 +1975,13 @@ func _hero_bond_detail(hero_id: String) -> String:
 		[["taishici", "ganning"], "江表双锋", "Twin Blades of Jiangbiao", {"taishici":["目标已处于灼烧状态时，本次直接伤害由150%提高至300%技能强度。", "Direct damage rises from 150% to 300% SKILL against burning targets."], "ganning":["自身与左侧友军的本次协击倍率由150%提高至250%技能强度。", "Both Gan Ning and his left ally rise from 150% to 250% SKILL for the assist."]}],
 		[["luxun", "sunquan"], "君臣同心", "Sovereign and Minister", {"luxun":["火球伤害提高50%，命中灼烧目标时再提高50%，合计提高100%。", "Fireball gains +50% damage and another +50% against burning targets, for +100% total."], "sunquan":["技能伤害由目标当前生命8%提高至12%，冷却由10秒缩短至8秒。", "Skill damage rises from 8% to 12% of target current HP and cooldown drops from 10s to 8s."]}],
 		[["dingfeng", "xusheng"], "江表虎臣", "Tiger Ministers", {"dingfeng":["雪中奋短兵追加攻击目标左右相邻格，造成70%技能强度伤害并压退15%行动条。", "Snowbound Blades also hits horizontal neighbors for 70% SKILL and pushes their gauges back 15%."], "xusheng":["宿卫水阵的控制持续时间提高50%。", "Guardian Water Formation's control duration increases by 50%."]}],
-		[["yanliang", "wenchou", "qunzhanghe", "gaolan"], "河北四庭柱", "Hebei Pillars", {"yanliang":["开场获得1层紫幕，抵挡下一次主动技能。", "Start with 1 Purple Ward blocking the next active."], "wenchou":["开场获得1层紫幕，且指向技能有35%概率反弹60%伤害。", "Start with 1 ward; targeted skills have 35% chance to reflect 60% damage."], "qunzhanghe":["开场获得1层紫幕；主动还能为同列友军补充1层。", "Start with 1 ward; the active gives the column another ward."], "gaolan":["开场获得1层紫幕，抵挡下一次主动技能。", "Start with 1 ward blocking the next active."]}],
-		[["yuji", "zhangjiao"], "天道", "Way of Heaven", {"yuji":["友军阵亡时有65%概率对随机敌人降下60%技能强度天雷。", "Allied deaths have 65% chance to strike a random enemy for 60% SKILL thunder."], "zhangjiao":["友军阵亡时有65%概率对随机敌人降下60%技能强度天雷。", "Allied deaths have 65% chance to strike a random enemy for 60% SKILL thunder."]}]
+		[["yanliang", "wenchou", "qunzhanghe", "gaolan"], "河北四庭柱", "Hebei Pillars", {"yanliang":["技能间隔内每次实际受伤使下次技能伤害提高15%，最高提高300%，释放后清空。", "Each actual hit between casts grants +15% next-cast damage up to +300%, cleared after casting."], "wenchou":["技能间隔内每次实际受伤使下次技能伤害提高15%，最高提高300%，释放后清空。", "Each actual hit between casts grants +15% next-cast damage up to +300%, cleared after casting."], "qunzhanghe":["技能目标再增加2名，护盾由200%提高至400%技能强度。", "Gain 2 more targets and raise shields from 200% to 400% SKILL."], "gaolan":["光环改为同排和同列全部友军技能强度增加40点。", "The aura grants +40 SKILL to all allies in Gao Lan's row and column."]}],
+		[["huatuo", "yuji"], "医道同源", "Medicine and Immortality", {"huatuo":["青囊三济会清除被治疗者身上的全部减益。", "Threefold Remedy cleanses every debuff from each healed ally."], "yuji":["蛊毒仙术增加1个目标，中毒持续时间由4秒延长至5秒。", "Venomous Immortal Art gains 1 target and lasts 5s instead of 4s."]}],
+		[["huatuo", "zuoci"], "济世仙缘", "Immortal Healers", {"huatuo":["青囊三济的治疗倍率由100%提高至150%技能强度。", "Threefold Remedy healing rises from 100% to 150% SKILL."], "zuoci":["遁甲济世的治疗倍率由150%提高至200%技能强度。", "Immortal Aid healing rises from 150% to 200% SKILL."]}],
+		[["yuji", "zuoci"], "方仙同门", "Immortal Lineage", {"yuji":["蛊毒仙术增加1个目标，中毒持续时间增加1秒。", "Venomous Immortal Art gains 1 target and +1s duration."], "zuoci":["治疗时同时随机雷击两名敌军，各造成150%技能强度伤害。", "Each heal also strikes 2 random enemies for 150% SKILL lightning damage."]}],
+		[["zhangjiao", "zhangliang"], "天人同道", "Heaven and Man", {"zhangjiao":["黄天雷引的伤害倍率由200%提高至250%技能强度。", "Yellow Sky Thunder rises from 200% to 250% SKILL."], "zhangliang":["人公虚弱增加1个目标。", "Yellow Sky Weakening gains 1 target."]}],
+		[["zhangjiao", "zhangbao"], "天地雷契", "Heaven and Earth", {"zhangjiao":["黄天雷引增加1个目标，每名受击者有50%概率眩晕1秒。", "Yellow Sky Thunder gains 1 target; each victim has a 50% chance to be stunned for 1s."], "zhangbao":["地公雷爆会波及每个主目标周围上下、左右与斜对角相邻的武将，造成50%技能强度伤害。", "Earth General Detonation splashes all eight neighboring units around each primary target for 50% SKILL."]}],
+		[["zhangliang", "zhangbao"], "地人续命", "Earth and Man", {"zhangliang":["人公虚弱增加1个目标。", "Yellow Sky Weakening gains 1 target."], "zhangbao":["本场战斗额外复生一次，总共可复生两次。", "Gain one additional revival, for two revivals per battle."]}]
 	]
 	for definition in combo_defs:
 		var members: Array = definition[0]
@@ -1759,7 +1996,7 @@ func _bond_detail(faction: String) -> String:
 		"shu": return t("汉室北伐（2/5/8）：全体蜀将承伤降低2%/5%/8%；8人时，每次受伤叠加2%额外减伤，最多3层达到14%，释放技能后清空额外层数。　桃园结义：刘备每秒治疗200%→300%技能强度；关羽按列斩实际伤害的30%自疗；张飞号令追加20%减伤。　五虎上将（5）：马超使全体前军和中军行动条速度提高15%；关羽列斩180%→300%；赵云五次连刺递增为50%/70%/90%/110%/130%。　七进七出：赵云变为7次连刺并强制攻击敌方后军；刘禅使被鼓舞友军获得4秒30%全能吸血。　一骑当千：马超贯穿全列均为200%，马岱开场立即行动。　宿命之敌：马岱施加40%易伤15秒，魏延为指定友军恢复15%最大生命。　飞火流星：黄忠有50%概率造成双倍伤害；敌方前军阵亡时魏延恢复50%最大生命。", "Han Expedition (2/5/8) grants 2%/5%/8% damage reduction. At 8, damage taken stacks another 2% up to three times (14% total), cleared after casting. Other listed Shu bonds retain their individual effects.")
 		"wei": return t("魏武中枢（2/5/8）：全体魏将控制时长提高3%/8%/15%；8人时，对眩晕、冻结、减速、中毒及其他任意减益目标造成的伤害提高15%。　曹操双卫、夏侯三将、五子良将与司马懿、郭嘉、荀彧、贾诩的两两羁绊分别强化成员技能。", "Wei Command (2/5/8) grants 3%/8%/15% control duration. At 8, Wei heroes deal 15% more damage to targets with any control or debuff. The Cao guards, Xiahou trio, Five Elites, and six strategist pair bonds each empower their members.")
 		"wu": return t("江东联动（2/5/8）：全体吴将最大生命提高2%/5%/8%；8人时，每场战斗首次有吴将即将阵亡，会按生命比例均摊全体存活吴将的生命，并各自恢复10%最大生命。　四英杰：周瑜额外点燃2格；陆逊火球总共弹射3次；鲁肃治疗两名最低当前生命友军并强化治疗与生命上限；吕蒙施加4秒恐惧。　琴瑟和鸣使周瑜灼烧延长至6秒，并使小乔减速3名后军8秒；江东双姝使小乔减速提高至60%；赤壁苦计强化周瑜点火；君臣同心强化陆逊火球；白衣奇袭强化吕蒙隐身后的下一次伤害。", "Jiangdong Relay (2/5/8) grants 2%/5%/8% max HP and its 8-unit survival effect. Four Heroes empowers Zhou Yu's tile count, Lu Xun's bounces, Lu Su's two-target treatment, and Lu Meng's fear. Harmonious Zither also empowers Xiao Qiao's target count and duration, while Jiangdong Sisters raises her slow to 60%. Other listed Wu bonds retain their individual effects.")
-		"qun": return t("乱世争衡（2/5/8）：全体群雄武将技能冷却缩短3%/8%/15%；8人时，每次释放技能有20%概率连续释放两次。鬼神权倾、河北四庭柱和天道继续强化各自成员技能。", "Chaos Struggle (2/5/8) grants 3%/8%/15% skill cooldown reduction. At 8, every cast has a 20% chance to cast twice. Other Qun bonds retain their individual effects.")
+		"qun": return t("乱世争衡（2/5/8）：全体群雄武将技能冷却缩短3%/8%/15%；8人时，每次释放技能有20%概率连续释放两次。吕布、董卓、貂蝉、陈宫、高顺通过六组双人羁绊强化技能；河北四庭柱必须四人齐聚才激活完全体；华佗、于吉、左慈组成医仙三角，张角、张梁、张宝组成黄巾三角，各自通过三组双人羁绊强化技能。", "Chaos Struggle (2/5/8) grants 3%/8%/15% cooldown reduction; at 8, casts have a 20% repeat chance. Lu Bu's group uses six pair bonds, Hebei Pillars requires all four, while the healer-immortal and Yellow Turban trios each form three pair bonds.")
 	return ""
 
 func _portrait_texture(hero_id: String) -> Texture2D:
@@ -1819,9 +2056,11 @@ func _render() -> void:
 	player_ruler_fill.modulate = Color("#a3ffae") if float(ruler_regen.player.get("time", 0.0)) > 0.0 else Color.WHITE
 	enemy_ruler_fill.modulate = Color("#a3ffae") if float(ruler_regen.enemy.get("time", 0.0)) > 0.0 else Color.WHITE
 	_update_battle_time_bar()
+	if is_instance_valid(unit_inspector_overlay) and unit_inspector_overlay.visible:
+		_refresh_unit_inspector()
 	enemy_title_label.text = t("敌方阵地  ·  后排在上 / 前排在下", "ENEMY FORMATION  ·  BACK TO FRONT")
 	player_title_label.text = t("我方阵地  ·  前排在上 / 后排在下", "YOUR FORMATION  ·  FRONT TO BACK")
-	if phase == "draft": draft_title_label.text = t("二选一 · 第%d/3轮" % (PICKS_PER_ROUND - draft_picks_remaining + 1), "PICK 1 OF 2 · ROUND %d/3" % (PICKS_PER_ROUND - draft_picks_remaining + 1))
+	if phase == "draft": draft_title_label.text = t("三选一 · 第%d/3轮" % (PICKS_PER_ROUND - draft_picks_remaining + 1), "PICK 1 OF 3 · ROUND %d/3" % (PICKS_PER_ROUND - draft_picks_remaining + 1))
 	elif phase == "placement": draft_title_label.text = t("布置新武将 · 待放 ", "DEPLOY RECRUITS · LEFT ") + str(pending_unit_ids.size())
 	elif phase == "combat": draft_title_label.text = t("最终无限战斗", "FINAL UNLIMITED BATTLE") if final_battle else t("本关战斗中 · 30 秒", "STAGE BATTLE · 30 SEC")
 	else: draft_title_label.text = t("征战结果", "CAMPAIGN RESULT")
@@ -1961,7 +2200,14 @@ func _render_board(board: GridContainer, units: Array, is_player: bool) -> void:
 			state.add_theme_constant_override("outline_size", 4)
 			state.add_theme_color_override("font_outline_color", Color.BLACK)
 			card_layer.add_child(state)
-			var name_label := _outlined_label(_hero_name(unit.hero_id) + "  " + "★".repeat(int(unit.get("level", 1))), 22, faction_color.lightened(0.34))
+			var status_icons := _unit_status_icon_row(unit)
+			status_icons.set_anchors_preset(Control.PRESET_TOP_WIDE)
+			status_icons.offset_left = 7
+			status_icons.offset_right = -7
+			status_icons.offset_top = 24
+			status_icons.offset_bottom = 43
+			card_layer.add_child(status_icons)
+			var name_label := _outlined_label(_hero_name(unit.hero_id), 22, faction_color.lightened(0.34))
 			name_label.anchor_left = 0.0
 			name_label.anchor_right = 1.0
 			name_label.anchor_top = 0.5
@@ -2047,9 +2293,36 @@ func _render_board(board: GridContainer, units: Array, is_player: bool) -> void:
 			cell.pressed.connect(_on_player_cell.bind(row, col))
 			if unit != null: cell.set_drag_forwarding(_drag_unit.bind(unit.id, cell), _can_drop_board.bind(row, col), _drop_board.bind(row, col))
 			else: cell.set_drag_forwarding(_drag_empty, _can_drop_board.bind(row, col), _drop_board.bind(row, col))
+		elif unit != null and phase == "combat":
+			cell.disabled = false
+			cell.pressed.connect(_toggle_unit_inspector.bind(str(unit.id)))
 		else:
 			cell.disabled = true
 		board.add_child(cell)
+
+func _unit_status_icon_row(unit: Dictionary) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_END
+	row.add_theme_constant_override("separation", 2)
+	var entries: Array = []
+	if float(unit.get("burn", 0.0)) > 0.0: entries.append(["fire.png", t("灼烧", "Burn")])
+	if float(unit.get("poison", 0.0)) > 0.0: entries.append(["poisoning.png", t("中毒", "Poison")])
+	if float(unit.get("skill_debuff_time", 0.0)) > 0.0: entries.append(["weak.png", t("虚弱", "Weak")])
+	if float(unit.get("stun", 0.0)) > 0.0 or float(unit.get("freeze", 0.0)) > 0.0: entries.append(["dizzy.png", t("眩晕/冻结", "Stun/Freeze")])
+	if float(unit.get("slow_time", 0.0)) > 0.0: entries.append(["slow.png", t("减速", "Slow")])
+	if float(unit.get("damage_buff", 0.0)) > 0.0 or float(unit.get("timed_damage_buff", 0.0)) > 0.0 or float(unit.get("kill_buff", 0.0)) > 0.0 or float(unit.get("vulnerable", 0.0)) > 0.0: entries.append(["boost.png", t("增伤/易伤", "Damage boost/Vulnerable")])
+	if float(unit.get("timed_action_bonus", 0.0)) > 0.0 or bool(unit.get("five_tigers_speed", false)): entries.append(["speed.png", t("加速", "Haste")])
+	for entry in entries.slice(0, 7):
+		var icon := TextureRect.new()
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.texture = load("res://ThreeKingdom/animations/" + str(entry[0]))
+		icon.tooltip_text = str(entry[1])
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(18, 18)
+		row.add_child(icon)
+	return row
 
 func _burning_state_overlay(alpha: float) -> TextureRect:
 	var overlay := TextureRect.new()
@@ -2079,18 +2352,22 @@ func _outlined_label(value: String, size: int, color: Color) -> Label:
 func _render_draft() -> void:
 	_clear_dynamic_children(draft_box)
 	draft_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var mobile := _is_mobile_ui()
 	for choice_index in choices.size():
 		var id: String = str(choices[choice_index])
 		var hero: Dictionary = heroes[id]
 		var option := VBoxContainer.new()
 		option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		option.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		option.custom_minimum_size = Vector2(500, 560)
+		option.custom_minimum_size = Vector2(245 if mobile else 360, 430 if mobile else 540)
 		option.add_theme_constant_override("separation", 10)
+		var rank_label := _label(t(["前军候选", "中军候选", "后军候选"][choice_index], ["VANGUARD", "MIDGUARD", "REARGUARD"][choice_index]), 18, Color("#f0c77a"))
+		rank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		option.add_child(rank_label)
 		var card := Button.new()
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		card.custom_minimum_size = Vector2(500, 505)
+		card.custom_minimum_size = Vector2(245 if mobile else 360, 360 if mobile else 475)
 		var roles := _roles_text(hero.roles)
 		card.text = ""
 		card.tooltip_text = t("点击后立即锁定，不能撤销", "Click to lock this pick; it cannot be undone") + "\n" + _skill_detail(id)
@@ -2208,7 +2485,7 @@ func _render_battle_stats() -> void:
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 6)
 		var side := t("我", "P") if row.team == "player" else t("敌", "E")
-		var hero_label := _label(side + " · " + _hero_name(row.hero_id) + " " + "★".repeat(int(row.level)), 11, Color("#90c59e") if row.team == "player" else Color("#d89a8f"))
+		var hero_label := _label(side + " · " + _hero_name(row.hero_id), 11, Color("#90c59e") if row.team == "player" else Color("#d89a8f"))
 		hero_label.custom_minimum_size.x = 112
 		hero_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		line.add_child(hero_label)
@@ -2251,7 +2528,7 @@ func _render_reserve() -> void:
 		slot.add_theme_font_size_override("font_size", 11)
 		if index < reserves.size():
 			var unit: Dictionary = reserves[index]
-			slot.text = _hero_name(unit.hero_id) + "\n" + "★".repeat(int(unit.level)) + "  HP " + str(round(unit.hp))
+			slot.text = _hero_name(unit.hero_id) + "\nHP " + str(round(unit.hp))
 			slot.tooltip_text = t("拖拽到战场上阵；拖到其他武将可交换；右键可出售", "Drag to deploy or swap; right-click to sell")
 			slot.modulate = Color("#f0c77a") if selected_unit == unit.id else Color.WHITE
 			slot.pressed.connect(_on_reserve_pressed.bind(unit.id))
@@ -2274,7 +2551,7 @@ func _drag_unit(_at_position: Vector2, unit_id: String, origin: Control):
 	if phase != "placement" or battle_running: return null
 	var unit = _find_by_id(player_units, unit_id)
 	if unit == null or not unit.alive: return null
-	var preview := _outlined_label(_hero_name(unit.hero_id) + " " + "★".repeat(int(unit.level)), 16, FACTION_COLORS[heroes[unit.hero_id].f].lightened(0.3))
+	var preview := _outlined_label(_hero_name(unit.hero_id), 16, FACTION_COLORS[heroes[unit.hero_id].f].lightened(0.3))
 	preview.custom_minimum_size = Vector2(150, 48)
 	preview.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if origin.get_viewport().gui_is_dragging(): origin.set_drag_preview(preview)
@@ -2286,7 +2563,9 @@ func _can_drop_board(_at_position: Vector2, data, _row: int, _col: int) -> bool:
 	var source = _find_by_id(player_units, str(data.unit_id))
 	if source == null or not _can_unit_use_row(source, _row): return false
 	var occupant = _unit_at(player_units, _row, _col)
-	return occupant == null or source.row < 0 or _can_unit_use_row(occupant, int(source.row))
+	if occupant == null or occupant.id == source.id: return true
+	if int(source.row) < 0: return false
+	return _can_unit_use_row(occupant, int(source.row))
 
 func _drop_board(_at_position: Vector2, data, row: int, col: int) -> void:
 	if not _can_drop_board(_at_position, data, row, col): return
@@ -2309,17 +2588,16 @@ func _can_drop_reserve(_at_position: Vector2, data, _index: int) -> bool:
 func _drop_reserve(_at_position: Vector2, data, index: int) -> void:
 	if not _can_drop_reserve(_at_position, data, index): return
 	var source: Dictionary = _find_by_id(player_units, str(data.unit_id))
+	if int(source.row) >= 0:
+		player_units.erase(source)
+		pending_unit_ids.erase(str(source.id))
+		selected_unit = ""
+		_log(_hero_name(source.hero_id) + t(" 已从战场出售。", " was sold from the battlefield."))
+		_render()
+		return
 	var reserves := _reserve_units()
 	var target = reserves[index] if index < reserves.size() else null
-	if source.row >= 0:
-		var old_row: int = int(source.row)
-		var old_col: int = int(source.col)
-		if target != null and target.id != source.id:
-			target.row = old_row
-			target.col = old_col
-		source.row = -1
-		source.col = -1
-	elif target != null and target.id != source.id:
+	if target != null and target.id != source.id:
 		var source_index := player_units.find(source)
 		var target_index := player_units.find(target)
 		player_units[source_index] = target
@@ -2334,7 +2612,7 @@ func _on_reserve_input(event: InputEvent, unit_id: String) -> void:
 func _sell_reserve_unit(unit_id: String) -> void:
 	if battle_running or phase not in ["draft", "placement"]: return
 	var unit = _find_by_id(player_units, unit_id)
-	if unit == null or unit.row >= 0: return
+	if unit == null: return
 	player_units.erase(unit)
 	pending_unit_ids.erase(unit_id)
 	_log(_hero_name(unit.hero_id) + t(" 已出售。", " was sold."))
@@ -2345,7 +2623,7 @@ func _bond_progress_tiers(bond_id: String, member_count: int) -> Array[int]:
 		"five_elites":
 			return [5]
 		"hebei_pillars":
-			return [3, 4]
+			return [4]
 	return [member_count]
 
 func _bond_progress_target(count: int, tiers: Array[int]) -> int:
@@ -2369,6 +2647,8 @@ func _bond_progress_entries(units: Array) -> Array:
 			continue
 		var hero_id := str(unit.get("hero_id", ""))
 		if not heroes.has(hero_id):
+			continue
+		if alive_hero_ids.has(hero_id):
 			continue
 		alive_hero_ids[hero_id] = true
 		var faction := str(heroes[hero_id].f)
@@ -2462,7 +2742,14 @@ func _combo_bond_text(units: Array) -> String:
 	if _roster_has_all(units, ["caocao", "xuchu"]): active.append(t("◆ 虎卫护主：曹操强化前军震慑 · 许褚目标+1", "◆ Tiger Guard: Cao Cao anti-vanguard boost · Xu Chu +1 target"))
 	if _roster_has_all(units, ["dianwei", "xuchu"]): active.append(t("◆ 魏武双卫：典韦与许褚技能伤害提高至400%", "◆ Twin Wei Guards: Dian Wei and Xu Chu rise to 400%"))
 	if _roster_has_all(units, ["zhouyu", "luxun", "lusu", "lvmeng"]): active.append(t("◆ 四英杰：周瑜4格点火 · 陆逊3次弹射 · 鲁肃双人强化治疗 · 吕蒙恐惧", "◆ Four Heroes: Zhou Yu 4 tiles · Lu Xun 3 bounces · Lu Su treats two · Lu Meng fear"))
-	if _roster_has_all(units, ["lvbu", "diaochan", "dongzhuo"]): active.append(t("◆ 鬼神权倾：鬼神免死 · 魅惑增伤 · 暴君重击", "◆ Tyrant's Court: death ward · charm burst · tyrant strike"))
+	if _roster_has_all(units, ["lvbu", "dongzhuo"]): active.append(t("◆ 暴虐无双：吕布横扫回血 · 董卓15%当前生命伤害", "◆ Tyrant and Peerless: Lu Bu sweep healing · Dong Zhuo 15% current-HP damage"))
+	if _roster_has_all(units, ["lvbu", "diaochan"]): active.append(t("◆ 英雄美人：吕布残血增伤 · 魅惑目标每秒倒戈", "◆ Hero and Beauty: Lu Bu missing-HP damage · charmed betrayal"))
+	if _roster_has_all(units, ["lvbu", "chengong"]): active.append(t("◆ 谋定无双：吕布50%概率二次横扫 · 陈宫光环增强", "◆ Peerless Strategy: 50% second sweep · stronger Chen Gong aura"))
+	if _roster_has_all(units, ["lvbu", "gaoshun"]): active.append(t("◆ 飞将陷阵：吕布追加中军横扫 · 高顺目标+2", "◆ Flying General Formation: Lu Bu midguard sweep · Gao Shun +2 targets"))
+	if _roster_has_all(units, ["dongzhuo", "diaochan"]): active.append(t("◆ 暴君倾城：董卓最大生命+50% · 貂蝉魅惑6秒", "◆ Tyrant and Beauty: Dong Zhuo +50% max HP · Diao Chan 6s charm"))
+	if _roster_has_all(units, ["chengong", "gaoshun"]): active.append(t("◆ 谋陷并驱：陈宫光环增强 · 高顺易碎6秒", "◆ Strategy and Formation: stronger aura · Gao Shun 6s Fragile"))
+	if _roster_has_all(units, ["yanliang", "wenchou"]): active.append(t("◆ 河北双雄：颜良、文丑技能目标各+2", "◆ Hebei Twin Champions: Yan Liang and Wen Chou each +2 targets"))
+	if _roster_has_all(units, ["gaolan", "qunzhanghe"]): active.append(t("◆ 河北同袍：高览光环+40技能强度 · 群张郃目标+2", "◆ Hebei Comrades: Gao Lan +40 SKILL aura · Zhang He +2 targets"))
 	if _roster_has_all(units, ["guanyu", "zhangfei", "zhaoyun", "huangzhong", "machao"]): active.append(t("◆ 五虎上将：前军与中军行动条速度+15% · 五虎绝技强化", "◆ Five Tigers: vanguard/midguard gauge speed +15% · signature skills empowered"))
 	if _roster_has_all(units, ["machao", "madai"]): active.append(t("◆ 一骑当千：马超全列200%贯穿 · 马岱开场满行动条", "◆ One Rider: Ma Chao 200% all-row pierce · Ma Dai opens ready"))
 	if _roster_has_all(units, ["weiyan", "madai"]): active.append(t("◆ 宿命之敌：马岱易伤标记 · 魏延邻位治疗", "◆ Fated Enemies: Ma Dai vulnerability · Wei Yan ally healing"))
@@ -2497,8 +2784,13 @@ func _combo_bond_text(units: Array) -> String:
 	if _roster_has_all(units, ["taishici", "ganning"]): active.append(t("◆ 江表双锋：太史慈对灼烧目标300% · 甘宁协击250%", "◆ Twin Blades: Taishi Ci 300% vs burning · Gan Ning assist 250%"))
 	if _roster_has_all(units, ["luxun", "sunquan"]): active.append(t("◆ 君臣同心：陆逊火球增伤 · 孙权12%当前生命伤害与8秒冷却", "◆ Sovereign and Minister: Lu Xun fireball damage · Sun Quan 12% current HP and 8s cooldown"))
 	if _roster_has_all(units, ["dingfeng", "xusheng"]): active.append(t("◆ 江表虎臣：丁奉横向追击 · 徐盛延长控制", "◆ Tiger Ministers: Ding Feng splash · Xu Sheng control"))
-	if _roster_has_count(units, ["yanliang", "wenchou", "qunzhanghe", "gaolan"], 3): active.append(t("◆ 河北四庭柱：开场紫幕挡技能 · 文丑反弹", "◆ Hebei Pillars: opening wards and reflection"))
-	if _roster_has_all(units, ["yuji", "zhangjiao"]): active.append(t("◆ 天道：亡魂雷爆", "◆ Way of Heaven"))
+	if _roster_has_all(units, ["yanliang", "wenchou", "qunzhanghe", "gaolan"]): active.append(t("◆ 河北四庭柱：颜文受击蓄势 · 高览同行同列光环 · 群张郃六人强盾", "◆ Hebei Pillars: stored damage · row/column aura · six strong wards"))
+	if _roster_has_all(units, ["huatuo", "yuji"]): active.append(t("◆ 医道同源：华佗治疗净化 · 于吉目标+1、持续+1秒", "◆ Medicine and Immortality: Hua Tuo cleanse · Yu Ji +1 target/duration"))
+	if _roster_has_all(units, ["huatuo", "zuoci"]): active.append(t("◆ 济世仙缘：华佗、左慈治疗倍率各+50%技能强度", "◆ Immortal Healers: Hua Tuo and Zuo Ci healing +50% SKILL"))
+	if _roster_has_all(units, ["yuji", "zuoci"]): active.append(t("◆ 方仙同门：于吉目标与持续强化 · 左慈追加双雷", "◆ Immortal Lineage: Yu Ji poison boost · Zuo Ci twin lightning"))
+	if _roster_has_all(units, ["zhangjiao", "zhangliang"]): active.append(t("◆ 天人同道：张角雷击+50% · 张梁目标+1", "◆ Heaven and Man: Zhang Jiao +50% · Zhang Liang +1 target"))
+	if _roster_has_all(units, ["zhangjiao", "zhangbao"]): active.append(t("◆ 天地雷契：张角三目标概率眩晕 · 张宝自爆波及八邻格", "◆ Heaven and Earth: Zhang Jiao stun · Zhang Bao adjacent splash"))
+	if _roster_has_all(units, ["zhangliang", "zhangbao"]): active.append(t("◆ 地人续命：张梁目标+1 · 张宝额外复生一次", "◆ Earth and Man: Zhang Liang +1 target · Zhang Bao +1 revival"))
 	if active.is_empty(): return t("尚未激活\n集齐指定的三名武将可获得足以改变战局的羁绊", "None active\nCollect a specific trio for a battle-changing bond")
 	return "\n".join(active)
 
@@ -2506,7 +2798,7 @@ func _roster_text(units: Array) -> String:
 	if units.is_empty(): return t("暂无武将", "No generals yet")
 	var entries: Array[String] = []
 	for unit in units:
-		entries.append(("† " if not unit.alive else "") + _hero_name(unit.hero_id) + " " + "★".repeat(int(unit.get("level", 1))) + " · " + _faction_name(heroes[unit.hero_id].f))
+		entries.append(("† " if not unit.alive else "") + _hero_name(unit.hero_id) + " · " + _faction_name(heroes[unit.hero_id].f))
 	return "  |  ".join(entries)
 
 func _render_combat_boards() -> void:
@@ -2535,6 +2827,8 @@ func _update_action_bars() -> void:
 		var bar = action_bar_refs.get(unit.id, null)
 		if not is_instance_valid(bar): continue
 		bar.value = float(unit.get("action", 0.0))
+	if is_instance_valid(unit_inspector_overlay) and unit_inspector_overlay.visible:
+		_refresh_unit_inspector()
 
 func _update_battle_time_bar() -> void:
 	if not is_instance_valid(battle_time_bar): return
@@ -2559,6 +2853,7 @@ func _status_text(unit: Dictionary) -> String:
 	if float(unit.get("fear", 0.0)) > 0.0: statuses.append(t("恐惧", "Fear"))
 	if float(unit.get("freeze", 0.0)) > 0.0: statuses.append(t("冻结", "Frozen"))
 	if float(unit.get("poison", 0.0)) > 0.0: statuses.append(t("中毒", "Poison"))
+	if float(unit.get("skill_debuff_time", 0.0)) > 0.0: statuses.append(t("虚弱", "Weakened"))
 	if float(unit.get("stealth", 0.0)) > 0: statuses.append(t("潜行", "Stealth"))
 	if float(unit.get("silence", 0.0)) > 0: statuses.append(t("沉默", "Silence"))
 	if float(unit.get("strategy_mark", 0.0)) > 0: statuses.append(t("谋略", "Strategy"))

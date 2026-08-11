@@ -6,21 +6,21 @@ func _initialize() -> void:
 	await process_frame
 	game.tick_timer.stop()
 
-	# Codex star values match the two-copy, +50% per upgrade system.
+	# Star selectors are retired; compatibility helpers always return one-star values.
 	assert(game._star_stat_multiplier(1) == 1.0)
-	assert(game._star_stat_multiplier(2) == 1.5)
-	assert(game._star_stat_multiplier(3) == 2.25)
-	assert(game._star_skill_values("huangzhong", 1) != game._star_skill_values("huangzhong", 2))
-	assert(game._star_skill_values("caoren", 2) != game._star_skill_values("caoren", 3))
+	assert(game._star_stat_multiplier(2) == 1.0)
+	assert(game._star_stat_multiplier(3) == 1.0)
+	assert(game._star_skill_values("huangzhong", 1) == game._star_skill_values("huangzhong", 2))
+	assert(game._star_skill_values("caoren", 2) == game._star_skill_values("caoren", 3))
 	for hero_id in game.heroes:
-		assert(game._star_skill_values(hero_id, 1) != game._star_skill_values(hero_id, 3))
+		assert(game._star_skill_values(hero_id, 1) == game._star_skill_values(hero_id, 3))
 
 	# Every hero keeps a positive skill budget after loading balance overrides.
 	for hero_id in game.heroes:
 		var hero: Dictionary = game.heroes[hero_id]
 		assert(float(hero.skill_value) > 0.0)
-	assert(game.heroes.sunshangxiang.skill_value == 80)
-	assert(game.heroes.huangzhong.skill_value < game.heroes.guanyu.skill_value)
+	assert(game.heroes.sunshangxiang.skill_value == 100)
+	assert(game.heroes.huangzhong.skill_value == game.heroes.guanyu.skill_value)
 	assert(game.heroes.huangzhong.ability_params.mult == 1.45)
 	assert(game.heroes.lvmeng.roles.has("刺客"))
 	assert(game.heroes.ganning.roles.has("刺客"))
@@ -59,13 +59,13 @@ func _initialize() -> void:
 	game._hide_encyclopedia_preview()
 
 	# Each pick locks immediately, replaces the pair, and cannot be undone.
-	assert(game.choices.size() == 2)
+	assert(game.choices.size() == 3)
 	var first: String = game.choices[0]
 	game._choose_hero(first)
 	assert(game.chosen_this_round.has(first))
 	assert(game.player_units.size() == 1)
 	assert(game.draft_picks_remaining == 2)
-	assert(game.choices.size() == 2)
+	assert(game.choices.size() == 3)
 	game._choose_hero("not_a_current_choice")
 	assert(game.chosen_this_round.has(first))
 	assert(game.player_units.size() == 1)

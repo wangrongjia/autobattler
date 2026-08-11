@@ -23,7 +23,7 @@ func _new_game() -> void:
 	if tick_timer: tick_timer.stop()
 	if is_instance_valid(log_box): log_box.clear()
 	_prepare_round()
-	_log(t("征战开始：每关进行三轮二选一，三名武将全部锁定后进入布阵。", "Campaign begins: complete three pick-one-of-two rounds, then deploy the three locked recruits."))
+	_log(t("征战开始：每关进行三轮三选一，选项从左到右固定为前军、中军、后军。", "Campaign begins with three pick-one-of-three rounds; slots are fixed to Vanguard, Midguard, and Rearguard."))
 	_render()
 
 func _save_game(silent := false) -> bool:
@@ -66,17 +66,17 @@ func _load_game() -> bool:
 	phase = str(data.phase)
 	player_ruler_hp = int(data.player_ruler_hp)
 	enemy_ruler_hp = int(data.enemy_ruler_hp)
-	player_units = data.player_units
-	enemy_units = data.enemy_units
-	draft_roster_baseline = data.get("draft_roster_baseline", player_units.duplicate(true))
-	choices = data.choices
+	player_units = _sanitize_loaded_units(data.player_units, "player")
+	enemy_units = _sanitize_loaded_units(data.enemy_units, "enemy")
+	draft_roster_baseline = _sanitize_loaded_units(data.get("draft_roster_baseline", player_units.duplicate(true)), "player")
+	choices = Array(data.choices).filter(func(hero_id): return heroes.has(str(hero_id)))
 	pending_unit_ids.clear()
 	for id in data.pending_unit_ids: pending_unit_ids.append(str(id))
 	chosen_this_round.clear()
 	for id in data.chosen_this_round: chosen_this_round.append(str(id))
 	draft_picks_remaining = int(data.draft_picks_remaining)
-	draft_refresh_available = [true, true]
-	var loaded_refresh_state: Array = data.get("draft_refresh_available", [true, true])
+	draft_refresh_available = [true, true, true]
+	var loaded_refresh_state: Array = data.get("draft_refresh_available", [true, true, true])
 	for index in mini(DRAFT_SIZE, loaded_refresh_state.size()):
 		draft_refresh_available[index] = bool(loaded_refresh_state[index])
 	refresh_charges = int(data.get("refresh_charges", 0))
@@ -100,6 +100,21 @@ func _load_game() -> bool:
 	_render()
 	return true
 
+func _sanitize_loaded_units(value, expected_team: String) -> Array:
+	var result: Array = []
+	if not value is Array: return result
+	for raw_unit in value:
+		if not raw_unit is Dictionary: continue
+		var hero_id := str(raw_unit.get("hero_id", ""))
+		if not heroes.has(hero_id): continue
+		var unit: Dictionary = raw_unit.duplicate(true)
+		unit.team = expected_team
+		unit.level = 1
+		unit.stat_mult = 1.0
+		_ensure_unit_fields(unit)
+		result.append(unit)
+	return result
+
 func _prepare_round() -> void:
 	phase = "draft"
 	draft_user_hidden = false
@@ -108,16 +123,21 @@ func _prepare_round() -> void:
 	chosen_this_round = []
 	draft_roster_baseline = player_units.duplicate(true)
 	selected_unit = ""
-	_add_enemy_wave()    # 按当前关卡数添加 2 名固定敌方武将
+	_add_enemy_wave()    # 每关从指定阵营（或全阵营）随机加入3名敌将
 	_generate_choices()
 
 func _generate_choices() -> void:
-	var pool: Array = heroes.keys().filter(func(hero_id):
-		return (draft_faction_filter.is_empty() or heroes[hero_id].f == draft_faction_filter) and not chosen_this_round.has(str(hero_id))
+	choices = []
+	for range_tier in [1, 2, 3]:
+		var pool := _draft_pool_for_range(range_tier, draft_faction_filter)
+		pool.shuffle()
+		if not pool.is_empty(): choices.append(pool[0])
+	draft_refresh_available = [true, true, true]
+
+func _draft_pool_for_range(range_tier: int, faction_filter: String) -> Array:
+	return heroes.keys().filter(func(hero_id):
+		return int(heroes[hero_id].range) == range_tier and (faction_filter.is_empty() or str(heroes[hero_id].f) == faction_filter)
 	)
-	pool.shuffle()  # 打乱顺序
-	choices = pool.slice(0, min(DRAFT_SIZE, pool.size()))
-	draft_refresh_available = [true, true]
 
 func _refresh_draft_choice(choice_index: int) -> void:
 	if phase != "draft" or battle_running or choice_index < 0 or choice_index >= choices.size():
@@ -125,11 +145,9 @@ func _refresh_draft_choice(choice_index: int) -> void:
 	if choice_index >= draft_refresh_available.size() or not draft_refresh_available[choice_index]:
 		return
 	var old_id := str(choices[choice_index])
-	var excluded := choices.duplicate()
-	excluded.append_array(chosen_this_round)
-	var pool: Array = heroes.keys().filter(func(hero_id):
-		return (draft_faction_filter.is_empty() or heroes[hero_id].f == draft_faction_filter) and not excluded.has(hero_id)
-	)
+	var required_range := choice_index + 1
+	var pool := _draft_pool_for_range(required_range, draft_faction_filter)
+	pool = pool.filter(func(hero_id): return str(hero_id) != old_id)
 	if pool.is_empty():
 		return
 	pool.shuffle()
@@ -142,13 +160,16 @@ func _refresh_shop(choice_index := 0) -> void:
 	_refresh_draft_choice(int(choice_index))
 
 func _add_enemy_wave() -> void:
-	var wave: Array = ENEMY_WAVES[min(round_number - 1, ENEMY_WAVES.size() - 1)]
+	var pool: Array = heroes.keys().filter(func(hero_id): return enemy_faction_filter.is_empty() or str(heroes[hero_id].f) == enemy_faction_filter)
+	pool.shuffle()
+	var wave: Array = pool.slice(0, mini(3, pool.size()))
 	for hero_id in wave:
 		var unit := _make_roster_unit("enemy", hero_id)
 		enemy_units.append(unit)
 		_auto_place_enemy(unit)
-		_try_upgrade(enemy_units, hero_id)  # 敌方同名武将也会升星
-	_log(t("第 %d 关敌军增援：" % round_number, "Stage %d enemy reinforcements: " % round_number) + _hero_name(wave[0]) + "、" + _hero_name(wave[1]))
+	var wave_names: Array[String] = []
+	for hero_id in wave: wave_names.append(_hero_name(str(hero_id)))
+	_log(t("第 %d 关敌军随机选择：" % round_number, "Stage %d enemy random picks: " % round_number) + "、".join(wave_names))
 
 func _choose_hero(id: String) -> void:
 	if battle_running or phase != "draft" or not choices.has(id): return
@@ -157,7 +178,6 @@ func _choose_hero(id: String) -> void:
 		return
 	var unit := _make_roster_unit("player", id)
 	player_units.append(unit)
-	_try_upgrade(player_units, id)
 	chosen_this_round.append(id)
 	draft_picks_remaining -= 1
 	var locked_count := PICKS_PER_ROUND - draft_picks_remaining
@@ -171,31 +191,11 @@ func _choose_hero(id: String) -> void:
 	_render()
 
 func _can_accept_hero(hero_id: String) -> bool:
-	if _reserve_units().size() < RESERVE_LIMIT: return true
-	return player_units.filter(func(unit): return unit.alive and unit.hero_id == hero_id and int(unit.get("level", 1)) == 1).size() >= 1
+	return _reserve_units().size() < RESERVE_LIMIT
 
 func _try_upgrade(roster: Array, hero_id: String):
-	var upgraded_unit = null
-	for level in [1, 2]:  # 检查 1→2 星 和 2→3 星
-		while true:
-			var copies := roster.filter(func(unit): return unit.alive and unit.hero_id == hero_id and int(unit.get("level", 1)) == level)
-			if copies.size() < 2: break  # 不足 2 个无法合成
-			copies.sort_custom(func(a, b): return (a.row >= 0) and (b.row < 0))
-			var primary: Dictionary = copies[0]
-			var old_max: float = primary.max_hp
-			primary.level = level + 1
-			primary.stat_mult = float(primary.get("stat_mult", 1.0)) * 1.5  # 属性 ×1.5
-			primary.max_hp *= 1.5
-			if float(primary.get("sunquan_initial_max_hp", 0.0)) > 0.0:
-				primary.sunquan_initial_max_hp = float(primary.sunquan_initial_max_hp) * 1.5
-			primary.hp = min(primary.max_hp, primary.hp + (primary.max_hp - old_max))  # 血量按差额补满
-			for consumed in [copies[1]]:
-				pending_unit_ids.erase(consumed.id)
-				roster.erase(consumed)  # 消耗掉副本
-			pending_unit_ids.erase(primary.id)
-			upgraded_unit = primary
-			_log(_hero_name(hero_id) + t(" 升至 ", " upgraded to ") + "★".repeat(int(primary.level)) + t("，生命与技能效果提高 50%。", "; HP and skill effects +50%."))
-	return upgraded_unit
+	# Compatibility shim for old callers/saves. Duplicate heroes remain separate.
+	return null
 
 func _auto_place_enemy(unit: Dictionary) -> void:
 	var hero: Dictionary = heroes[unit.hero_id]
@@ -260,13 +260,7 @@ func _on_player_cell(row: int, col: int) -> void:
 	elif occupant != null:
 		var selected: Variant = _find_by_id(player_units, selected_unit)
 		if selected != null and selected.row < 0:
-			if not _can_unit_use_row(selected, row): return
-			occupant.row = -1
-			occupant.col = -1
-			selected.row = row
-			selected.col = col
-			selected_unit = ""
-			_log(_hero_name(selected.hero_id) + t(" 从备战区替换上场。", " swaps in from reserve."))
+			_log(t("该战位已有武将；请先将原武将拖到备战区出售。", "That tile is occupied; drag its unit to the reserve to sell it first."))
 		else:
 			selected_unit = occupant.id
 	else:
@@ -298,6 +292,8 @@ func _start_battle() -> void:
 		for unit in team_units:
 			if not unit.alive or unit.row < 0: continue
 			_ensure_unit_fields(unit)
+			unit.level = 1
+			unit.stat_mult = 1.0
 			unit.team = "player" if team_units == player_units else "enemy"
 			if not unit.has("action"): unit.action = 0.0
 			unit.action_gain_mult = 1.0
@@ -311,7 +307,7 @@ func _start_battle() -> void:
 	_apply_combo_bonds()
 	_apply_faction_bonuses()
 	_apply_opening_skills()
-	_log("[color=#f6c860]" + t("第 ", "Stage ") + str(round_number) + t(" 关战斗开始（30 秒）！", " battle begins (30 seconds)!") + "[/color]")
+	_log("[color=#f6c860]" + t("第 ", "Stage ") + str(round_number) + t(" 关战斗开始（300 秒）！", " battle begins (300 seconds)!") + "[/color]")
 	tick_timer.start()
 	_render()
 
@@ -338,7 +334,7 @@ func _finish_battle() -> void:
 		round_number += 1
 		_prepare_round()
 		_save_game(true)
-		_log(t("进入下一关：敌方主公保留剩余生命，再进行三轮二选一。", "Next stage: the enemy ruler keeps its remaining HP; complete three pick-one-of-two rounds."))
+		_log(t("进入下一关：敌方主公保留剩余生命，再进行三轮三选一。", "Next stage: the enemy ruler keeps its remaining HP; complete three pick-one-of-three rounds."))
 	_render()
 
 func _start_final_battle() -> void:

@@ -2,6 +2,9 @@ extends "res://ThreeKingdom/systems/game_ui.gd"
 
 const BALANCE_PROJECT_PATH := "res://ThreeKingdom/data/hero_balance_overrides.json"
 const BALANCE_USER_PATH := "user://hero_balance_overrides.json"
+const BALANCE_GITHUB_SYNC_PATH := "user://balance_lab_github_sync.json"
+const BALANCE_GITHUB_GIST_API := "https://api.github.com/gists"
+const BALANCE_GITHUB_GIST_FILENAME := "hero_balance_overrides.json"
 const LAB_LINEUPS_PATH := "user://balance_lab_lineups.json"
 const FAST_BATTLE_LIMIT := 300.0
 const FAST_BATTLE_MAX_ACTIONS := 12000
@@ -16,6 +19,13 @@ var balance_editor_cooldown: SpinBox
 var balance_editor_range: SpinBox
 var balance_editor_params: TextEdit
 var balance_editor_status: Label
+var balance_editor_hero_detail: RichTextLabel
+var balance_editor_scroll: ScrollContainer
+var balance_github_token: LineEdit
+var balance_github_gist_id: LineEdit
+var balance_github_status: Label
+var balance_github_request: HTTPRequest
+var balance_github_request_mode := ""
 var balance_editor_selected_id := ""
 var balance_default_heroes := {}
 var balance_overrides := {}
@@ -27,8 +37,6 @@ var lab_player_hero: OptionButton
 var lab_enemy_hero: OptionButton
 var lab_player_faction: OptionButton
 var lab_enemy_faction: OptionButton
-var lab_player_star: OptionButton
-var lab_enemy_star: OptionButton
 var lab_player_board: GridContainer
 var lab_enemy_board: GridContainer
 var lab_player_selected_pos := Vector2i(-1, -1)
@@ -102,6 +110,8 @@ func _apply_hero_override(hero_id: String, data: Dictionary) -> void:
 	var hero: Dictionary = heroes[hero_id]
 	hero.hp = maxi(1, int(data.get("hp", hero.hp)))
 	hero.skill_value = maxi(0, int(data.get("skill_value", hero.skill_value)))
+	if data.has("skill_output_base"):
+		hero.skill_output_base = maxf(0.0, float(data.skill_output_base))
 	hero.cooldown = maxf(COOLDOWN_INPUT_MIN, float(data.get("cooldown", hero.cooldown)))
 	hero.range = clampi(int(data.get("range", hero.range)), 1, 3)
 	if data.get("ability_params", null) is Dictionary:
@@ -118,7 +128,7 @@ func _apply_hero_override(hero_id: String, data: Dictionary) -> void:
 
 func _normalize_hero_override(data: Dictionary, hero_id := "") -> Dictionary:
 	var normalized := {}
-	for key in ["hp", "skill_value", "cooldown", "range"]:
+	for key in ["hp", "skill_value", "skill_output_base", "cooldown", "range"]:
 		if data.has(key):
 			normalized[key] = maxf(COOLDOWN_INPUT_MIN, float(data[key])) if key == "cooldown" else data[key]
 	if data.get("ability_params", null) is Dictionary:
@@ -137,6 +147,7 @@ func _save_balance_overrides() -> bool:
 
 func _build_balance_lab() -> void:
 	_load_lab_presets()
+	_build_balance_github_request()
 	balance_lab_overlay = ColorRect.new()
 	balance_lab_overlay.color = Color("#07090cfb")
 	balance_lab_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -229,17 +240,52 @@ func _show_balance_lab() -> void:
 	_refresh_lab_presets()
 	balance_lab_overlay.show()
 
+func _build_balance_github_request() -> void:
+	if is_instance_valid(balance_github_request): return
+	balance_github_request = HTTPRequest.new()
+	balance_github_request.request_completed.connect(_on_balance_github_request_completed)
+	add_child(balance_github_request)
+
 func _build_balance_editor_page(page: VBoxContainer) -> void:
+	var sub_tabs := TabContainer.new()
+	sub_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.add_child(sub_tabs)
+	var skills_page := VBoxContainer.new()
+	skills_page.name = t("武将技能", "HERO SKILLS")
+	sub_tabs.add_child(skills_page)
+	var github_page := VBoxContainer.new()
+	github_page.name = t("GitHub 上传下载", "GITHUB SYNC")
+	sub_tabs.add_child(github_page)
+	balance_editor_scroll = ScrollContainer.new()
+	balance_editor_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	balance_editor_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_enable_touch_scroll(balance_editor_scroll)
+	skills_page.add_child(balance_editor_scroll)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 10)
+	balance_editor_scroll.add_child(content)
 	var help := _label(t("这里只调整生命、射程、技能基础数值、技能冷却和技能机制参数。修改后立即影响后续战斗，并写入数值覆盖文件。", "Only HP, range, skill base value, skill cooldown, and skill mechanic parameters are editable. Changes affect future battles immediately and are written to the balance override file."), 13, Color("#c9c0b1"))
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	page.add_child(help)
-	var columns := HBoxContainer.new()
-	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(help)
+	var github_scroll := ScrollContainer.new()
+	github_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	github_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_enable_touch_scroll(github_scroll)
+	github_page.add_child(github_scroll)
+	var github_content := VBoxContainer.new()
+	github_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	github_content.add_theme_constant_override("separation", 12)
+	github_scroll.add_child(github_content)
+	_build_balance_github_sync_controls(github_content)
+	var mobile_layout := _is_mobile_ui()
+	var columns: Container = VBoxContainer.new() if mobile_layout else HBoxContainer.new()
+	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_theme_constant_override("separation", 16)
-	page.add_child(columns)
+	content.add_child(columns)
 
 	var picker_panel := PanelContainer.new()
-	picker_panel.custom_minimum_size.x = 360
+	picker_panel.custom_minimum_size = Vector2(0 if mobile_layout else 360, 250 if mobile_layout else 0)
 	_style(picker_panel, Color("#1d2021"), 10, Color("#4a4640"), 1)
 	columns.add_child(picker_panel)
 	var picker := VBoxContainer.new()
@@ -264,21 +310,45 @@ func _build_balance_editor_page(page: VBoxContainer) -> void:
 	values.add_theme_constant_override("separation", 9)
 	values_panel.add_child(values)
 	values.add_child(_label(t("英雄与技能参数", "HERO & SKILL VALUES"), 22, Color("#e3c58c")))
+	var top_values: Container = VBoxContainer.new() if mobile_layout else HBoxContainer.new()
+	top_values.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_values.add_theme_constant_override("separation", 12)
+	values.add_child(top_values)
+	var value_controls := VBoxContainer.new()
+	value_controls.custom_minimum_size.x = 0 if mobile_layout else 430
+	value_controls.add_theme_constant_override("separation", 9)
+	top_values.add_child(value_controls)
 	balance_editor_hp = _lab_spinbox(1, 200000, 1)
 	balance_editor_skill_value = _lab_spinbox(0, 10000, 1)
 	balance_editor_cooldown = _lab_spinbox(COOLDOWN_INPUT_MIN, 3600.0, 0.1)
 	balance_editor_range = _lab_spinbox(1, 3, 1)
-	values.add_child(_lab_value_row(t("生命", "HP"), balance_editor_hp))
-	values.add_child(_lab_value_row(t("技能基础数值", "Skill base value"), balance_editor_skill_value))
-	values.add_child(_lab_value_row(t("技能冷却（秒）", "Skill cooldown (seconds)"), balance_editor_cooldown))
-	values.add_child(_lab_value_row(t("射程层级", "Range tier"), balance_editor_range))
+	value_controls.add_child(_lab_value_row(t("生命", "HP"), balance_editor_hp))
+	value_controls.add_child(_lab_value_row(t("技能基础数值", "Skill base value"), balance_editor_skill_value))
+	value_controls.add_child(_lab_value_row(t("技能冷却（秒）", "Skill cooldown (seconds)"), balance_editor_cooldown))
+	value_controls.add_child(_lab_value_row(t("射程层级", "Range tier"), balance_editor_range))
+	var detail_panel := PanelContainer.new()
+	detail_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style(detail_panel, Color("#15191d"), 8, Color("#5b513f"), 1)
+	top_values.add_child(detail_panel)
+	var detail_box := VBoxContainer.new()
+	detail_box.add_theme_constant_override("separation", 4)
+	detail_panel.add_child(detail_box)
+	detail_box.add_child(_label(t("图鉴信息（只读）", "CODEX INFO (READ ONLY)"), 15, Color("#e3c58c")))
+	balance_editor_hero_detail = RichTextLabel.new()
+	balance_editor_hero_detail.bbcode_enabled = true
+	balance_editor_hero_detail.fit_content = false
+	balance_editor_hero_detail.scroll_active = true
+	balance_editor_hero_detail.custom_minimum_size = Vector2(0 if mobile_layout else 420, 190)
+	balance_editor_hero_detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail_box.add_child(balance_editor_hero_detail)
 	values.add_child(_label(t("技能参数 JSON（派生伤害值会自动重算）", "SKILL PARAMS JSON (derived values recalculate)"), 14, Color("#e3c58c")))
 	balance_editor_params = TextEdit.new()
 	balance_editor_params.custom_minimum_size.y = 250
 	balance_editor_params.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	balance_editor_params.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	values.add_child(balance_editor_params)
-	var actions := HBoxContainer.new()
+	var actions: Container = VBoxContainer.new() if mobile_layout else HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
 	values.add_child(actions)
 	var save := _button(t("保存此武将", "SAVE HERO"))
 	save.pressed.connect(_save_selected_hero_balance)
@@ -336,7 +406,22 @@ func _select_balance_hero(index: int) -> void:
 	balance_editor_cooldown.value = float(hero.cooldown)
 	balance_editor_range.value = float(hero.range)
 	balance_editor_params.text = JSON.stringify(_editable_ability_params(balance_editor_selected_id), "\t")
+	_refresh_balance_editor_hero_detail()
 	balance_editor_status.text = _hero_name(balance_editor_selected_id) + t(" · 当前实战数据", " · current combat values")
+
+func _refresh_balance_editor_hero_detail() -> void:
+	if not is_instance_valid(balance_editor_hero_detail) or balance_editor_selected_id.is_empty(): return
+	var hero: Dictionary = heroes[balance_editor_selected_id]
+	var title := _hero_name(balance_editor_selected_id) + " · " + _faction_name(str(hero.f))
+	var basics := t("兵种", "Rank") + "：" + _hero_army_name(balance_editor_selected_id)
+	basics += "\n" + t("定位", "Roles") + "：" + _roles_text(hero.get("roles", []))
+	basics += "\n" + t("当前生命 / 射程", "Current HP / range") + "：%d / %d" % [int(hero.hp), int(hero.range)]
+	basics += "\n" + t("当前基础技能值 / 冷却", "Current skill base / cooldown") + "：%d / %.1fs" % [int(hero.skill_value), float(hero.cooldown)]
+	var detail := "[b][color=#f0c77a]" + title + "[/color][/b]\n"
+	detail += "[color=#c9c0b1]" + basics + "[/color]\n\n"
+	detail += "[b]" + t("技能", "SKILL") + "[/b]\n" + _skill_detail(balance_editor_selected_id) + "\n\n"
+	detail += "[b]" + t("羁绊效果", "BOND EFFECTS") + "[/b]\n" + _hero_bond_detail(balance_editor_selected_id)
+	balance_editor_hero_detail.text = detail
 
 func _save_selected_hero_balance() -> void:
 	if balance_editor_selected_id.is_empty(): return
@@ -348,6 +433,7 @@ func _save_selected_hero_balance() -> void:
 	var data := {
 		"hp": int(balance_editor_hp.value),
 		"skill_value": int(balance_editor_skill_value.value),
+		"skill_output_base": float(heroes[balance_editor_selected_id].get("skill_output_base", 100.0)),
 		"cooldown": float(balance_editor_cooldown.value),
 		"range": int(balance_editor_range.value),
 		"ability_params": parsed
@@ -389,15 +475,190 @@ func _import_balance_data() -> void:
 	if not parsed is Dictionary:
 		balance_editor_status.text = t("剪贴板不是有效的数值覆盖 JSON。", "Clipboard does not contain valid balance override JSON.")
 		return
+	var applied := _apply_balance_document(parsed, false)
+	if applied <= 0:
+		balance_editor_status.text = t("剪贴板中没有可识别的武将数值。", "Clipboard contains no recognized hero balance values.")
+		return
+	balance_editor_status.text = t("已导入并应用数值覆盖。", "Balance overrides imported and applied.")
+
+func _apply_balance_document(parsed: Dictionary, replace_all := false) -> int:
+	if replace_all:
+		heroes = balance_default_heroes.duplicate(true)
+		balance_overrides = {}
+	var applied := 0
 	for hero_id in parsed:
 		if heroes.has(hero_id) and parsed[hero_id] is Dictionary:
 			var normalized := _normalize_hero_override(parsed[hero_id], str(hero_id))
 			balance_overrides[hero_id] = normalized
 			_apply_hero_override(hero_id, normalized)
-			_apply_balance_to_existing_units(hero_id)
+			applied += 1
+	if replace_all:
+		for hero_id in heroes:
+			_apply_balance_to_existing_units(str(hero_id))
+	else:
+		for hero_id in parsed:
+			if heroes.has(hero_id): _apply_balance_to_existing_units(str(hero_id))
 	_save_balance_overrides()
 	_refresh_balance_hero_list()
-	balance_editor_status.text = t("已导入并应用数值覆盖。", "Balance overrides imported and applied.")
+	return applied
+
+func _build_balance_github_sync_controls(values: VBoxContainer) -> void:
+	var sync_panel := PanelContainer.new()
+	_style(sync_panel, Color("#15191d"), 8, Color("#5b513f"), 1)
+	values.add_child(sync_panel)
+	var sync := VBoxContainer.new()
+	sync.add_theme_constant_override("separation", 6)
+	sync_panel.add_child(sync)
+	sync.add_child(_label(t("GitHub 私有 Gist 手动同步", "GITHUB PRIVATE GIST · MANUAL SYNC"), 15, Color("#e3c58c")))
+	var note := _label(t("首次上传会自动创建私有 Gist；在手机与电脑上填写同一 Token 和 Gist ID，再手动点击上传或下载。Token 仅保存在本机。", "The first upload creates a private Gist. Enter the same token and Gist ID on phone and desktop, then manually upload or download. The token stays on this device."), 12, Color("#c9c0b1"))
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sync.add_child(note)
+	balance_github_token = LineEdit.new()
+	balance_github_token.placeholder_text = t("GitHub Classic Token（需要 gist 权限）", "GitHub Classic Token (gist scope required)")
+	balance_github_token.secret = true
+	balance_github_token.custom_minimum_size.y = 38
+	sync.add_child(balance_github_token)
+	balance_github_gist_id = LineEdit.new()
+	balance_github_gist_id.placeholder_text = t("Gist ID（首次上传可留空）", "Gist ID (leave blank for first upload)")
+	balance_github_gist_id.custom_minimum_size.y = 38
+	sync.add_child(balance_github_gist_id)
+	var sync_actions: Container = VBoxContainer.new() if _is_mobile_ui() else HBoxContainer.new()
+	sync_actions.add_theme_constant_override("separation", 8)
+	sync.add_child(sync_actions)
+	var upload := _button(t("上传到 GitHub", "UPLOAD TO GITHUB"))
+	upload.pressed.connect(_upload_balance_to_github)
+	sync_actions.add_child(upload)
+	var download := _button(t("从 GitHub 下载", "DOWNLOAD FROM GITHUB"))
+	download.pressed.connect(_download_balance_from_github)
+	sync_actions.add_child(download)
+	var copy_gist_id := _button(t("复制 Gist ID", "COPY GIST ID"))
+	copy_gist_id.pressed.connect(_copy_balance_github_gist_id)
+	sync_actions.add_child(copy_gist_id)
+	balance_github_status = _label("", 12, Color("#90c59e"))
+	balance_github_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sync.add_child(balance_github_status)
+	_load_balance_github_sync_settings()
+
+func _load_balance_github_sync_settings() -> void:
+	if not is_instance_valid(balance_github_token) or not is_instance_valid(balance_github_gist_id): return
+	var saved = _read_json_file(BALANCE_GITHUB_SYNC_PATH, {})
+	if not saved is Dictionary: return
+	balance_github_token.text = str(saved.get("token", ""))
+	balance_github_gist_id.text = str(saved.get("gist_id", ""))
+
+func _save_balance_github_sync_settings() -> bool:
+	if not is_instance_valid(balance_github_token) or not is_instance_valid(balance_github_gist_id): return false
+	return _write_json_file(BALANCE_GITHUB_SYNC_PATH, {
+		"token": balance_github_token.text.strip_edges(),
+		"gist_id": balance_github_gist_id.text.strip_edges()
+	})
+
+func _github_balance_headers() -> PackedStringArray:
+	return PackedStringArray([
+		"Accept: application/vnd.github+json",
+		"Authorization: Bearer " + balance_github_token.text.strip_edges(),
+		"X-GitHub-Api-Version: 2022-11-28",
+		"User-Agent: ThreeKingdom-BalanceLab"
+	])
+
+func _balance_github_request_is_busy() -> bool:
+	return is_instance_valid(balance_github_request) and balance_github_request.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED
+
+func _set_balance_github_status(message: String, ok := true) -> void:
+	if not is_instance_valid(balance_github_status): return
+	balance_github_status.text = message
+	balance_github_status.add_theme_color_override("font_color", Color("#90c59e") if ok else Color("#df7878"))
+
+func _upload_balance_to_github() -> void:
+	if balance_github_token.text.strip_edges().is_empty():
+		_set_balance_github_status(t("请先填写带 gist 权限的 GitHub Classic Token。", "Enter a GitHub Classic Token with gist scope first."), false)
+		return
+	if _balance_github_request_is_busy():
+		_set_balance_github_status(t("GitHub 请求正在进行，请稍候。", "A GitHub request is already in progress."), false)
+		return
+	if not _save_balance_overrides():
+		_set_balance_github_status(t("本地数值文件保存失败，未上传。", "Local balance save failed; upload was not started."), false)
+		return
+	_save_balance_github_sync_settings()
+	var gist_id := balance_github_gist_id.text.strip_edges()
+	var payload := {
+		"description": "ThreeKingdom Balance Lab Sync",
+		"public": false,
+		"files": {BALANCE_GITHUB_GIST_FILENAME: {"content": JSON.stringify(balance_overrides, "\t")}}
+	}
+	balance_github_request_mode = "upload_create" if gist_id.is_empty() else "upload_update"
+	var url := BALANCE_GITHUB_GIST_API if gist_id.is_empty() else BALANCE_GITHUB_GIST_API + "/" + gist_id
+	var method := HTTPClient.METHOD_POST if gist_id.is_empty() else HTTPClient.METHOD_PATCH
+	var request_error := balance_github_request.request(url, _github_balance_headers(), method, JSON.stringify(payload))
+	if request_error != OK:
+		balance_github_request_mode = ""
+		_set_balance_github_status(t("无法发起 GitHub 上传，请检查网络。", "Could not start GitHub upload; check the network."), false)
+		return
+	_set_balance_github_status(t("正在上传数值覆盖…", "Uploading balance overrides…"))
+
+func _download_balance_from_github() -> void:
+	if balance_github_token.text.strip_edges().is_empty() or balance_github_gist_id.text.strip_edges().is_empty():
+		_set_balance_github_status(t("下载需要填写 GitHub Token 和 Gist ID。", "Downloading requires both GitHub token and Gist ID."), false)
+		return
+	if _balance_github_request_is_busy():
+		_set_balance_github_status(t("GitHub 请求正在进行，请稍候。", "A GitHub request is already in progress."), false)
+		return
+	_save_balance_github_sync_settings()
+	balance_github_request_mode = "download"
+	var request_error := balance_github_request.request(BALANCE_GITHUB_GIST_API + "/" + balance_github_gist_id.text.strip_edges(), _github_balance_headers(), HTTPClient.METHOD_GET)
+	if request_error != OK:
+		balance_github_request_mode = ""
+		_set_balance_github_status(t("无法发起 GitHub 下载，请检查网络。", "Could not start GitHub download; check the network."), false)
+		return
+	_set_balance_github_status(t("正在下载数值覆盖…", "Downloading balance overrides…"))
+
+func _copy_balance_github_gist_id() -> void:
+	var gist_id := balance_github_gist_id.text.strip_edges()
+	if gist_id.is_empty():
+		_set_balance_github_status(t("当前还没有 Gist ID，请先上传一次。", "No Gist ID yet; upload once first."), false)
+		return
+	DisplayServer.clipboard_set(gist_id)
+	_set_balance_github_status(t("Gist ID 已复制；请在另一台设备填写相同的 Token 和此 ID。", "Gist ID copied; enter this ID and the same token on the other device."))
+
+func _on_balance_github_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	var mode := balance_github_request_mode
+	balance_github_request_mode = ""
+	var response_text := body.get_string_from_utf8()
+	var parsed = JSON.parse_string(response_text)
+	if result != HTTPRequest.RESULT_SUCCESS or response_code < 200 or response_code >= 300:
+		var reason := ""
+		if parsed is Dictionary: reason = str(parsed.get("message", ""))
+		_set_balance_github_status(t("GitHub 同步失败", "GitHub sync failed") + " (%d)" % response_code + (": " + reason if not reason.is_empty() else ""), false)
+		return
+	if not parsed is Dictionary:
+		_set_balance_github_status(t("GitHub 返回的数据无效。", "GitHub returned invalid data."), false)
+		return
+	if mode.begins_with("upload"):
+		var gist_id := str(parsed.get("id", ""))
+		if gist_id.is_empty():
+			_set_balance_github_status(t("上传完成，但未获得 Gist ID。", "Upload completed, but no Gist ID was returned."), false)
+			return
+		balance_github_gist_id.text = gist_id
+		_save_balance_github_sync_settings()
+		_set_balance_github_status(t("上传完成。私有 Gist ID：", "Upload complete. Private Gist ID: ") + gist_id)
+		return
+	if mode != "download":
+		_set_balance_github_status(t("未知的 GitHub 同步操作。", "Unknown GitHub sync operation."), false)
+		return
+	var files = parsed.get("files", {})
+	var balance_file = files.get(BALANCE_GITHUB_GIST_FILENAME, {}) if files is Dictionary else {}
+	if not balance_file is Dictionary or bool(balance_file.get("truncated", false)):
+		_set_balance_github_status(t("Gist 中没有可读取的数值文件，或文件过大。", "The Gist has no readable balance file, or it is too large."), false)
+		return
+	var balance_document = JSON.parse_string(str(balance_file.get("content", "")))
+	if not balance_document is Dictionary:
+		_set_balance_github_status(t("Gist 中的数值文件不是有效 JSON。", "The balance file in the Gist is not valid JSON."), false)
+		return
+	var applied := _apply_balance_document(balance_document, true)
+	if applied <= 0:
+		_set_balance_github_status(t("Gist 中没有可识别的武将数值，未覆盖本机数据。", "The Gist has no recognized heroes; local data was not replaced."), false)
+		return
+	_set_balance_github_status(t("下载完成，已完整覆盖并应用 ", "Download complete; fully replaced and applied ") + str(applied) + t(" 名武将的数值。", " hero balance entries."))
 
 func _build_fast_battle_page(page: VBoxContainer) -> void:
 	var top := HBoxContainer.new()
@@ -502,9 +763,6 @@ func _build_lineup_side(is_player: bool) -> PanelContainer:
 	var hero_option := OptionButton.new()
 	hero_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pick_row.add_child(hero_option)
-	var star_option := OptionButton.new()
-	for level in [1, 2, 3]: star_option.add_item("★".repeat(level), level)
-	pick_row.add_child(star_option)
 	var add := _button(t("自动加入", "AUTO ADD"))
 	add.custom_minimum_size.x = 105
 	add.pressed.connect(_add_lab_unit.bind(is_player))
@@ -545,14 +803,6 @@ func _build_lineup_side(is_player: bool) -> PanelContainer:
 	var selected_actions := HBoxContainer.new()
 	selected_actions.add_theme_constant_override("separation", 5)
 	box.add_child(selected_actions)
-	var star_down := _button("－★")
-	star_down.tooltip_text = t("选中武将降一星", "Decrease selected hero star")
-	star_down.pressed.connect(_change_lab_unit_star.bind(-1, is_player))
-	selected_actions.add_child(star_down)
-	var star_up := _button("＋★")
-	star_up.tooltip_text = t("选中武将升一星；双击列表也可升星", "Increase selected hero star; double-click also works")
-	star_up.pressed.connect(_change_lab_unit_star.bind(1, is_player))
-	selected_actions.add_child(star_up)
 	var remove := _button(t("移除", "REMOVE"))
 	remove.pressed.connect(_remove_lab_unit.bind(is_player))
 	selected_actions.add_child(remove)
@@ -568,12 +818,10 @@ func _build_lineup_side(is_player: bool) -> PanelContainer:
 	if is_player:
 		lab_player_faction = faction_option
 		lab_player_hero = hero_option
-		lab_player_star = star_option
 		lab_player_board = board
 	else:
 		lab_enemy_faction = faction_option
 		lab_enemy_hero = hero_option
-		lab_enemy_star = star_option
 		lab_enemy_board = board
 	_refresh_lab_hero_option(is_player)
 	return panel
@@ -631,22 +879,14 @@ func _build_preset_panel() -> PanelContainer:
 
 func _add_lab_unit(is_player: bool) -> void:
 	var hero_option := lab_player_hero if is_player else lab_enemy_hero
-	var star_option := lab_player_star if is_player else lab_enemy_star
 	var lineup: Array = lab_player_lineup if is_player else lab_enemy_lineup
 	if hero_option.item_count == 0: return
 	var hero_id := str(hero_option.get_item_metadata(hero_option.selected))
-	var level := star_option.selected + 1
-	for entry in lineup:
-		if str(entry.hero_id) != hero_id: continue
-		entry.level = level
-		lab_status.text = _hero_name(hero_id) + t(" 已更新为", " updated to ") + "★".repeat(level)
-		_refresh_lab_lineups()
-		return
 	var position := _next_lab_position(lineup, hero_id)
 	if position.x < 0:
 		lab_status.text = t("没有适合该武将的空位；可移除武将或点击自动整理。", "No suitable slot; remove a hero or auto-arrange.")
 		return
-	lineup.append({"hero_id":hero_id, "level":level, "row":position.x, "col":position.y})
+	lineup.append({"hero_id":hero_id, "level":1, "row":position.x, "col":position.y})
 	if is_player: lab_player_selected_pos = position
 	else: lab_enemy_selected_pos = position
 	lab_status.text = _hero_name(hero_id) + t(" 已自动加入阵容。", " auto-added to the lineup.")
@@ -662,11 +902,8 @@ func _remove_lab_unit(is_player: bool) -> void:
 	_refresh_lab_lineups()
 
 func _change_lab_unit_star(delta: int, is_player: bool) -> void:
-	var lineup: Array = lab_player_lineup if is_player else lab_enemy_lineup
-	var index := _selected_lab_entry_index(is_player)
-	if index < 0: return
-	lineup[index].level = clampi(int(lineup[index].level) + delta, 1, 3)
-	_refresh_lab_lineups()
+	# 保留方法供旧信号/存档兼容；新规则下所有武将固定为一星基准。
+	return
 
 func _clear_lab_lineup(is_player: bool) -> void:
 	if is_player:
@@ -763,8 +1000,8 @@ func _refresh_lab_lineups() -> void:
 				slot.tooltip_text = t("空位：第%d排第%d列" % [int(slot.board_row) + 1, int(slot.board_col) + 1], "Empty: R%d C%d" % [int(slot.board_row) + 1, int(slot.board_col) + 1])
 				slot.modulate = Color.WHITE
 			else:
-				slot.text = _hero_name(str(entry.hero_id)) + "\n" + "★".repeat(int(entry.level))
-				slot.tooltip_text = t("拖拽换位；点击后可升降星或移除", "Drag to move; click to change stars or remove")
+				slot.text = _hero_name(str(entry.hero_id))
+				slot.tooltip_text = t("拖拽换位；点击后可移除", "Drag to move; click to remove")
 				var faction_color: Color = FACTION_COLORS[heroes[entry.hero_id].f].lightened(0.28)
 				slot.modulate = Color("#f0c77a") if selected == Vector2i(int(slot.board_row), int(slot.board_col)) else faction_color
 
@@ -864,7 +1101,7 @@ func _sanitize_lab_lineup(value) -> Array:
 		for index in range(sanitized.size() - 1, -1, -1):
 			if int(sanitized[index].row) == row and int(sanitized[index].col) == col:
 				sanitized.remove_at(index)
-		sanitized.append({"hero_id":hero_id, "level":clampi(int(raw_entry.get("level", 1)), 1, 3), "row":row, "col":col})
+		sanitized.append({"hero_id":hero_id, "level":1, "row":row, "col":col})
 	return sanitized
 
 func _save_lab_presets() -> void:
@@ -901,7 +1138,7 @@ func _save_current_lab_preset() -> void:
 		lab_loaded_preset_id = str(lab_presets[selected_index].id)
 		_save_lab_presets()
 		_refresh_lab_presets()
-		lab_status.text = t("默认对决的站位、星级和演练次数已更新。", "Built-in matchup formation, stars, and run count updated.")
+		lab_status.text = t("默认对决的站位和演练次数已更新。", "Built-in matchup formation and run count updated.")
 		return
 	var preset := {"id":_new_lab_preset_id(), "name":preset_name, "builtin":false, "player":lab_player_lineup.duplicate(true), "enemy":lab_enemy_lineup.duplicate(true), "runs":int(lab_runs.value)}
 	var replaced := false
@@ -1062,8 +1299,8 @@ func _build_lab_live_units(team: String, setup: Array) -> Array:
 	var result: Array = []
 	for entry in setup:
 		var unit: Dictionary = _make_roster_unit(team, str(entry.hero_id))
-		unit.level = clampi(int(entry.get("level", 1)), 1, 3)
-		unit.stat_mult = _star_stat_multiplier(unit.level)
+		unit.level = 1
+		unit.stat_mult = 1.0
 		unit.max_hp = float(heroes[unit.hero_id].hp) * float(unit.stat_mult)
 		unit.hp = unit.max_hp
 		unit.row = clampi(int(entry.get("row", 0)), 0, BOARD_ROWS - 1)
@@ -1216,7 +1453,7 @@ func _build_lab_live_report(manual: bool, winner: String, elapsed: float, player
 	for row in stats:
 		var side := t("我", "P") if row.team == "player" else t("敌", "E")
 		var color := "#90c59e" if row.team == "player" else "#d89a8f"
-		lines.append("[color=" + color + "]" + side + " · " + _hero_name(row.hero_id) + " " + "★".repeat(int(row.level)) + "[/color]　" + str(round(float(row.damage))) + " / " + str(round(float(row.taken))) + " / " + str(round(float(row.healing))) + " / " + "%.2f" % float(row.control))
+		lines.append("[color=" + color + "]" + side + " · " + _hero_name(row.hero_id) + "[/color]　" + str(round(float(row.damage))) + " / " + str(round(float(row.taken))) + " / " + str(round(float(row.healing))) + " / " + "%.2f" % float(row.control))
 	return "\n".join(lines)
 
 func _finish_battle() -> void:
@@ -1277,7 +1514,7 @@ func _run_fast_battles() -> void:
 		wins[result.winner] = int(wins[result.winner]) + 1
 		duration_total += float(result.duration)
 		for entry in result.stats:
-			var key := str(entry.team) + ":" + str(entry.hero_id) + ":" + str(entry.level)
+			var key := str(entry.team) + ":" + str(entry.hero_id)
 			if not aggregate.has(key):
 				aggregate[key] = {"team":entry.team, "hero_id":entry.hero_id, "level":entry.level, "damage":0.0, "taken":0.0, "healing":0.0, "control":0.0}
 			for metric in ["damage", "taken", "healing", "control"]:
@@ -1301,8 +1538,8 @@ func _simulate_fast_battle(player_setup: Array, enemy_setup: Array, seed: int) -
 	for side in [["player", player_setup], ["enemy", enemy_setup]]:
 		for entry in side[1]:
 			var unit: Dictionary = sandbox._make_roster_unit(side[0], str(entry.hero_id))
-			unit.level = clampi(int(entry.get("level", 1)), 1, 3)
-			unit.stat_mult = sandbox._star_stat_multiplier(unit.level)
+			unit.level = 1
+			unit.stat_mult = 1.0
 			unit.max_hp = float(sandbox.heroes[unit.hero_id].hp) * unit.stat_mult
 			unit.hp = unit.max_hp
 			unit.row = clampi(int(entry.get("row", 0)), 0, BOARD_ROWS - 1)
@@ -1373,5 +1610,5 @@ func _render_fast_battle_result(runs: int, wins: Dictionary, aggregate: Dictiona
 	for row in rows:
 		var side := t("我", "P") if row.team == "player" else t("敌", "E")
 		var color := "#90c59e" if row.team == "player" else "#d89a8f"
-		lines.append("[color=" + color + "]" + side + " · " + _hero_name(row.hero_id) + " " + "★".repeat(int(row.level)) + "[/color]　" + str(round(float(row.damage) / runs)) + " / " + str(round(float(row.taken) / runs)) + " / " + str(round(float(row.healing) / runs)) + " / " + "%.2f" % (float(row.control) / runs))
+		lines.append("[color=" + color + "]" + side + " · " + _hero_name(row.hero_id) + "[/color]　" + str(round(float(row.damage) / runs)) + " / " + str(round(float(row.taken) / runs)) + " / " + str(round(float(row.healing) / runs)) + " / " + "%.2f" % (float(row.control) / runs))
 	lab_result.text = "\n".join(lines)

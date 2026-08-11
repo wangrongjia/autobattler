@@ -4,8 +4,8 @@ func _initialize() -> void:
 	var game = load("res://ThreeKingdom/ThreeKingdom.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
-	assert(game.heroes.size() == 59)
-	var faction_sizes := {"shu":15, "wei":15, "wu":15, "qun":14}
+	assert(game.heroes.size() == 60)
+	var faction_sizes := {"shu":15, "wei":15, "wu":15, "qun":15}
 	for faction in faction_sizes:
 		assert(game.heroes.values().filter(func(hero): return hero.f == faction).size() == faction_sizes[faction])
 	assert(game._portrait_texture("zhaoyun") != null)
@@ -38,7 +38,7 @@ func _initialize() -> void:
 	var ready_enemy: Dictionary = game._make_roster_unit("enemy", "dianwei")
 	dailai.row = 0
 	dailai.col = 1
-	dailai.level = 2
+	dailai.level = 1
 	slow_enemy.row = 0
 	slow_enemy.col = 1
 	slow_enemy.action = 30.0
@@ -50,7 +50,7 @@ func _initialize() -> void:
 	game.combat_units = [dailai, slow_enemy, ready_enemy]
 	game.battle_stats[dailai.id] = {"damage":0.0, "healing":0.0, "taken":0.0, "control":0.0}
 	game._cast_dailai_skill(dailai)
-	assert(ready_enemy.action == 55.0)
+	assert(ready_enemy.action == 65.0)
 	assert(slow_enemy.action == 30.0)
 	assert(float(ready_enemy.hp) < float(ready_enemy.max_hp))
 	game.visual_events.clear()
