@@ -922,11 +922,9 @@ func _cast_xiahouyuan_skill(unit: Dictionary) -> void:
 	var targets := _random_unique_living_enemies(unit, int(params.get("target_count", 2)))
 	var visual_group := "xiahouyuan_suppression:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
 	if targets.is_empty():
-		_hit_ruler(unit, _unit_skill_stat_value(unit) * float(params.get("mult", 1.75)), _random_enemy_tile(unit), t("神速震袭空击", "Swift Suppression missed"), visual_group, "multi_target")
+		_hit_ruler(unit, _unit_skill_stat_value(unit) * float(params.get("mult", 2.2)), _random_enemy_tile(unit), t("神速震袭空击", "Swift Suppression missed"), visual_group, "multi_target")
 	for target in targets:
-		var was_stunned := float(target.stun) > 0.0
-		var mult := float(params.get("stunned_mult", 2.50)) if was_stunned else float(params.get("mult", 1.75))
-		_damage(unit, target, _unit_skill_stat_value(unit) * mult, "physical", t("神速震袭", "Swift Suppression"), visual_group, "multi_target")
+		_damage(unit, target, _unit_skill_stat_value(unit) * float(params.get("mult", 2.2)), "physical", t("神速震袭", "Swift Suppression"), visual_group, "multi_target")
 		_apply_skill_stun(unit, target, stun_duration)
 	unit.cast_count = int(unit.get("cast_count", 0)) + 1
 

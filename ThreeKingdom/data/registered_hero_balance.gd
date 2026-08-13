@@ -5,7 +5,7 @@ extends RefCounted
 # They are now the single code baseline; no hidden stat multipliers apply.
 const BASE_STATS := {
 	"caocao":{"hp":5470,"cooldown":5.6,"range":1},
-	"caoren":{"hp":4680,"cooldown":9.0,"range":1},
+	"caoren":{"hp":5620,"cooldown":5.2,"range":1},
 	"chengong":{"hp":2280,"cooldown":0.0,"range":3},
 	"dailaidongzhu":{"hp":4610,"cooldown":4.9,"range":2},
 	"daqiao":{"hp":2760,"cooldown":9.4,"range":3},
@@ -42,8 +42,8 @@ const BASE_STATS := {
 	"taishici":{"hp":3200,"cooldown":5.0,"range":2},
 	"weiyan":{"hp":4540,"cooldown":5.4,"range":1},
 	"wenchou":{"hp":3900,"cooldown":4.0,"range":1},
-	"xiahoudun":{"hp":4920,"cooldown":10.0,"range":1},
-	"xiahouyuan":{"hp":2280,"cooldown":8.5,"range":3},
+	"xiahoudun":{"hp":5900,"cooldown":5.2,"range":1},
+	"xiahouyuan":{"hp":2740,"cooldown":5.2,"range":3},
 	"xiaoqiao":{"hp":2760,"cooldown":9.5,"range":3},
 	"xuchu":{"hp":5040,"cooldown":6.4,"range":1},
 	"xuhuang":{"hp":5040,"cooldown":5.6,"range":1},
@@ -68,7 +68,7 @@ const BASE_STATS := {
 
 # Final editable skill parameters migrated from hero_balance_overrides.json.
 const PARAM_OVERRIDES := {
-	"caoren":{"guard_time":6.0,"mult":1.5,"rear_reduction":0.2,"stun":1.4,"target_count":2.0},
+	"caoren":{"guard_time":5.0,"mult":2.0,"rear_reduction":0.2,"stun":1.0,"target_count":2.0},
 	"daqiao":{"bond_heal_bonus_per_step":0.04,"bond_missing_hp_step":0.1,"flat":43.0,"mult":1.25},
 	"ganning":{"lvmeng_low_hp_bonus":0.5,"mult":1.5,"taishici_mult":2.5},
 	"guojia":{"freeze":2.1,"shatter_per_second":400.0,"target_count":2.0},
@@ -80,8 +80,8 @@ const PARAM_OVERRIDES := {
 	"sunquan":{"current_hp_damage_ratio":0.08,"luxun_cooldown":7.0,"luxun_damage_ratio":0.12,"max_hp_cap_mult":2.0,"max_hp_gain":200.0,"missing_hp_heal_ratio":0.074,"sun_legacy_max_hp_cap_mult":4.0,"sun_legacy_max_hp_gain":400.0,"sun_legacy_missing_hp_cap_gain_ratio":0.1,"sun_legacy_missing_hp_heal_ratio":0.11},
 	"sunshangxiang":{"ally_death_skill_gain":3.0,"hit_count":1.0,"mult":1.0,"skill_gain_per_cast":1.0,"sun_legacy_cooldown":5.0,"sun_legacy_hit_count":2.0,"sun_legacy_mult":1.5,"sun_legacy_skill_gain_per_cast":1.0},
 	"taishici":{"burn":5.0,"burn_ratio":0.16,"ganning_burning_mult":3.0,"mult":1.7,"sunce_target_count":3.0,"target_count":2.0},
-	"xiahoudun":{"front_reduction":0.2,"guard_time":6.5,"mult":1.5,"stun":1.4,"target_count":2.0},
-	"xiahouyuan":{"mult":1.75,"stun":1.4,"stunned_mult":2.5,"target_count":2.0},
+	"xiahoudun":{"front_reduction":0.2,"guard_time":5.0,"mult":2.4,"stun":1.5,"target_count":2.0},
+	"xiahouyuan":{"mult":2.2,"stun":1.0,"target_count":2.0},
 	"xiaoqiao":{"daqiao_slow":0.45,"slow":0.275,"slow_time":5.5,"target_count":2.0,"zhouyu_slow_time":7.5,"zhouyu_target_count":3.0},
 	"zhouyu":{"burn":3.0,"burn_ratio":0.42,"four_heroes_bonus_tiles":2.0,"missing_hp_bonus_per_step":0.05,"missing_hp_step":0.1,"mult":1.16,"tile_count":2.0,"xiaoqiao_burn":6.0}
 }
