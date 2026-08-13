@@ -244,7 +244,7 @@ func _auto_place_player() -> void:
 	_render()
 
 func _on_player_cell(row: int, col: int) -> void:
-	if phase != "placement" or battle_running: return
+	if phase not in ["draft", "placement"] or battle_running: return
 	var occupant: Variant = _unit_at(player_units, row, col)
 	if not pending_unit_ids.is_empty():
 		if occupant != null: return

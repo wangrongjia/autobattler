@@ -50,7 +50,7 @@ func _initialize() -> void:
 	assert(game._minimum_skill_cooldown("zhangfei") == 0.0)
 	assert(game._minimum_skill_cooldown("huangzhong") == 0.0)
 	assert(game._minimum_skill_cooldown("guanyu") == 0.0)
-	for cooldown_case in [["zhangfei", 6.5], ["huangzhong", 4.0]]:
+	for cooldown_case in [["zhangfei", 6.6], ["huangzhong", 4.2]]:
 		for hero_index in game.balance_editor_hero_list.item_count:
 			if str(game.balance_editor_hero_list.get_item_metadata(hero_index)) != str(cooldown_case[0]): continue
 			game._select_balance_hero(hero_index)
@@ -78,7 +78,7 @@ func _initialize() -> void:
 	game.lab_player_lineup.append({"hero_id":"guanyu", "level":1, "row":0, "col":0})
 	assert(game._can_move_lab_unit(true, 0, 0, 2, 0))
 
-	# Editing the skill base value also refreshes derived skill damage.
+	# Editing Strategy changes the direct runtime formula without generated base fields.
 	var old_hero: Dictionary = game.heroes.xusheng.duplicate(true)
 	var params: Dictionary = game._editable_ability_params("xusheng")
 	game._apply_hero_override("xusheng", {"hp":1400, "skill_value":77, "cooldown":0.0, "range":3, "ability_params":params})
@@ -86,7 +86,7 @@ func _initialize() -> void:
 	assert(game.heroes.xusheng.skill_value == 77)
 	assert(game.heroes.xusheng.cooldown == 0.0)
 	assert(game.balance_editor_cooldown.min_value == game._minimum_skill_cooldown(game.balance_editor_selected_id))
-	assert(game.heroes.xusheng.ability_params.base_value == round(float(game.heroes.xusheng.skill_output_base) * float(params.mult)))
+	assert(not game.heroes.xusheng.ability_params.has("base_value"))
 	game.heroes.xusheng = old_hero
 
 	# Signature heroes expose their real multipliers and mechanics through the same JSON editor.
@@ -105,7 +105,7 @@ func _initialize() -> void:
 	game.combat_units = [signature_actor, signature_target]
 	var target_hp_before := float(signature_target.hp)
 	game._cast_dianwei_skill(signature_actor)
-	assert(is_equal_approx(target_hp_before - float(signature_target.hp), float(game.heroes.dianwei.skill_output_base) * 0.80 * 2.25))
+	assert(is_equal_approx(target_hp_before - float(signature_target.hp), 80.0 * 2.25))
 	game.heroes.dianwei = old_dianwei
 
 	# Live battle uses the selected formation, locks deployment, supports speed,

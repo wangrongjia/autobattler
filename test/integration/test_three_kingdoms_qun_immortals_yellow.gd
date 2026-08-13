@@ -84,7 +84,7 @@ func _initialize() -> void:
 	game._cast_zhangjiao_skill(zhangjiao)
 	var lightning_hits: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(lightning_hits.size() == 3)
-	assert(lightning_hits.all(func(event): return int(event.amount) == roundi(game._unit_skill_output_base(zhangjiao) * game._unit_skill_power_multiplier(zhangjiao) * 2.5)))
+	assert(lightning_hits.all(func(event): return int(event.amount) == roundi(game._unit_skill_stat_value(zhangjiao) * 2.5)))
 	print("qun_new:zhangjiao_ok")
 
 	# Zhang Liang reaches four targets when both bonds are active and expiry restores SKILL.
@@ -113,7 +113,8 @@ func _initialize() -> void:
 	assert(game.visual_events.filter(func(event): return event.get("kind", "") == "damage" and str(event.get("source_id", "")) == str(zhangbao.id)).size() >= 6)
 	print("qun_new:zhangbao_ok")
 
-	# Combat board click opens a realtime inspector and the same toggle closes it.
+	# Combat board click opens the realtime inspector; tapping the hero again keeps it open.
+	# It closes only from the inspector's explicit close bar so mobile scrolling is safe.
 	zhangjiao.alive = true
 	zhangjiao.hp = zhangjiao.max_hp - 100.0
 	zhangjiao.skill_debuff = 0.5
@@ -124,10 +125,12 @@ func _initialize() -> void:
 	game._toggle_unit_inspector(str(zhangjiao.id))
 	assert(game.unit_inspector_overlay.visible)
 	assert(game.unit_inspector_detail.text.contains("HP"))
-	assert(game.unit_inspector_detail.text.contains("技能强度"))
-	assert(game.unit_inspector_detail.text.contains("天人同道"))
-	assert(game.unit_inspector_detail.text.contains("虚弱"))
+	assert(game.unit_inspector_detail.text.contains("鎶€鑳藉己搴?))
+	assert(game.unit_inspector_detail.text.contains("澶╀汉鍚岄亾"))
+	assert(game.unit_inspector_detail.text.contains("铏氬急"))
 	game._toggle_unit_inspector(str(zhangjiao.id))
+	assert(game.unit_inspector_overlay.visible)
+	game._hide_unit_inspector()
 	assert(not game.unit_inspector_overlay.visible)
 	print("qun_new:inspector_ok")
 

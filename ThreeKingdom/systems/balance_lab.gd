@@ -110,8 +110,6 @@ func _apply_hero_override(hero_id: String, data: Dictionary) -> void:
 	var hero: Dictionary = heroes[hero_id]
 	hero.hp = maxi(1, int(data.get("hp", hero.hp)))
 	hero.skill_value = maxi(0, int(data.get("skill_value", hero.skill_value)))
-	if data.has("skill_output_base"):
-		hero.skill_output_base = maxf(0.0, float(data.skill_output_base))
 	hero.cooldown = maxf(COOLDOWN_INPUT_MIN, float(data.get("cooldown", hero.cooldown)))
 	hero.range = clampi(int(data.get("range", hero.range)), 1, 3)
 	if data.get("ability_params", null) is Dictionary:
@@ -120,15 +118,12 @@ func _apply_hero_override(hero_id: String, data: Dictionary) -> void:
 		var params: Dictionary = hero.get("ability_params", {}).duplicate(true)
 		for key in data.ability_params:
 			params[key] = data.ability_params[key]
-		for derived_key in ["base_value", "base_heal", "base_shield", "burn_per_sec"]:
-			params.erase(derived_key)
 		hero.ability_params = params
 	heroes[hero_id] = hero
-	_finalize_hero_skill_values(hero_id)
 
 func _normalize_hero_override(data: Dictionary, hero_id := "") -> Dictionary:
 	var normalized := {}
-	for key in ["hp", "skill_value", "skill_output_base", "cooldown", "range"]:
+	for key in ["hp", "skill_value", "cooldown", "range"]:
 		if data.has(key):
 			normalized[key] = maxf(COOLDOWN_INPUT_MIN, float(data[key])) if key == "cooldown" else data[key]
 	if data.get("ability_params", null) is Dictionary:
@@ -136,10 +131,7 @@ func _normalize_hero_override(data: Dictionary, hero_id := "") -> Dictionary:
 	return normalized
 
 func _editable_ability_params(hero_id: String) -> Dictionary:
-	var params: Dictionary = heroes[hero_id].get("ability_params", {}).duplicate(true)
-	for derived_key in ["base_value", "base_heal", "base_shield", "burn_per_sec"]:
-		params.erase(derived_key)
-	return params
+	return heroes[hero_id].get("ability_params", {}).duplicate(true)
 
 func _save_balance_overrides() -> bool:
 	var path := BALANCE_PROJECT_PATH if balance_project_writable else BALANCE_USER_PATH
@@ -251,7 +243,7 @@ func _build_balance_editor_page(page: VBoxContainer) -> void:
 	sub_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	page.add_child(sub_tabs)
 	var skills_page := VBoxContainer.new()
-	skills_page.name = t("武将技能", "HERO SKILLS")
+	skills_page.name = t("武将技能", "HERO StrategyS")
 	sub_tabs.add_child(skills_page)
 	var github_page := VBoxContainer.new()
 	github_page.name = t("GitHub 上传下载", "GITHUB SYNC")
@@ -309,7 +301,7 @@ func _build_balance_editor_page(page: VBoxContainer) -> void:
 	var values := VBoxContainer.new()
 	values.add_theme_constant_override("separation", 9)
 	values_panel.add_child(values)
-	values.add_child(_label(t("英雄与技能参数", "HERO & SKILL VALUES"), 22, Color("#e3c58c")))
+	values.add_child(_label(t("英雄与技能参数", "HERO & Strategy VALUES"), 22, Color("#e3c58c")))
 	var top_values: Container = VBoxContainer.new() if mobile_layout else HBoxContainer.new()
 	top_values.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top_values.add_theme_constant_override("separation", 12)
@@ -323,7 +315,7 @@ func _build_balance_editor_page(page: VBoxContainer) -> void:
 	balance_editor_cooldown = _lab_spinbox(COOLDOWN_INPUT_MIN, 3600.0, 0.1)
 	balance_editor_range = _lab_spinbox(1, 3, 1)
 	value_controls.add_child(_lab_value_row(t("生命", "HP"), balance_editor_hp))
-	value_controls.add_child(_lab_value_row(t("技能基础数值", "Skill base value"), balance_editor_skill_value))
+	value_controls.add_child(_lab_value_row(t("兵略值", "Strategy"), balance_editor_skill_value))
 	value_controls.add_child(_lab_value_row(t("技能冷却（秒）", "Skill cooldown (seconds)"), balance_editor_cooldown))
 	value_controls.add_child(_lab_value_row(t("射程层级", "Range tier"), balance_editor_range))
 	var detail_panel := PanelContainer.new()
@@ -341,7 +333,7 @@ func _build_balance_editor_page(page: VBoxContainer) -> void:
 	balance_editor_hero_detail.custom_minimum_size = Vector2(0 if mobile_layout else 420, 190)
 	balance_editor_hero_detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail_box.add_child(balance_editor_hero_detail)
-	values.add_child(_label(t("技能参数 JSON（派生伤害值会自动重算）", "SKILL PARAMS JSON (derived values recalculate)"), 14, Color("#e3c58c")))
+	values.add_child(_label(t("技能参数 JSON", "Strategy PARAMS JSON"), 14, Color("#e3c58c")))
 	balance_editor_params = TextEdit.new()
 	balance_editor_params.custom_minimum_size.y = 250
 	balance_editor_params.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -407,19 +399,18 @@ func _select_balance_hero(index: int) -> void:
 	balance_editor_range.value = float(hero.range)
 	balance_editor_params.text = JSON.stringify(_editable_ability_params(balance_editor_selected_id), "\t")
 	_refresh_balance_editor_hero_detail()
-	balance_editor_status.text = _hero_name(balance_editor_selected_id) + t(" · 当前实战数据", " · current combat values")
+	balance_editor_status.text = _hero_name(balance_editor_selected_id) + t(" · 当前数据", " · current combat values")
 
 func _refresh_balance_editor_hero_detail() -> void:
 	if not is_instance_valid(balance_editor_hero_detail) or balance_editor_selected_id.is_empty(): return
 	var hero: Dictionary = heroes[balance_editor_selected_id]
 	var title := _hero_name(balance_editor_selected_id) + " · " + _faction_name(str(hero.f))
 	var basics := t("兵种", "Rank") + "：" + _hero_army_name(balance_editor_selected_id)
-	basics += "\n" + t("定位", "Roles") + "：" + _roles_text(hero.get("roles", []))
 	basics += "\n" + t("当前生命 / 射程", "Current HP / range") + "：%d / %d" % [int(hero.hp), int(hero.range)]
-	basics += "\n" + t("当前基础技能值 / 冷却", "Current skill base / cooldown") + "：%d / %.1fs" % [int(hero.skill_value), float(hero.cooldown)]
+	basics += "\n" + t("兵略值 / 冷却", "Strategy / cooldown") + "：%d / %.1fs" % [int(hero.skill_value), float(hero.cooldown)]
 	var detail := "[b][color=#f0c77a]" + title + "[/color][/b]\n"
 	detail += "[color=#c9c0b1]" + basics + "[/color]\n\n"
-	detail += "[b]" + t("技能", "SKILL") + "[/b]\n" + _skill_detail(balance_editor_selected_id) + "\n\n"
+	detail += "[b]" + t("技能", "Strategy") + "[/b]\n" + _skill_detail(balance_editor_selected_id) + "\n\n"
 	detail += "[b]" + t("羁绊效果", "BOND EFFECTS") + "[/b]\n" + _hero_bond_detail(balance_editor_selected_id)
 	balance_editor_hero_detail.text = detail
 
@@ -433,7 +424,6 @@ func _save_selected_hero_balance() -> void:
 	var data := {
 		"hp": int(balance_editor_hp.value),
 		"skill_value": int(balance_editor_skill_value.value),
-		"skill_output_base": float(heroes[balance_editor_selected_id].get("skill_output_base", 100.0)),
 		"cooldown": float(balance_editor_cooldown.value),
 		"range": int(balance_editor_range.value),
 		"ability_params": parsed
@@ -450,7 +440,6 @@ func _reset_selected_hero_balance() -> void:
 	if balance_editor_selected_id.is_empty() or not balance_default_heroes.has(balance_editor_selected_id): return
 	heroes[balance_editor_selected_id] = balance_default_heroes[balance_editor_selected_id].duplicate(true)
 	balance_overrides.erase(balance_editor_selected_id)
-	_finalize_hero_skill_values(balance_editor_selected_id)
 	_apply_balance_to_existing_units(balance_editor_selected_id)
 	_save_balance_overrides()
 	_select_balance_hero(balance_editor_hero_list.get_selected_items()[0])

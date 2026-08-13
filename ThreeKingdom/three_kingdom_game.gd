@@ -2,14 +2,11 @@ extends "res://ThreeKingdom/systems/visual_effects.gd"
 
 func _ready() -> void:
 	rng.randomize()              # 用当前时间初始化随机数种子,保证每局随机不同
-	_add_extended_roster()       # 注册 45 名扩展武将(加上 12 名招牌 = 57 名)
-	_rebalance_role_stats()      # 第1步:平衡数值(远程武将技能强度封顶、特例覆盖)
-	_apply_document_skill_rework()  # 第2步:按设计文档重做 18 名武将的技能
+	_add_extended_roster()       # 注册 武将
+	_apply_existing_faction_skill_reworks() # 保留尚未轮到重做阵营的既有技能配置
 	_configure_combat_profiles()
-	_scale_hero_health()         # 第4步:所有武将基础血量 ×12（相对原配置翻倍）
-	_finalize_skill_values()     # 第5步:从技能基础数值预计算伤害/治疗/护盾
-	_load_balance_overrides()    # 载入平衡实验室保存的项目数值覆盖
-	_normalize_all_skill_strengths() # 全员技能强度统一为100，保留原一星实战输出基准
+	_apply_registered_balance_baseline() # 直接载入代码中的最终基础值，无职业/血量隐式修正
+	_load_balance_overrides()    # 只载入此后由平衡实验室保存的新差异
 	balance_default_heroes = heroes.duplicate(true)
 	_load_settings()             # 读取持久化设置(速度、暂停选项、阵营过滤)
 	_build_ui()                  # 构建整个游戏界面(纯代码创建所有 UI 元素)

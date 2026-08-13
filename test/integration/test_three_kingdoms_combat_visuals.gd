@@ -111,7 +111,8 @@ func _initialize() -> void:
 	assert(initial_fire_damage.all(func(event): return str(event.visual_group) == row_group and str(event.group_style) == "tile_burn"))
 	game.visual_events.clear()
 	for target in fire_targets:
-		if str(target.get("burn_visual_group", "")) == row_group: target.burn_clock = 0.9
+		for effect in target.get("burn_effects", []):
+			if str(effect.get("visual_group", "")) == row_group: effect.clock = 0.9
 	game._process_statuses(0.2)
 	var burn_tick_damage: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(burn_tick_damage.size() == 2)
@@ -146,7 +147,8 @@ func _initialize() -> void:
 	assert(game.ground_effects.size() == sparse_row_empty.size())
 	assert(game.RULER_MAX_HP - game.enemy_ruler_hp == int(sparse_row_empty.reduce(func(total, event): return total + int(event.amount), 0)))
 	for target in sparse_fire_targets:
-		if float(target.burn) > 0.0: target.burn_clock = 0.9
+		if float(target.burn) > 0.0:
+			for effect in target.get("burn_effects", []): effect.clock = 0.9
 	for effect in game.ground_effects: effect.clock = 0.9
 	game.visual_events.clear()
 	game._process_statuses(0.2)

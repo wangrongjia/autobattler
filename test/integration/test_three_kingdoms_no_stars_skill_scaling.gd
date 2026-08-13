@@ -7,10 +7,10 @@ func _initialize() -> void:
 	print("CHECKPOINT scene_ready")
 	game.tick_timer.stop()
 
-	# Every hero exposes 100 SKILL while retaining its former output baseline.
+	# Every hero is registered directly with 100 Strategy; no hidden output baseline exists.
 	for hero in game.heroes.values():
 		assert(float(hero.skill_value) == 100.0)
-		assert(hero.has("skill_output_base"))
+		assert(not hero.has("skill_output_base"))
 	assert(game._star_stat_multiplier(3) == 1.0)
 	assert(game._star_effect_multiplier(3) == 1.0)
 	print("CHECKPOINT normalized")
@@ -42,11 +42,11 @@ func _initialize() -> void:
 	game.heroes.madai.skill_value = 100
 	print("CHECKPOINT madai")
 	game._cast_madai_execution(madai)
-	assert(is_equal_approx(float(target.hp), 6000.0))
+	assert(is_equal_approx(float(target.hp), 5000.0))
 	target.hp = 10000.0
 	game.heroes.madai.skill_value = 50
 	game._cast_madai_execution(madai)
-	assert(is_equal_approx(float(target.hp), 8000.0))
+	assert(is_equal_approx(float(target.hp), 7500.0))
 	game.heroes.madai.skill_value = 100
 
 	# Recruitment always exposes Vanguard / Midguard / Rearguard slots.
@@ -83,8 +83,8 @@ func _initialize() -> void:
 	assert(apply_events.size() == 2)
 	assert(apply_events.all(func(event): return str(event.visual_group).begins_with("yuji_poison:")))
 	game.visual_events.clear()
-	poison_a.poison_clock = 0.9
-	poison_b.poison_clock = 0.9
+	for effect in poison_a.get("poison_effects", []): effect.clock = 0.9
+	for effect in poison_b.get("poison_effects", []): effect.clock = 0.9
 	game.battle_time = 1.0
 	game._process_statuses(0.2)
 	var poison_ticks: Array = game.visual_events.filter(func(event): return str(event.get("group_style", "")) == "poison_tick")

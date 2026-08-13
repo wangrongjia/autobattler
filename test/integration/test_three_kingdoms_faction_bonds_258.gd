@@ -34,7 +34,7 @@ func _initialize() -> void:
 		game.enemy_ruler_hp = game.RULER_MAX_HP
 		game.visual_events.clear()
 		game._cast_madai_execution(madai)
-		assert(game.RULER_MAX_HP - game.enemy_ruler_hp == 1000)
+		assert(game.RULER_MAX_HP - game.enemy_ruler_hp == int(game.heroes.madai.ability_params.empty_ruler_damage))
 		assert(game.visual_events.any(func(event): return event.kind == "empty" and int(event.row) == 0))
 
 	# Shu: 8% base reduction, then +2% per damage instance up to 14%;

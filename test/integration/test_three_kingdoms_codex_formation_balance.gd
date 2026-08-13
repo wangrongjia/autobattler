@@ -10,10 +10,7 @@ func _initialize() -> void:
 	assert(game._star_stat_multiplier(1) == 1.0)
 	assert(game._star_stat_multiplier(2) == 1.0)
 	assert(game._star_stat_multiplier(3) == 1.0)
-	assert(game._star_skill_values("huangzhong", 1) == game._star_skill_values("huangzhong", 2))
-	assert(game._star_skill_values("caoren", 2) == game._star_skill_values("caoren", 3))
-	for hero_id in game.heroes:
-		assert(game._star_skill_values(hero_id, 1) == game._star_skill_values(hero_id, 3))
+	assert(not game.has_method("_star_skill_values"))
 
 	# Every hero keeps a positive skill budget after loading balance overrides.
 	for hero_id in game.heroes:
@@ -21,21 +18,21 @@ func _initialize() -> void:
 		assert(float(hero.skill_value) > 0.0)
 	assert(game.heroes.sunshangxiang.skill_value == 100)
 	assert(game.heroes.huangzhong.skill_value == game.heroes.guanyu.skill_value)
-	assert(game.heroes.huangzhong.ability_params.mult == 1.45)
-	assert(game.heroes.lvmeng.roles.has("刺客"))
-	assert(game.heroes.ganning.roles.has("刺客"))
+	assert(game.heroes.huangzhong.ability_params.mult == 4.2)
+	assert(not game.heroes.lvmeng.has("roles"))
+	assert(not game.heroes.ganning.has("roles"))
 	assert(game.heroes.lvmeng.skill_value > 0 and game.heroes.ganning.skill_value > 0)
-	assert(game._hero_bond_detail("machao").contains("行动条速度提高15%"))
-	assert(game._hero_bond_detail("liushan").contains("30%全能吸血"))
-	assert(game._hero_bond_detail("huangzhong").contains("50%概率暴击"))
+	assert(game._hero_bond_detail("machao").contains("0.4×马超兵略值"))
+	assert(game._hero_bond_detail("liushan").contains("30%用于恢复"))
+	assert(game._hero_bond_detail("huangzhong").contains("30%概率暴击"))
 	assert(not game._hero_bond_detail("huangzhong").contains("魏延恢复50%最大生命"))
-	assert(game._hero_bond_detail("weiyan").contains("魏延恢复50%最大生命"))
+	assert(game._hero_bond_detail("weiyan").contains("实际伤害23%"))
 	for tiger_id in ["guanyu", "zhangfei", "zhaoyun", "huangzhong"]:
 		assert(not game._hero_bond_detail(tiger_id).contains("行动条速度提高15%"))
 	assert(game._hero_bond_detail("jiangwei").contains("北伐传承"))
-	assert(game._hero_bond_detail("jiangwei").contains("减伤由15%提高至30%"))
+	assert(game._hero_bond_detail("jiangwei").contains("100%兵略值"))
 	assert(game._hero_bond_detail("pangtong").contains("卧龙凤雏"))
-	assert(game._hero_bond_detail("pangtong").contains("两条普通羁绊"))
+	assert(game._hero_bond_detail("pangtong").contains("提高至50%"))
 	for bond_name in ["七擒孟获", "南蛮夫妇", "蛮王援军"]:
 		assert(game._hero_bond_detail("menghuo").contains(bond_name))
 	for bond_name in ["南蛮夫妇", "姐弟同心"]:

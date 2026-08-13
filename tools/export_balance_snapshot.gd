@@ -17,17 +17,14 @@ func _initialize() -> void:
 			"zh": hero.get("zh", ""),
 			"en": hero.get("en", ""),
 			"faction": hero.get("f", ""),
-			"roles": hero.get("roles", []),
 			"hp": hero.get("hp", 0),
-			"atk": hero.get("atk", 0),
-			"spd": hero.get("spd", 0.0),
+			"strategy": hero.get("skill_value", 100),
 			"range": hero.get("range", 0),
 			"skill": hero.get("zh_skill", ""),
 			"ability": hero.get("ability", ""),
 			"ability_params": hero.get("ability_params", {}),
 			"skill_detail": game._skill_detail(hero_id),
 			"bond_detail": game._hero_bond_detail(hero_id),
-			"star_values": game._star_skill_values(hero_id, 1)
 		})
 
 	var snapshot := {

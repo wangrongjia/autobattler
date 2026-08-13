@@ -7,8 +7,8 @@ func _initialize() -> void:
 	game.tick_timer.stop()
 
 	assert(game.heroes.zhugeliang.zh_skill == "八阵奇谋")
-	assert(game.heroes.zhugeliang.cooldown == float(game.balance_overrides.get("zhugeliang", {}).get("cooldown", 4.0)))
-	assert(game.heroes.zhugeliang.ability_params.mult == 2.0)
+	assert(game.heroes.zhugeliang.cooldown == float(game.balance_overrides.get("zhugeliang", {}).get("cooldown", 6.9)))
+	assert(game.heroes.zhugeliang.ability_params.mult == 2.3)
 	assert(game._zhugeliang_affected_tiles(1, 2, false, false).size() == 3)
 	assert(game._zhugeliang_affected_tiles(1, 2, true, false).size() == 5)
 	assert(game._zhugeliang_affected_tiles(1, 2, true, true).size() == 9)
@@ -36,8 +36,8 @@ func _initialize() -> void:
 	game.combat_units = player_team + enemy_team
 	game.visual_events.clear()
 
-	var base_damage := float(game.heroes.zhugeliang.ability_params.base_value)
-	var complete_first_hit := base_damage * 1.20 * 1.80
+	var base_damage := float(game.heroes.zhugeliang.skill_value) * float(game.heroes.zhugeliang.ability_params.mult)
+	var complete_first_hit := base_damage * 1.20 * 1.32
 	game._cast_zhugeliang_area_at(zhuge, 1, 2)
 	for target in enemy_team:
 		assert(is_equal_approx(float(target.hp), float(target.max_hp) - complete_first_hit))
@@ -53,7 +53,7 @@ func _initialize() -> void:
 	game.visual_events.clear()
 	var hp_before_second: Array = enemy_team.map(func(target): return float(target.hp))
 	game._cast_zhugeliang_area_at(zhuge, 1, 2)
-	var complete_marked_hit := complete_first_hit * 1.30
+	var complete_marked_hit := complete_first_hit * 1.40
 	for index in enemy_team.size():
 		assert(is_equal_approx(hp_before_second[index] - float(enemy_team[index].hp), complete_marked_hit))
 		assert(bool(enemy_team[index].zhuge_fire_mark))
@@ -89,5 +89,5 @@ func _initialize() -> void:
 	assert(bond_detail.contains("卧龙凤雏"))
 	assert(bond_detail.contains("北伐传承"))
 	assert(bond_detail.contains("七擒孟获"))
-	assert(bond_detail.contains("命中9人时提高80%"))
+	assert(bond_detail.contains("命中9人时提高32%"))
 	quit()

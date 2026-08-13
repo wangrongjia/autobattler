@@ -28,7 +28,7 @@ func _initialize() -> void:
 	assert(yujin.shield == 0.0)
 	assert(caoren.shield == 0.0)
 	assert(ally.shield > 0.0)
-	assert(is_equal_approx(float(ally.shield), 200.0 + float(ally.max_hp) * 0.03))
+	assert(is_equal_approx(float(ally.shield), 300.0))
 	assert(ally.shield < ally.max_hp * 0.30)
 
 	# Sun Quan's reworked signature no longer leaves any team/column damage buff.

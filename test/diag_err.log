@@ -1,0 +1,12 @@
+SCRIPT ERROR: Parse Error: Could not resolve class "res://ThreeKingdom/systems/visual_effects.gd".
+   at: GDScript::reload (res://ThreeKingdom/three_kingdom_game.gd:1)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://test/integration/test_three_kingdoms_no_stars_skill_scaling.gd:4)
+ERROR: Failed to load script "res://ThreeKingdom/three_kingdom_game.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://test/integration/test_three_kingdoms_no_stars_skill_scaling.gd:4)
+SCRIPT ERROR: Invalid access to property or key 'tick_timer' on a base object of type 'Control'.
+   at: _initialize (res://test/integration/test_three_kingdoms_no_stars_skill_scaling.gd:8)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://test/integration/test_three_kingdoms_no_stars_skill_scaling.gd:8)

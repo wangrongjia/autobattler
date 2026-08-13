@@ -358,15 +358,6 @@ func _start_burn_flare(target: Control, speed_scale: float) -> Tween:
 	fire_root.z_index = 115
 	fire_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	target.add_child(fire_root)
-	var fire_image := TextureRect.new()
-	fire_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fire_image.texture = load("res://ThreeKingdom/animations/onfire.png")
-	fire_image.material = _fire_effect_material()
-	fire_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	fire_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	fire_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	fire_image.modulate = Color(1.0, 0.82, 0.58, 0.90)
-	fire_root.add_child(fire_image)
 	var glow := ColorRect.new()
 	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glow.color = Color("#ff5a1f55")

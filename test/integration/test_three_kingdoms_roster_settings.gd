@@ -11,7 +11,7 @@ func _initialize() -> void:
 	assert(game._portrait_texture("zhaoyun") != null)
 	assert(game._portrait_source_texture("dailaidongzhu").resource_path.ends_with("/pic/dailaidongzhu.png"))
 	assert(game.heroes.dailaidongzhu.zh_skill == "蛮骨狼袭")
-	assert(game.heroes.dailaidongzhu.cooldown == 7.0)
+	assert(game.heroes.dailaidongzhu.cooldown == 4.9)
 	game.pause_during_actions = true
 	game._toggle_pause_setting()
 	assert(not game.pause_during_actions)
@@ -50,7 +50,7 @@ func _initialize() -> void:
 	game.combat_units = [dailai, slow_enemy, ready_enemy]
 	game.battle_stats[dailai.id] = {"damage":0.0, "healing":0.0, "taken":0.0, "control":0.0}
 	game._cast_dailai_skill(dailai)
-	assert(ready_enemy.action == 65.0)
+	assert(ready_enemy.action == 90.0)
 	assert(slow_enemy.action == 30.0)
 	assert(float(ready_enemy.hp) < float(ready_enemy.max_hp))
 	game.visual_events.clear()

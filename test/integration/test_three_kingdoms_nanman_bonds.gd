@@ -44,10 +44,10 @@ func _initialize() -> void:
 	game.rng.seed = seed
 	game._cast_jiangwei_skill(jiangwei)
 	var jiang_params: Dictionary = game.heroes.jiangwei.ability_params
-	assert(is_equal_approx(float(jiangwei.timed_reduction), float(jiang_params.bond_reduction)))
-	assert(is_equal_approx(float(jiangwei.timed_reduction_time), float(jiang_params.reduction_duration)))
-	assert(is_equal_approx(1000000.0 - float(jiang_main.hp), float(jiang_params.base_value)))
-	var expected_diagonal := float(game.heroes.jiangwei.skill_value) * float(jiang_params.diagonal_mult)
+	assert(is_equal_approx(float(jiangwei.timed_reduction), 0.0))
+	assert(is_equal_approx(float(jiangwei.timed_reduction_time), 0.0))
+	assert(is_equal_approx(1000000.0 - float(jiang_main.hp), float(game.heroes.jiangwei.skill_value) * float(jiang_params.mult)))
+	var expected_diagonal := float(game.heroes.jiangwei.skill_value) * float(jiang_params.bond_splash_mult)
 	assert(is_equal_approx(1000000.0 - float(jiang_diagonal_left.hp), expected_diagonal))
 	assert(is_equal_approx(1000000.0 - float(jiang_diagonal_right.hp), expected_diagonal))
 
@@ -66,8 +66,10 @@ func _initialize() -> void:
 	game._cast_pangtong_skill(pangtong)
 	var pang_params: Dictionary = game.heroes.pangtong.ability_params
 	for target in pang_targets:
-		assert(is_equal_approx(1000000.0 - float(target.hp), float(game.heroes.pangtong.skill_value) * float(pang_params.bond_mult)))
-		assert(is_equal_approx(float(target.stun), float(pang_params.bond_stun)))
+		assert(is_equal_approx(1000000.0 - float(target.hp), float(game.heroes.pangtong.skill_value) * float(pang_params.mult)))
+		assert(is_equal_approx(float(target.stun), 0.0))
+		assert(target.chain_effects.size() == 1)
+		assert(is_equal_approx(float(target.chain_effects[0].ratio), float(pang_params.bond_link_ratio)))
 	var pang_damage_events: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(pang_damage_events.size() == 3)
 	assert(pang_damage_events.all(func(event): return event.get("group_style", "") == "area_impact"))
@@ -91,7 +93,7 @@ func _initialize() -> void:
 	_set_combat(game, meng_allies, meng_targets)
 	game._cast_menghuo_skill(menghuo)
 	var meng_params: Dictionary = game.heroes.menghuo.ability_params
-	var expected_meng_damage := float(meng_params.base_value) * float(meng_params.burning_damage_mult)
+	var expected_meng_damage := float(game.heroes.menghuo.skill_value) * float(meng_params.mult) * float(meng_params.burning_damage_mult)
 	expected_meng_damage += float(game.heroes.menghuo.skill_value) * float(meng_params.aftershock_mult)
 	for target in meng_targets:
 		assert(is_equal_approx(1000000.0 - float(target.hp), expected_meng_damage))
@@ -104,7 +106,7 @@ func _initialize() -> void:
 		meng_visual_groups[str(event.visual_group)] = true
 	assert(meng_visual_groups.size() == 2)
 
-	# 南蛮夫妇 + 姐弟同心：祝融横向弹射，三格都获得6秒、每秒40%的强化灼烧。
+	# 南蛮夫妇 + 姐弟同心：祝融主目标300%，左右各50%，三格获得5秒、每秒100%的强化灼烧。
 	var zhurong := _place(game, "player", "zhurong", 2, 0)
 	var zhurong_allies: Array = [
 		zhurong,
@@ -118,18 +120,23 @@ func _initialize() -> void:
 		target.hp = target.max_hp
 		zhurong_targets.append(target)
 	_set_combat(game, zhurong_allies, zhurong_targets)
-	seed = _seed_for_tile(game, zhurong, 1, 2)
+	# 三个候选按列顺序排列，选择索引1作为主目标。
+	for target_seed in range(10000):
+		game.rng.seed = target_seed
+		if game.rng.randi_range(0, 2) == 1:
+			seed = target_seed
+			break
 	game.rng.seed = seed
 	game._cast_zhurong_skill(zhurong)
 	var zhurong_params: Dictionary = game.heroes.zhurong.ability_params
-	assert(is_equal_approx(1000000.0 - float(zhurong_targets[1].hp), float(zhurong_params.base_value)))
+	assert(is_equal_approx(1000000.0 - float(zhurong_targets[1].hp), float(game.heroes.zhurong.skill_value) * float(zhurong_params.mult)))
 	for index in [0, 2]:
 		assert(is_equal_approx(1000000.0 - float(zhurong_targets[index].hp), float(game.heroes.zhurong.skill_value) * float(zhurong_params.bounce_mult)))
 	for target in zhurong_targets:
-		assert(is_equal_approx(float(target.burn), float(zhurong_params.bond_burn)))
-		assert(is_equal_approx(float(target.burn_damage), float(game.heroes.zhurong.skill_value) * float(zhurong_params.bond_burn_ratio)))
+		assert(is_equal_approx(float(target.burn), float(zhurong_params.burn) + float(zhurong_params.sibling_burn_bonus)))
+		assert(is_equal_approx(float(target.burn_damage), float(game.heroes.zhurong.skill_value) * float(zhurong_params.sibling_burn_ratio)))
 
-	# 蛮王援军 + 姐弟同心：带来洞主纵向追击，并强化对已灼烧目标的伤害。
+	# 蛮王援军 + 姐弟同心：带来洞主以320%攻击整列，已灼烧目标额外增加50%兵略值。
 	var dailai := _place(game, "player", "dailaidongzhu", 0, 0)
 	var dailai_allies: Array = [
 		dailai,
@@ -147,14 +154,12 @@ func _initialize() -> void:
 	_set_combat(game, dailai_allies, dailai_targets)
 	game._cast_dailai_skill(dailai)
 	var dailai_params: Dictionary = game.heroes.dailaidongzhu.ability_params
-	var burning_bonus := float(dailai_params.burning_damage_mult)
-	var expected_main := float(dailai_params.base_value) * float(dailai_params.mult) * burning_bonus
-	var expected_splash := float(game.heroes.dailaidongzhu.skill_value) * float(dailai_params.column_splash_mult) * burning_bonus
-	assert(is_equal_approx(1000000.0 - float(dailai_targets[1].hp), expected_main))
-	assert(is_equal_approx(float(dailai_targets[1].action), 90.0 - float(dailai_params.action_reduction_by_star[0])))
-	for index in [0, 2]:
-		assert(is_equal_approx(1000000.0 - float(dailai_targets[index].hp), expected_splash))
-		assert(is_equal_approx(float(dailai_targets[index].action), 50.0 - float(dailai_params.splash_action_reduction)))
+	var expected_column := float(game.heroes.dailaidongzhu.skill_value) * (float(dailai_params.column_mult) + float(dailai_params.burning_bonus_mult))
+	for target in dailai_targets:
+		assert(is_equal_approx(1000000.0 - float(target.hp), expected_column))
+	assert(is_equal_approx(float(dailai_targets[1].action), 90.0))
+	assert(is_equal_approx(float(dailai_targets[0].action), 50.0))
+	assert(is_equal_approx(float(dailai_targets[2].action), 50.0))
 	for target in dailai_targets:
 		assert(is_equal_approx(float(target.burn), float(dailai_params.bond_burn)))
 		assert(is_equal_approx(float(target.burn_damage), float(game.heroes.dailaidongzhu.skill_value) * float(dailai_params.bond_burn_ratio)))
