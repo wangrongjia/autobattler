@@ -172,7 +172,7 @@ func _initialize() -> void:
 	game.ground_effects.clear()
 	game.enemy_ruler_hp = game.RULER_MAX_HP
 	game.visual_events.clear()
-	game._cast_generic_ability(menghuo)
+	game._cast_menghuo_skill(menghuo)
 	var row_impacts: Array = game.visual_events.filter(func(event): return str(event.get("kind", "")) in ["damage", "empty"])
 	assert(row_impacts.size() == game.BOARD_COLUMNS)
 	assert(row_impacts.filter(func(event): return event.get("kind", "") == "empty").size() == game.BOARD_COLUMNS - 1)

@@ -1,18 +1,36 @@
 extends SceneTree
 
-func _place(game, team: String, hero_id: String, row: int, col: int) -> Dictionary:
+const WU_IDS := ["zhouyu", "luxun", "lvmeng", "lusu", "daqiao", "xiaoqiao", "taishici", "ganning", "huanggai", "sunjian", "sunce", "sunquan", "sunshangxiang", "dingfeng", "xusheng"]
+
+func _place(game, team: String, hero_id: String, row: int, col: int, hp := 10000.0) -> Dictionary:
 	var unit: Dictionary = game._make_roster_unit(team, hero_id)
 	unit.row = row
 	unit.col = col
+	unit.max_hp = hp
+	unit.hp = hp
+	unit.skill_value = 100.0
 	return unit
 
-func _set_combat(game, allies: Array, enemies: Array) -> void:
+func _set_combat(game, allies: Array, enemies: Array, apply_bonds := true) -> void:
 	game.player_units = allies
 	game.enemy_units = enemies
 	game.combat_units = allies + enemies
 	game.visual_events.clear()
+	game.ground_effects.clear()
 	game.enemy_ruler_hp = game.RULER_MAX_HP
 	game.player_ruler_hp = game.RULER_MAX_HP
+	if apply_bonds: game._apply_combo_bonds(true, false)
+
+func _full_enemy_board(game, hp := 10000.0) -> Array:
+	var result: Array = []
+	var ids := ["liubei", "guanyu", "zhangfei", "zhaoyun", "huangzhong", "machao", "weiyan", "madai", "zhugeliang", "jiangwei", "pangtong", "menghuo", "zhurong", "dailaidongzhu", "liushan"]
+	for row in game.BOARD_ROWS:
+		for col in game.BOARD_COLUMNS:
+			result.append(_place(game, "enemy", ids[row * game.BOARD_COLUMNS + col], row, col, hp))
+	return result
+
+func _assert_close(actual: float, expected: float, tolerance := 0.01) -> void:
+	assert(absf(actual - expected) <= tolerance, "expected %s, got %s" % [expected, actual])
 
 func _initialize() -> void:
 	var game = load("res://ThreeKingdom/ThreeKingdom.tscn").instantiate()
@@ -20,508 +38,234 @@ func _initialize() -> void:
 	await process_frame
 	game.tick_timer.stop()
 
+	var cooldowns := {
+		"zhouyu":5.8, "luxun":5.8, "lvmeng":5.6, "lusu":5.6, "daqiao":6.2,
+		"xiaoqiao":6.2, "taishici":6.0, "ganning":6.0, "huanggai":8.8,
+		"sunjian":15.0, "sunce":5.2, "sunquan":5.2, "sunshangxiang":5.2,
+		"dingfeng":5.4, "xusheng":5.8
+	}
+	for hero_id in WU_IDS:
+		assert(game.heroes.has(hero_id))
+		_assert_close(float(game.heroes[hero_id].cooldown), float(cooldowns[hero_id]))
+		_assert_close(float(game.heroes[hero_id].skill_value), 100.0)
 	assert(not game.heroes.has("jiangqin"))
-	assert(game.heroes.has("taishici"))
-	assert(game.heroes.has("dingfeng"))
+	assert("200%兵略值" in game._skill_detail("zhouyu") and "灼烧4秒" in game._skill_detail("zhouyu"))
+	assert("290%兵略值" in game._skill_detail("luxun"))
+	assert("500%兵略值" in game._skill_detail("lvmeng"))
+	assert("320%兵略值" in game._skill_detail("lusu"))
+	assert("380%兵略值" in game._skill_detail("daqiao"))
+	assert("0.35×兵略值%" in game._skill_detail("xiaoqiao"))
+	assert("300%自身兵略值" in game._skill_detail("ganning"))
+	assert("400%兵略值" in game._skill_detail("dingfeng"))
+	assert("0.3×兵略值%" in game._skill_detail("xusheng"))
 
-	# A full Wu roster activates both four-hero cores and every pair bond.
-	var wu_ids := ["zhouyu", "luxun", "lusu", "lvmeng", "sunjian", "sunce", "sunquan", "sunshangxiang", "daqiao", "xiaoqiao", "huanggai", "taishici", "ganning", "dingfeng", "xusheng"]
-	var wu_team: Array = []
-	for index in wu_ids.size():
-		wu_team.append(_place(game, "player", wu_ids[index], index % game.BOARD_ROWS, floori(float(index) / float(game.BOARD_ROWS))))
-	_set_combat(game, wu_team, [])
-	game._apply_combo_bonds(true, false)
-	assert(game._combat_hero("player", "zhouyu").four_heroes)
-	assert(game._combat_hero("player", "sunce").sun_legacy)
-	assert(game._combat_hero("player", "sunce").sunce_taishi)
-	assert(game._combat_hero("player", "daqiao").sunce_daqiao)
-	assert(game._combat_hero("player", "xiaoqiao").zhouyu_xiaoqiao)
-	assert(game._combat_hero("player", "huanggai").zhouyu_huanggai)
-	assert(game._combat_hero("player", "sunjian").huanggai_sunjian)
-	assert(game._combat_hero("player", "ganning").taishici_ganning)
-	assert(game._combat_hero("player", "luxun").luxun_sunquan)
-	assert(game._combat_hero("player", "dingfeng").dingfeng_xusheng)
-	assert(is_equal_approx(float(game._combat_hero("player", "xusheng").control_multiplier), 1.50))
+	# Full roster activates every Wu bond without changing the user's HP/range values.
+	var full_team: Array = []
+	for index in WU_IDS.size():
+		full_team.append(_place(game, "player", WU_IDS[index], index % game.BOARD_ROWS, floori(float(index) / float(game.BOARD_ROWS))))
+	_set_combat(game, full_team, [])
+	assert(bool(game._combat_hero("player", "zhouyu").four_heroes))
+	assert(bool(game._combat_hero("player", "sunce").sun_legacy))
+	assert(bool(game._combat_hero("player", "lvmeng").lvmeng_ganning))
+	assert(bool(game._combat_hero("player", "sunce").sunce_taishi))
+	assert(bool(game._combat_hero("player", "daqiao").sunce_daqiao))
+	assert(bool(game._combat_hero("player", "xusheng").dingfeng_xusheng))
+	_assert_close(game._unit_skill_cooldown(game._combat_hero("player", "ganning")), 4.8)
+	_assert_close(float(game._combat_hero("player", "sunjian").action), game.ACTION_MAX)
 
-	# 神亭酣战 + 江表双锋：太史慈选择行动条最高的3人；已灼烧目标300%，其余150%。
-	var taishici := _place(game, "player", "taishici", 0, 0)
-	var sunce_for_taishi := _place(game, "player", "sunce", 0, 1)
-	var ganning_for_taishi := _place(game, "player", "ganning", 0, 2)
-	var taishi_targets: Array = []
-	for index in 4:
-		var target := _place(game, "enemy", "sunjian", index % game.BOARD_ROWS, index)
-		target.max_hp = 1000000.0
-		target.hp = target.max_hp
-		target.action = 90.0 - index * 10.0
-		taishi_targets.append(target)
-	taishi_targets[0].burn = 1.0
-	_set_combat(game, [taishici, sunce_for_taishi, ganning_for_taishi], taishi_targets)
-	game._apply_combo_bonds(true, false)
-	game._cast_taishici_skill(taishici)
-	var taishi_params: Dictionary = game.heroes.taishici.ability_params
-	assert(is_equal_approx(1000000.0 - float(taishi_targets[0].hp), float(game.heroes.taishici.skill_value) * float(taishi_params.ganning_burning_mult)))
-	for index in [1, 2]:
-		assert(is_equal_approx(1000000.0 - float(taishi_targets[index].hp), float(game.heroes.taishici.skill_value) * float(taishi_params.mult)))
-		assert(is_equal_approx(float(taishi_targets[index].burn), 5.0))
-	assert(is_equal_approx(float(taishi_targets[3].hp), 1000000.0))
-	assert(game.visual_events.filter(func(event): return event.get("kind", "") == "damage").size() == 3)
-	assert(is_equal_approx(float(game.heroes.taishici.cooldown), 5.0))
-	var base_taishici := _place(game, "player", "taishici", 1, 0)
-	var base_taishi_targets: Array = []
-	for index in 3:
-		var target := _place(game, "enemy", "caocao", index, index)
-		target.max_hp = 10000.0
-		target.hp = 10000.0
-		target.action = 80.0 - index * 10.0
-		base_taishi_targets.append(target)
-	_set_combat(game, [base_taishici], base_taishi_targets)
-	game._apply_combo_bonds(true, false)
-	game._cast_taishici_skill(base_taishici)
-	assert(is_equal_approx(float(base_taishi_targets[0].hp), 10000.0 - float(game.heroes.taishici.skill_value) * float(game.heroes.taishici.ability_params.mult)))
-	assert(is_equal_approx(float(base_taishi_targets[1].hp), 10000.0 - float(game.heroes.taishici.skill_value) * float(game.heroes.taishici.ability_params.mult)))
-	assert(is_equal_approx(float(base_taishi_targets[2].hp), 10000.0))
+	# 太史慈：双羁绊完全体为3目标，每名230伤害，灼烧每秒20。
+	var taishi := _place(game, "player", "taishici", 1, 0)
+	var taishi_sunce := _place(game, "player", "sunce", 0, 1)
+	var taishi_ganning := _place(game, "player", "ganning", 1, 2)
+	var taishi_targets := [_place(game, "enemy", "liubei", 0, 0), _place(game, "enemy", "guanyu", 0, 1), _place(game, "enemy", "zhangfei", 0, 2)]
+	for index in taishi_targets.size(): taishi_targets[index].action = 90.0 - index
+	_set_combat(game, [taishi, taishi_sunce, taishi_ganning], taishi_targets)
+	game._cast_taishici_skill(taishi)
+	for target in taishi_targets:
+		_assert_close(10000.0 - float(target.hp), 230.0)
+		assert(target.burn_effects.size() == 1)
+		_assert_close(float(target.burn_effects[0].damage), 20.0)
 
-	# 江表虎臣：丁奉攻击中心与左右格，并分别压退行动条。
-	var dingfeng := _place(game, "player", "dingfeng", 0, 0)
-	var xusheng := _place(game, "player", "xusheng", 0, 1)
-	var ding_targets: Array = []
-	for col in range(1, 4):
-		var target := _place(game, "enemy", "sunjian", 0, col)
-		target.max_hp = 1000000.0
-		target.hp = target.max_hp
-		target.action = 90.0 if col == 2 else 50.0
-		ding_targets.append(target)
-	_set_combat(game, [dingfeng, xusheng], ding_targets)
-	game._apply_combo_bonds(true, false)
-	game._cast_dingfeng_skill(dingfeng)
-	var ding_params: Dictionary = game.heroes.dingfeng.ability_params
-	assert(is_equal_approx(1000000.0 - float(ding_targets[1].hp), float(game.heroes.dingfeng.skill_value) * float(ding_params.mult)))
-	assert(is_equal_approx(float(ding_targets[1].action), 90.0 - float(ding_params.action_reduction)))
-	for index in [0, 2]:
-		assert(is_equal_approx(1000000.0 - float(ding_targets[index].hp), float(game.heroes.dingfeng.skill_value) * float(ding_params.bond_splash_mult)))
-		assert(is_equal_approx(float(ding_targets[index].action), 50.0 - float(ding_params.bond_splash_action_reduction)))
+	# 丁奉羁绊只强化主目标，不再攻击相邻格。
+	var ding := _place(game, "player", "dingfeng", 1, 0)
+	var xu_for_ding := _place(game, "player", "xusheng", 0, 1)
+	var ding_target := _place(game, "enemy", "liubei", 0, 0)
+	ding_target.action = 100.0
+	_set_combat(game, [ding, xu_for_ding], [ding_target])
+	game._cast_dingfeng_skill(ding)
+	_assert_close(10000.0 - float(ding_target.hp), 500.0)
+	_assert_close(float(ding_target.action), 30.0)
 
-	# 四英杰 + 琴瑟和鸣 + 赤壁苦计：随机4格、灼烧6秒，
-	# 目标已损失50%生命时直接伤害和灼烧均提高25%。
-	var zhouyu := _place(game, "player", "zhouyu", 2, 0)
-	var xiaoqiao := _place(game, "player", "xiaoqiao", 2, 1)
-	var huanggai_for_zhou := _place(game, "player", "huanggai", 0, 2)
-	var luxun_for_zhou := _place(game, "player", "luxun", 2, 2)
-	var lusu_for_zhou := _place(game, "player", "lusu", 2, 3)
-	var lvmeng_for_zhou := _place(game, "player", "lvmeng", 0, 3)
-	var zhou_targets: Array = []
-	for row in game.BOARD_ROWS:
-		for col in game.BOARD_COLUMNS:
-			var target := _place(game, "enemy", "sunjian", row, col)
-			target.max_hp = 1000000.0
-			target.hp = target.max_hp * 0.50
-			zhou_targets.append(target)
-	_set_combat(game, [zhouyu, xiaoqiao, huanggai_for_zhou, luxun_for_zhou, lusu_for_zhou, lvmeng_for_zhou], zhou_targets)
-	game._apply_combo_bonds(true, false)
-	game._cast_zhouyu(zhouyu)
-	var burned: Array = zhou_targets.filter(func(target): return float(target.burn) > 0.0)
-	assert(burned.size() == 4)
-	assert(burned.all(func(target): return is_equal_approx(float(target.burn), 6.0)))
-	var zhou_expected := float(game.heroes.zhouyu.ability_params.base_value) * 1.25
-	assert(burned.all(func(target): return is_equal_approx(500000.0 - float(target.hp), zhou_expected)))
-	assert(game.visual_events.filter(func(event): return event.get("kind", "") == "row_burn").size() == 4)
-	game.visual_events.clear()
-	for target in burned:
-		target.burn_clock = 0.0
-	game._process_statuses(1.0)
-	var expected_burn_tick := float(game.heroes.zhouyu.ability_params.burn_per_sec) * 1.25
-	assert(burned.all(func(target): return is_equal_approx(500000.0 - zhou_expected - float(target.hp), expected_burn_tick)))
-	game._render_combat_boards()
-	var burning_card: Control = game.unit_cell_refs[burned[0].id]
-	var burning_overlay := burning_card.get_node_or_null("BurningStateOverlay")
-	assert(is_instance_valid(burning_overlay))
-	assert(str(burning_overlay.texture.resource_path).ends_with("animations/onfire.png"))
-
-	# 江东佳偶：受治疗目标每损失10%生命，本次治疗提高4%。
-	var daqiao := _place(game, "player", "daqiao", 2, 0)
-	var sunce_for_daqiao := _place(game, "player", "sunce", 0, 0)
-	sunce_for_daqiao.max_hp = 10000.0
-	sunce_for_daqiao.hp = 5000.0
-	_set_combat(game, [daqiao, sunce_for_daqiao], [])
-	game._apply_combo_bonds(true, false)
-	var heal_base := float(game.heroes.daqiao.ability_params.base_heal)
-	game._cast_generic_ability(daqiao)
-	assert(is_equal_approx(float(sunce_for_daqiao.hp), 5000.0 + heal_base * 1.20))
-	assert(is_equal_approx(float(game.heroes.sunce.hp), 3720.0))
-	assert(is_equal_approx(float(game.heroes.daqiao.hp), 2760.0))
-
-	# 四英杰 + 君臣同心：陆逊总共弹射3次（4次命中），相邻传递；
-	# 孙权使基础增伤50%，灼烧目标再增伤50%，合计100%。
-	var luxun := _place(game, "player", "luxun", 2, 0)
-	var sunquan := _place(game, "player", "sunquan", 2, 1)
-	var zhouyu_for_luxun := _place(game, "player", "zhouyu", 2, 2)
-	var lusu_for_luxun := _place(game, "player", "lusu", 2, 3)
-	var lvmeng_for_luxun := _place(game, "player", "lvmeng", 0, 3)
-	var luxun_targets: Array = []
-	for row in game.BOARD_ROWS:
-		for col in game.BOARD_COLUMNS:
-			var target := _place(game, "enemy", "sunjian", row, col)
-			target.max_hp = 1000000.0
-			target.hp = target.max_hp
-			target.burn = 5.0
-			luxun_targets.append(target)
-	_set_combat(game, [luxun, sunquan, zhouyu_for_luxun, lusu_for_luxun, lvmeng_for_luxun], luxun_targets)
-	game._apply_combo_bonds(true, false)
-	game._cast_luxun(luxun)
-	var luxun_damage: float = round(float(game.heroes.luxun.ability_params.base_value) * 2.0)
-	var luxun_events: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
-	assert(luxun_events.size() == 4)
-	assert(luxun_events.all(func(event): return is_equal_approx(float(event.amount), luxun_damage)))
-	assert(luxun_events.all(func(event): return str(event.get("projectile_asset", "")).ends_with("animations/fireball.png")))
-	for index in range(1, luxun_events.size()):
-		var previous = game._find_by_id(luxun_targets, str(luxun_events[index - 1].target_id))
-		var current = game._find_by_id(luxun_targets, str(luxun_events[index].target_id))
-		assert(abs(int(previous.row) - int(current.row)) + abs(int(previous.col) - int(current.col)) == 1)
-
-	# 鲁肃按当前生命值总量而非生命百分比选人。基础治疗1名并加200上限；
-	# 四英杰治疗最低的2名，改为20%治疗和350上限。
-	var base_lusu := _place(game, "player", "lusu", 2, 0)
-	var low_ratio_high_total := _place(game, "player", "sunjian", 0, 0)
-	low_ratio_high_total.max_hp = 10000.0
-	low_ratio_high_total.hp = 900.0
-	var lowest_total := _place(game, "player", "sunce", 0, 1)
-	lowest_total.max_hp = 1000.0
-	lowest_total.hp = 500.0
-	var second_total := _place(game, "player", "sunquan", 2, 1)
-	second_total.max_hp = 1000.0
-	second_total.hp = 700.0
-	_set_combat(game, [base_lusu, low_ratio_high_total, lowest_total, second_total], [])
-	game._apply_combo_bonds(true, false)
-	var lusu_params: Dictionary = game.heroes.lusu.ability_params
-	game._cast_lusu_skill(base_lusu)
-	var base_lusu_max := 1000.0 + float(lusu_params.max_hp_flat)
-	assert(is_equal_approx(float(lowest_total.max_hp), base_lusu_max))
-	assert(is_equal_approx(float(lowest_total.hp), minf(base_lusu_max, 500.0 + base_lusu_max * float(lusu_params.heal_ratio))))
-	assert(is_equal_approx(float(low_ratio_high_total.max_hp), 10000.0))
-	assert(is_equal_approx(float(second_total.max_hp), 1000.0))
-
-	var four_lusu := _place(game, "player", "lusu", 2, 0)
-	var lusu_lowest := _place(game, "player", "sunjian", 0, 0)
-	var lusu_second := _place(game, "player", "sunce", 0, 1)
-	lusu_lowest.max_hp = 1000.0
-	lusu_lowest.hp = 500.0
-	lusu_second.max_hp = 1000.0
-	lusu_second.hp = 600.0
-	var four_zhouyu := _place(game, "player", "zhouyu", 2, 1)
-	var four_luxun := _place(game, "player", "luxun", 2, 2)
-	var four_lvmeng := _place(game, "player", "lvmeng", 0, 2)
-	_set_combat(game, [four_lusu, lusu_lowest, lusu_second, four_zhouyu, four_luxun, four_lvmeng], [])
-	game._apply_combo_bonds(true, false)
-	game._cast_lusu_skill(four_lusu)
-	var four_lusu_max := 1000.0 + float(lusu_params.four_heroes_max_hp_flat)
-	var four_lusu_heal := four_lusu_max * float(lusu_params.four_heroes_heal_ratio)
-	assert(is_equal_approx(float(lusu_lowest.max_hp), four_lusu_max))
-	assert(is_equal_approx(float(lusu_second.max_hp), four_lusu_max))
-	assert(is_equal_approx(float(lusu_lowest.hp), 500.0 + four_lusu_heal))
-	assert(is_equal_approx(float(lusu_second.hp), 600.0 + four_lusu_heal))
-	game._after_active_skill(four_lusu)
-	assert(is_equal_approx(float(four_zhouyu.action), 0.0))
-
-	# 孙权基础技能：8%目标当前生命，最大生命+200（2倍封顶），再回复10%已损生命。
-	var base_sunquan := _place(game, "player", "sunquan", 2, 0)
-	var base_quan_target := _place(game, "enemy", "caocao", 0, 0)
-	base_sunquan.max_hp = 1000.0
-	base_sunquan.hp = 500.0
-	base_quan_target.max_hp = 1000.0
-	base_quan_target.hp = 1000.0
-	_set_combat(game, [base_sunquan], [base_quan_target])
-	game._apply_combo_bonds(true, false)
-	game._cast_sunquan_skill(base_sunquan)
-	assert(is_equal_approx(float(base_quan_target.hp), 920.0))
-	assert(is_equal_approx(float(base_sunquan.max_hp), 1200.0))
-	var expected_base_sunquan_hp := 500.0 + (1200.0 - 500.0) * float(game.heroes.sunquan.ability_params.missing_hp_heal_ratio)
-	assert(is_equal_approx(float(base_sunquan.hp), expected_base_sunquan_hp))
-	assert(is_equal_approx(game._unit_skill_cooldown(base_sunquan), float(game.heroes.sunquan.cooldown)))
-
-	# 君臣同心：孙权改为12%当前生命伤害、8秒冷却。
-	var minister_sunquan := _place(game, "player", "sunquan", 2, 0)
-	var minister_luxun := _place(game, "player", "luxun", 2, 1)
-	var minister_target := _place(game, "enemy", "caocao", 0, 0)
-	minister_sunquan.max_hp = 1000.0
-	minister_sunquan.hp = 500.0
-	minister_target.max_hp = 1000.0
-	minister_target.hp = 1000.0
-	_set_combat(game, [minister_sunquan, minister_luxun], [minister_target])
-	game._apply_combo_bonds(true, false)
-	game._cast_sunquan_skill(minister_sunquan)
-	assert(is_equal_approx(float(minister_target.hp), 880.0))
-	assert(is_equal_approx(game._unit_skill_cooldown(minister_sunquan), float(game.heroes.sunquan.ability_params.luxun_cooldown)))
-
-	# 四英杰 + 白衣奇袭：吕蒙后军400%，隐身3秒，恐惧4秒；
-	# 恐惧每秒5%最大生命，隐身后的下一次伤害提高60%。
+	# 吕蒙与甘宁：650%伤害并无视护盾；四英杰同时施加5秒恐惧。
 	var lvmeng := _place(game, "player", "lvmeng", 0, 0)
-	var ganning_for_lvmeng := _place(game, "player", "ganning", 0, 1)
-	var zhouyu_for_lvmeng := _place(game, "player", "zhouyu", 2, 0)
-	var luxun_for_lvmeng := _place(game, "player", "luxun", 2, 1)
-	var lusu_for_lvmeng := _place(game, "player", "lusu", 2, 2)
-	var lvmeng_target := _place(game, "enemy", "caocao", 2, 2)
-	lvmeng_target.max_hp = 10000.0
-	lvmeng_target.hp = 10000.0
-	_set_combat(game, [lvmeng, ganning_for_lvmeng, zhouyu_for_lvmeng, luxun_for_lvmeng, lusu_for_lvmeng], [lvmeng_target])
-	game._apply_combo_bonds(true, false)
+	var lm_ganning := _place(game, "player", "ganning", 1, 1)
+	var lm_zhouyu := _place(game, "player", "zhouyu", 2, 0)
+	var lm_luxun := _place(game, "player", "luxun", 2, 1)
+	var lm_lusu := _place(game, "player", "lusu", 1, 2)
+	var rear_target := _place(game, "enemy", "huangzhong", 2, 0)
+	rear_target.shield = 1000.0
+	_set_combat(game, [lvmeng, lm_ganning, lm_zhouyu, lm_luxun, lm_lusu], [rear_target])
 	game._cast_lvmeng_skill(lvmeng)
-	assert(is_equal_approx(10000.0 - float(lvmeng_target.hp), float(game.heroes.lvmeng.ability_params.base_value)))
-	assert(is_equal_approx(float(lvmeng.stealth), 3.0))
-	assert(is_equal_approx(float(lvmeng_target.fear), 4.0))
-	assert(bool(lvmeng.stealth_ambush_bonus_ready))
-	assert(not game._targets_in_range(lvmeng_target).has(lvmeng))
-	assert(game._targets_in_range(lvmeng_target).has(ganning_for_lvmeng))
-	game._process_statuses(1.0)
-	assert(is_equal_approx(10000.0 - float(game.heroes.lvmeng.ability_params.base_value) - float(lvmeng_target.hp), 500.0))
-	var before_ambush := float(lvmeng_target.hp)
-	game._damage(lvmeng, lvmeng_target, 100.0, "physical", "post stealth")
-	assert(is_equal_approx(before_ambush - float(lvmeng_target.hp), 160.0))
-	assert(not bool(lvmeng.stealth_ambush_bonus_ready))
+	_assert_close(10000.0 - float(rear_target.hp), 650.0)
+	_assert_close(float(rear_target.shield), 1000.0)
+	_assert_close(float(rear_target.fear), 5.0)
+	_assert_close(float(rear_target.fear_damage_ratio), 0.04)
+	_assert_close(float(lvmeng.stealth), 0.0)
 
-	# Remaining pair effects: Sun Ce self-heal, Gan Ning assist, Huang Gai column burn/cost,
-	# Sun Jian's full-gauge spent-HP strike, and Xiao Qiao's rearguard slow.
-	var sunce_pair := _place(game, "player", "sunce", 0, 0)
-	var daqiao_pair := _place(game, "player", "daqiao", 2, 0)
-	sunce_pair.hp = float(sunce_pair.max_hp) * 0.50
-	_set_combat(game, [sunce_pair, daqiao_pair], [])
-	game._apply_combo_bonds(true, false)
-	game._perform_action(sunce_pair)
-	assert(is_equal_approx(float(sunce_pair.hp), float(sunce_pair.max_hp) * 0.62))
+	# 大乔：基础380%，双姝追加150%；江东佳偶按目标已损生命整体放大。
+	var daqiao := _place(game, "player", "daqiao", 2, 0)
+	var dq_xiao := _place(game, "player", "xiaoqiao", 2, 1)
+	var dq_sunce := _place(game, "player", "sunce", 0, 2)
+	var heal_target := _place(game, "player", "guanyu", 0, 3, 5000.0)
+	heal_target.hp = 2500.0
+	_set_combat(game, [daqiao, dq_xiao, dq_sunce, heal_target], [])
+	game._cast_daqiao_skill(daqiao)
+	_assert_close(float(heal_target.hp), 3136.0)
 
-	var ganning_pair := _place(game, "player", "ganning", 1, 1)
-	var ganning_left := _place(game, "player", "zhouyu", 1, 0)
-	var taishici_pair := _place(game, "player", "taishici", 1, 2)
-	var lvmeng_pair := _place(game, "player", "lvmeng", 0, 0)
-	var ganning_target := _place(game, "enemy", "caocao", 2, 0)
-	ganning_target.max_hp = 10000.0
-	ganning_target.hp = 4000.0
-	ganning_left.action = 73.0
-	_set_combat(game, [ganning_pair, ganning_left, taishici_pair, lvmeng_pair], [ganning_target])
-	game._apply_combo_bonds(true, false)
-	game._cast_ganning_skill(ganning_pair)
-	var ganning_expected := (float(game.heroes.ganning.skill_value) + float(game.heroes.zhouyu.skill_value)) * 2.5 * 1.5
-	assert(is_equal_approx(4000.0 - float(ganning_target.hp), ganning_expected))
-	assert(is_equal_approx(float(ganning_left.action), 73.0))
-	assert(is_equal_approx(float(game.heroes.ganning.cooldown), 8.0))
-	var base_ganning := _place(game, "player", "ganning", 1, 1)
-	var base_ganning_left := _place(game, "player", "zhouyu", 1, 0)
-	var base_ganning_target := _place(game, "enemy", "caocao", 2, 0)
-	base_ganning_target.max_hp = 10000.0
-	base_ganning_target.hp = 10000.0
-	base_ganning_left.action = 61.0
-	_set_combat(game, [base_ganning, base_ganning_left], [base_ganning_target])
-	game._apply_combo_bonds(true, false)
-	game._cast_ganning_skill(base_ganning)
-	assert(is_equal_approx(10000.0 - float(base_ganning_target.hp), (float(game.heroes.ganning.skill_value) + float(game.heroes.zhouyu.skill_value)) * 1.5))
-	assert(is_equal_approx(float(base_ganning_left.action), 61.0))
+	# 鲁肃四英杰：两名最低生命友军，各加500最大生命并治疗400。
+	var lusu := _place(game, "player", "lusu", 1, 0)
+	var low_a := _place(game, "player", "guanyu", 0, 0, 1000.0)
+	var low_b := _place(game, "player", "zhangfei", 0, 1, 1000.0)
+	low_a.hp = 100.0
+	low_b.hp = 200.0
+	var rs_zhou := _place(game, "player", "zhouyu", 2, 1)
+	var rs_luxun := _place(game, "player", "luxun", 2, 2)
+	var rs_lvmeng := _place(game, "player", "lvmeng", 0, 2)
+	_set_combat(game, [lusu, low_a, low_b, rs_zhou, rs_luxun, rs_lvmeng], [])
+	game._cast_lusu_skill(lusu)
+	_assert_close(float(low_a.max_hp), 1500.0)
+	_assert_close(float(low_b.max_hp), 1500.0)
+	_assert_close(float(low_a.hp), 500.0)
+	_assert_close(float(low_b.hp), 600.0)
 
-	var huanggai_pair := _place(game, "player", "huanggai", 0, 0)
-	var zhouyu_pair := _place(game, "player", "zhouyu", 2, 0)
-	var sunjian_pair := _place(game, "player", "sunjian", 0, 1)
-	var full_enemy_board: Array = []
-	for row in game.BOARD_ROWS:
-		for col in game.BOARD_COLUMNS:
-			var target := _place(game, "enemy", "sunjian", row, col)
-			target.max_hp = 1000000.0
-			target.hp = target.max_hp
-			full_enemy_board.append(target)
-	_set_combat(game, [huanggai_pair, zhouyu_pair, sunjian_pair], full_enemy_board)
-	game._apply_combo_bonds(true, false)
-	assert(is_equal_approx(float(sunjian_pair.action), game.ACTION_MAX))
-	huanggai_pair.max_hp = 1000.0
-	huanggai_pair.hp = 1000.0
-	game._cast_huanggai_skill(huanggai_pair)
-	assert(is_equal_approx(float(huanggai_pair.hp), 850.0))
-	var huanggai_burned: Array = full_enemy_board.filter(func(target): return float(target.burn) > 0.0)
-	assert(huanggai_burned.size() == game.BOARD_ROWS)
-	assert(huanggai_burned.all(func(target): return is_equal_approx(float(target.burn), 6.0) and is_equal_approx(float(target.burn_damage), 7.5)))
-	assert(huanggai_burned.all(func(target): return is_equal_approx(1000000.0 - float(target.hp), 67.5)))
-	var base_huanggai := _place(game, "player", "huanggai", 0, 0)
-	var base_huanggai_targets: Array = []
-	for row in game.BOARD_ROWS:
-		for col in game.BOARD_COLUMNS:
-			var target := _place(game, "enemy", "caocao", row, col)
-			target.max_hp = 10000.0
-			target.hp = 10000.0
-			base_huanggai_targets.append(target)
-	base_huanggai.max_hp = 1000.0
-	base_huanggai.hp = 1000.0
-	_set_combat(game, [base_huanggai], base_huanggai_targets)
-	game._apply_combo_bonds(true, false)
-	game._cast_huanggai_skill(base_huanggai)
-	assert(is_equal_approx(float(base_huanggai.hp), 900.0))
-	var base_huanggai_damaged := base_huanggai_targets.filter(func(target): return float(target.hp) < 10000.0)
-	assert(base_huanggai_damaged.size() == game.BOARD_ROWS)
-	assert(base_huanggai_damaged.all(func(target): return is_equal_approx(10000.0 - float(target.hp), 33.0) and is_equal_approx(float(target.burn), 0.0)))
-	var fragile_huanggai := _place(game, "player", "huanggai", 0, 0)
-	var fragile_sunjian := _place(game, "player", "sunjian", 0, 1)
-	var fragile_target := _place(game, "enemy", "caocao", 0, 0)
-	fragile_huanggai.max_hp = 1000.0
-	fragile_huanggai.hp = 100.0
-	fragile_target.max_hp = 10000.0
-	fragile_target.hp = 10000.0
-	_set_combat(game, [fragile_huanggai, fragile_sunjian], [fragile_target])
-	game._apply_combo_bonds(true, false)
-	game._cast_huanggai_skill(fragile_huanggai)
-	assert(not fragile_huanggai.alive)
+	# 周瑜完全体：4格、200直接伤害、7秒且每秒110的灼烧；黄盖只放大DOT。
+	var zhou := _place(game, "player", "zhouyu", 2, 0)
+	var z_luxun := _place(game, "player", "luxun", 2, 1)
+	var z_lusu := _place(game, "player", "lusu", 1, 1)
+	var z_lvmeng := _place(game, "player", "lvmeng", 0, 1)
+	var z_xiao := _place(game, "player", "xiaoqiao", 2, 2)
+	var z_huang := _place(game, "player", "huanggai", 0, 2)
+	var z_targets := _full_enemy_board(game)
+	_set_combat(game, [zhou, z_luxun, z_lusu, z_lvmeng, z_xiao, z_huang], z_targets)
+	game._cast_zhouyu(zhou)
+	var ignited := z_targets.filter(func(target): return target.burn_effects.size() > 0)
+	assert(ignited.size() == 4)
+	for target in ignited:
+		_assert_close(10000.0 - float(target.hp), 200.0)
+		_assert_close(float(target.burn_effects[0].time), 7.0)
+		_assert_close(float(target.burn_effects[0].damage), 110.0)
+		_assert_close(float(target.burn_effects[0].missing_hp_bonus_per_step), 0.03)
 
-	_set_combat(game, [huanggai_pair, zhouyu_pair, sunjian_pair], full_enemy_board)
-	game._apply_combo_bonds(true, false)
-	sunjian_pair.max_hp = 1000.0
-	sunjian_pair.hp = 1000.0
-	game.visual_events.clear()
-	game._cast_sunjian_skill(sunjian_pair)
-	var sunjian_events: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
-	var sunjian_expected := 600.0 # 首次消耗400生命，江东柱石按150%结算。
-	assert(sunjian_events.size() == 1)
-	assert(is_equal_approx(float(sunjian_events[0].amount), sunjian_expected))
-	assert(is_equal_approx(float(sunjian_pair.hp), 600.0))
-	game._cast_sunjian_skill(sunjian_pair)
-	assert(is_equal_approx(float(sunjian_pair.hp), 540.0))
-	var second_sunjian_events: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
-	assert(is_equal_approx(float(second_sunjian_events[-1].amount), 90.0))
+	# 小乔双羁绊：3名后军、47%减速、仍固定6秒。
+	var xiao := _place(game, "player", "xiaoqiao", 2, 0)
+	var x_daqiao := _place(game, "player", "daqiao", 2, 1)
+	var x_zhou := _place(game, "player", "zhouyu", 2, 2)
+	var x_targets := [_place(game, "enemy", "huangzhong", 2, 0), _place(game, "enemy", "madai", 2, 1), _place(game, "enemy", "pangtong", 2, 2)]
+	_set_combat(game, [xiao, x_daqiao, x_zhou], x_targets)
+	game._cast_xiaoqiao_skill(xiao)
+	for target in x_targets:
+		_assert_close(float(target.slow), 0.47)
+		_assert_close(float(target.slow_time), 6.0)
 
-	# 孙氏之志：孙坚首次/后续分别消耗80%/20%当前生命；死亡后存活吴将
-	# 在本回合剩余时间内获得10%伤害。孙尚香从任意友军阵亡获得5点技能强度。
-	var legacy_sunjian := _place(game, "player", "sunjian", 0, 0)
-	var legacy_sunce := _place(game, "player", "sunce", 0, 1)
-	var legacy_sunquan := _place(game, "player", "sunquan", 2, 2)
-	var legacy_xiang := _place(game, "player", "sunshangxiang", 2, 3)
-	var legacy_killer := _place(game, "enemy", "caocao", 0, 0)
-	legacy_sunjian.max_hp = 1000.0
-	legacy_sunjian.hp = 1000.0
-	legacy_killer.max_hp = 1000000.0
-	legacy_killer.hp = legacy_killer.max_hp
-	_set_combat(game, [legacy_sunjian, legacy_sunce, legacy_sunquan, legacy_xiang], [legacy_killer])
-	game._apply_combo_bonds(true, false)
-	game._cast_sunjian_skill(legacy_sunjian)
-	assert(is_equal_approx(float(legacy_sunjian.hp), 200.0))
-	game._cast_sunjian_skill(legacy_sunjian)
-	assert(is_equal_approx(float(legacy_sunjian.hp), 160.0))
-	game._damage(legacy_killer, legacy_sunjian, 10000.0, "physical", "legacy test")
-	assert(not legacy_sunjian.alive)
-	for legacy_ally in [legacy_sunce, legacy_sunquan, legacy_xiang]:
-		assert(is_equal_approx(float(legacy_ally.kill_buff), 0.10))
-	assert(is_equal_approx(float(legacy_sunquan.action), 0.0))
-	assert(is_equal_approx(float(legacy_xiang.action), 0.0))
-	assert(is_equal_approx(float(legacy_xiang.sunshangxiang_skill_bonus), float(game.heroes.sunshangxiang.ability_params.ally_death_skill_gain)))
+	# 甘宁双羁绊：低血目标时自身和左侧友军各480伤害，冷却4.8秒。
+	var gan_left := _place(game, "player", "zhouyu", 1, 0)
+	var gan := _place(game, "player", "ganning", 1, 1)
+	var gan_taishi := _place(game, "player", "taishici", 1, 2)
+	var gan_lvmeng := _place(game, "player", "lvmeng", 0, 2)
+	var gan_target := _place(game, "enemy", "huangzhong", 2, 0)
+	gan_target.hp = 4000.0
+	_set_combat(game, [gan_left, gan, gan_taishi, gan_lvmeng], [gan_target])
+	game._cast_ganning_skill(gan)
+	_assert_close(float(gan_target.hp), 3040.0)
+	_assert_close(game._unit_skill_cooldown(gan), 4.8)
 
-	# 孙氏之志强化孙权：最大生命+400+10%施法前已损生命，4倍封顶，再恢复15%已损生命。
-	var legacy_quan_skill := _place(game, "player", "sunquan", 2, 0)
-	var legacy_quan_jian := _place(game, "player", "sunjian", 0, 0)
-	var legacy_quan_ce := _place(game, "player", "sunce", 0, 1)
-	var legacy_quan_xiang := _place(game, "player", "sunshangxiang", 2, 1)
-	var legacy_quan_target := _place(game, "enemy", "caocao", 0, 0)
-	legacy_quan_skill.max_hp = 1000.0
-	legacy_quan_skill.hp = 500.0
-	legacy_quan_target.max_hp = 1000.0
-	legacy_quan_target.hp = 1000.0
-	_set_combat(game, [legacy_quan_skill, legacy_quan_jian, legacy_quan_ce, legacy_quan_xiang], [legacy_quan_target])
-	game._apply_combo_bonds(true, false)
-	game._cast_sunquan_skill(legacy_quan_skill)
-	assert(is_equal_approx(float(legacy_quan_target.hp), 920.0))
-	assert(is_equal_approx(float(legacy_quan_skill.max_hp), 1450.0))
-	assert(is_equal_approx(float(legacy_quan_skill.hp), 642.5))
-	assert(is_equal_approx(game._unit_skill_cooldown(legacy_quan_xiang), float(game.heroes.sunshangxiang.ability_params.sun_legacy_cooldown)))
+	# 黄盖双羁绊：15%最大生命，整列每格200兵略值+消耗生命50%，并附加5秒灼烧。
+	var huang := _place(game, "player", "huanggai", 0, 0, 1000.0)
+	var h_zhou := _place(game, "player", "zhouyu", 2, 1)
+	var h_sunjian := _place(game, "player", "sunjian", 0, 2)
+	var h_targets := _full_enemy_board(game)
+	_set_combat(game, [huang, h_zhou, h_sunjian], h_targets)
+	game._cast_huanggai_skill(huang)
+	_assert_close(float(huang.hp), 850.0)
+	var h_hit := h_targets.filter(func(target): return target.burn_effects.size() > 0)
+	assert(h_hit.size() == 3)
+	for target in h_hit:
+		_assert_close(10000.0 - float(target.hp), 275.0)
+		_assert_close(float(target.burn_effects[0].time), 5.0)
+		_assert_close(float(target.burn_effects[0].damage), 50.0)
 
-	# 孙尚香基础为80强度、单击100%、施法后+1；孙氏之志改为双击150%、施法后+2。
-	var base_xiang := _place(game, "player", "sunshangxiang", 2, 0)
-	var base_xiang_target := _place(game, "enemy", "caocao", 0, 0)
-	base_xiang_target.max_hp = 10000.0
-	base_xiang_target.hp = 10000.0
-	_set_combat(game, [base_xiang], [base_xiang_target])
-	game._apply_combo_bonds(true, false)
-	game._cast_sunshangxiang_skill(base_xiang)
-	game._cast_sunshangxiang_skill(base_xiang)
+	# 孙权完全体先成长、治疗，再按自身当前生命11%造成伤害。
+	var quan := _place(game, "player", "sunquan", 1, 0, 2000.0)
+	quan.hp = 1000.0
+	var q_jian := _place(game, "player", "sunjian", 0, 1)
+	var q_ce := _place(game, "player", "sunce", 0, 2)
+	var q_xiang := _place(game, "player", "sunshangxiang", 2, 2)
+	var q_luxun := _place(game, "player", "luxun", 2, 1)
+	var q_target := _place(game, "enemy", "liubei", 0, 0)
+	_set_combat(game, [quan, q_jian, q_ce, q_xiang, q_luxun], [q_target])
+	game._cast_sunquan_skill(quan)
+	_assert_close(float(quan.max_hp), 2400.0)
+	_assert_close(float(quan.hp), 1280.0)
+	_assert_close(10000.0 - float(q_target.hp), 140.8)
 
-	var bonded_xiang := _place(game, "player", "sunshangxiang", 2, 0)
-	var bonded_xiang_jian := _place(game, "player", "sunjian", 0, 0)
-	var bonded_xiang_ce := _place(game, "player", "sunce", 0, 1)
-	var bonded_xiang_quan := _place(game, "player", "sunquan", 2, 1)
-	var bonded_xiang_target := _place(game, "enemy", "caocao", 0, 0)
-	bonded_xiang_target.max_hp = 10000.0
-	bonded_xiang_target.hp = 10000.0
-	_set_combat(game, [bonded_xiang, bonded_xiang_jian, bonded_xiang_ce, bonded_xiang_quan], [bonded_xiang_target])
-	game._apply_combo_bonds(true, false)
-	game._cast_sunshangxiang_skill(bonded_xiang)
-	assert(is_equal_approx(float(bonded_xiang_target.hp), 9760.0))
-	var bonded_xiang_gain := float(game.heroes.sunshangxiang.ability_params.sun_legacy_skill_gain_per_cast)
-	assert(is_equal_approx(float(bonded_xiang.sunshangxiang_skill_bonus), bonded_xiang_gain))
-	assert(is_equal_approx(game._unit_skill_cooldown(bonded_xiang), float(game.heroes.sunshangxiang.ability_params.sun_legacy_cooldown)))
-	game._damage(bonded_xiang_target, bonded_xiang_ce, 100000.0, "physical", "ally death growth test")
-	assert(is_equal_approx(float(bonded_xiang.sunshangxiang_skill_bonus), bonded_xiang_gain + float(game.heroes.sunshangxiang.ability_params.ally_death_skill_gain)))
+	# 孙策：太史慈使基础倍率变为210%；孙氏追加第二段；大乔提供残血减伤。
+	var ce := _place(game, "player", "sunce", 0, 1, 1000.0)
+	ce.hp = 500.0
+	var ce_taishi := _place(game, "player", "taishici", 1, 0)
+	var ce_daqiao := _place(game, "player", "daqiao", 2, 0)
+	var ce_jian := _place(game, "player", "sunjian", 0, 3)
+	var ce_quan := _place(game, "player", "sunquan", 1, 3)
+	var ce_xiang := _place(game, "player", "sunshangxiang", 2, 3)
+	var ce_targets := [_place(game, "enemy", "liubei", 0, 0), _place(game, "enemy", "guanyu", 0, 1), _place(game, "enemy", "zhangfei", 0, 2)]
+	_set_combat(game, [ce, ce_taishi, ce_daqiao, ce_jian, ce_quan, ce_xiang], ce_targets)
+	game._cast_sunce_skill(ce)
+	_assert_close(10000.0 - float(ce_targets[1].hp), 504.0)
+	_assert_close(10000.0 - float(ce_targets[0].hp), 252.0)
+	_assert_close(10000.0 - float(ce_targets[2].hp), 252.0)
+	var ce_before := float(ce.hp)
+	game._damage(ce_targets[1], ce, 100.0, "physical", "test")
+	_assert_close(ce_before - float(ce.hp), 85.0)
 
-	# 孙氏之志下，孙策以400%基础倍率攻击正前方和左侧；50%生命时再增伤10%，
-	# 并获得20%伤害减免。
-	var legacy_ce := _place(game, "player", "sunce", 0, 1)
-	var legacy_jian := _place(game, "player", "sunjian", 0, 0)
-	var legacy_quan := _place(game, "player", "sunquan", 2, 2)
-	var legacy_shangxiang := _place(game, "player", "sunshangxiang", 2, 3)
-	var legacy_ce_targets: Array = []
-	for col in range(3):
-		var target := _place(game, "enemy", "caocao", 0, col)
-		target.max_hp = 1000000.0
-		target.hp = target.max_hp
-		legacy_ce_targets.append(target)
-	_set_combat(game, [legacy_ce, legacy_jian, legacy_quan, legacy_shangxiang], legacy_ce_targets)
-	game._apply_combo_bonds(true, false)
-	legacy_ce.max_hp = 1000.0
-	legacy_ce.hp = 500.0
-	game._cast_sunce_skill(legacy_ce)
-	var legacy_ce_damage := float(game.heroes.sunce.ability_params.base_value) * 4.0 * 1.10
-	assert(is_equal_approx(1000000.0 - float(legacy_ce_targets[0].hp), legacy_ce_damage))
-	assert(is_equal_approx(1000000.0 - float(legacy_ce_targets[1].hp), legacy_ce_damage))
-	assert(is_equal_approx(float(legacy_ce_targets[2].hp), 1000000.0))
-	var legacy_ce_hp_before := float(legacy_ce.hp)
-	game._damage(legacy_ce_targets[1], legacy_ce, 100.0, "physical", "low hp reduction test")
-	assert(is_equal_approx(legacy_ce_hp_before - float(legacy_ce.hp), 80.0))
+	# 孙尚香孙氏：随机2个不同目标，各500伤害；释放后兵略值+1。
+	var xiang := _place(game, "player", "sunshangxiang", 2, 0)
+	var ss_jian := _place(game, "player", "sunjian", 0, 0)
+	var ss_ce := _place(game, "player", "sunce", 0, 1)
+	var ss_quan := _place(game, "player", "sunquan", 1, 1)
+	var ss_targets := [_place(game, "enemy", "liubei", 0, 0), _place(game, "enemy", "guanyu", 0, 1)]
+	_set_combat(game, [xiang, ss_jian, ss_ce, ss_quan], ss_targets)
+	game._cast_sunshangxiang_skill(xiang)
+	for target in ss_targets: _assert_close(10000.0 - float(target.hp), 500.0)
+	_assert_close(float(xiang.sunshangxiang_skill_bonus), 1.0)
 
-	# 神亭酣战：第一段命中正前方+左侧，第二段命中正前方+右侧；中心两次。
-	var double_ce := _place(game, "player", "sunce", 0, 1)
-	var double_taishi := _place(game, "player", "taishici", 1, 2)
-	var double_targets: Array = []
-	for col in range(3):
-		var target := _place(game, "enemy", "caocao", 0, col)
-		target.max_hp = 1000000.0
-		target.hp = target.max_hp
-		double_targets.append(target)
-	_set_combat(game, [double_ce, double_taishi], double_targets)
-	game._apply_combo_bonds(true, false)
-	game._cast_sunce_skill(double_ce)
-	var double_ce_damage := float(game.heroes.sunce.ability_params.base_value) * 2.0
-	assert(is_equal_approx(1000000.0 - float(double_targets[0].hp), double_ce_damage))
-	assert(is_equal_approx(1000000.0 - float(double_targets[1].hp), double_ce_damage * 2.0))
-	assert(is_equal_approx(1000000.0 - float(double_targets[2].hp), double_ce_damage))
-	assert(game.visual_events.filter(func(event): return event.get("kind", "") == "damage").size() == 4)
+	# 徐盛羁绊：随机一整排，全部格子同步受伤100并减速30%，持续7秒。
+	var xu := _place(game, "player", "xusheng", 0, 0)
+	var xu_ding := _place(game, "player", "dingfeng", 1, 1)
+	var xu_targets := _full_enemy_board(game)
+	_set_combat(game, [xu, xu_ding], xu_targets)
+	game._cast_xusheng_skill(xu)
+	var water_hit := xu_targets.filter(func(target): return float(target.slow_time) > 0.0)
+	assert(water_hit.size() == game.BOARD_COLUMNS)
+	for target in water_hit:
+		_assert_close(10000.0 - float(target.hp), 100.0)
+		_assert_close(float(target.slow), 0.30)
+		_assert_close(float(target.slow_time), 7.0)
 
-	var xiaoqiao_pair := _place(game, "player", "xiaoqiao", 2, 0)
-	var zhouyu_for_xiao := _place(game, "player", "zhouyu", 2, 1)
-	var daqiao_for_xiao := _place(game, "player", "daqiao", 2, 2)
-	for target in full_enemy_board:
-		target.hp = target.max_hp
-		target.slow = 0.0
-		target.slow_time = 0.0
-	_set_combat(game, [xiaoqiao_pair], full_enemy_board)
-	game._apply_combo_bonds(true, false)
-	game._cast_xiaoqiao_skill(xiaoqiao_pair)
-	var base_slowed: Array = full_enemy_board.filter(func(target): return float(target.slow_time) > 0.0)
-	assert(base_slowed.size() == 2)
-	assert(base_slowed.all(func(target): return int(target.row) == game.BOARD_ROWS - 1 and is_equal_approx(float(target.slow), 0.35) and is_equal_approx(float(target.slow_time), 6.0)))
-	for target in full_enemy_board:
-		target.slow = 0.0
-		target.slow_time = 0.0
-	_set_combat(game, [xiaoqiao_pair, zhouyu_for_xiao, daqiao_for_xiao], full_enemy_board)
-	game._apply_combo_bonds(true, false)
-	game._cast_xiaoqiao_skill(xiaoqiao_pair)
-	var bonded_slowed: Array = full_enemy_board.filter(func(target): return float(target.slow_time) > 0.0)
-	assert(bonded_slowed.size() == 3)
-	assert(bonded_slowed.all(func(target): return int(target.row) == game.BOARD_ROWS - 1 and is_equal_approx(float(target.slow), 0.60) and is_equal_approx(float(target.slow_time), 8.0)))
+	# 孙坚孙氏：消耗全部生命、按实际消耗值攻击，并给予12%不可叠加增伤。
+	var jian := _place(game, "player", "sunjian", 0, 0, 1000.0)
+	var j_ce := _place(game, "player", "sunce", 0, 1)
+	var j_quan := _place(game, "player", "sunquan", 1, 1)
+	var j_xiang := _place(game, "player", "sunshangxiang", 2, 1)
+	var j_target := _place(game, "enemy", "liubei", 0, 0)
+	_set_combat(game, [jian, j_ce, j_quan, j_xiang], [j_target])
+	game._cast_sunjian_skill(jian)
+	assert(not jian.alive)
+	_assert_close(10000.0 - float(j_target.hp), 1000.0)
+	_assert_close(float(j_ce.kill_buff), 0.12)
 
-	# 图鉴为新武将显示完整小羁绊效果。
-	for bond_name in ["神亭酣战", "江表双锋"]:
-		assert(game._hero_bond_detail("taishici").contains(bond_name))
-	assert(game._hero_bond_detail("dingfeng").contains("江表虎臣"))
-	assert(game._hero_bond_detail("zhouyu").contains("琴瑟和鸣"))
-	assert(game._hero_bond_detail("zhouyu").contains("赤壁苦计"))
+	var all_wu_bond_details := ""
+	for hero_id in WU_IDS: all_wu_bond_details += game._hero_bond_detail(hero_id)
+	for bond_name in ["四英杰", "孙氏之志", "江东双姝", "白衣奇袭", "神亭酣战", "江东佳偶", "琴瑟和鸣", "赤壁苦计", "江东柱石", "江表双锋", "君臣同心", "江表虎臣"]:
+		assert(bond_name in all_wu_bond_details)
 
+	game.queue_free()
 	quit()

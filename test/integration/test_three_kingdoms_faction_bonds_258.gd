@@ -52,7 +52,7 @@ func _initialize() -> void:
 	for index in 4:
 		var before := float(shu_target.hp)
 		game._damage(null, shu_target, 1000.0, "magic", "faction test")
-		assert(is_equal_approx(before - float(shu_target.hp), [920.0, 900.0, 880.0, 860.0][index]))
+		assert(is_equal_approx(before - float(shu_target.hp), [920.0, 890.0, 860.0, 830.0][index]))
 		assert(int(shu_target.shu_damage_stacks) == mini(3, index + 1))
 	shu_target.shu_damage_stacks = 0
 	shu_target.burn = 2.0
@@ -65,7 +65,7 @@ func _initialize() -> void:
 	assert(int(shu_target.shu_damage_stacks) == 0)
 
 	# Wu: max HP increases by 8%. The first lethal hit equalizes current
-	# health ratios and heals 10%; the second lethal hit is not prevented.
+	# health ratios and heals 5%; the second lethal hit during the 30s cooldown is not prevented.
 	var wu_team := _team(game, WU_IDS, "player")
 	var wu_enemy: Dictionary = game._make_roster_unit("enemy", "caocao")
 	wu_enemy.row = 0
@@ -82,13 +82,13 @@ func _initialize() -> void:
 	game._damage(wu_enemy, wu_target, 1000000.0, "physical", "first lethal")
 	assert(wu_target.alive)
 	assert(float(wu_target.hp) > 0.0)
-	assert(bool(game.faction_battle_state.player.wu_equalize_used))
+	assert(is_equal_approx(float(game.faction_battle_state.player.wu_equalize_cooldown), 30.0))
 	wu_target.hp = 1.0
 	game._damage(wu_enemy, wu_target, 1000000.0, "physical", "second lethal")
 	assert(not wu_target.alive)
 
-	# Wei: control duration gains 15%, and all debuffs qualify the target for
-	# the 15% damage bonus at eight members.
+	# Wei: control duration gains 8%, and all debuffs qualify the target for
+	# the 8% damage bonus at eight members.
 	var wei_team := _team(game, WEI_IDS, "player")
 	var wei_target: Dictionary = game._make_roster_unit("enemy", "liubei")
 	wei_target.row = 0
@@ -99,14 +99,14 @@ func _initialize() -> void:
 	game._reset_faction_battle_state()
 	game._apply_faction_bonuses(false)
 	var wei_source: Dictionary = wei_team[0]
-	assert(is_equal_approx(game._control_duration_multiplier(wei_source), 1.15))
+	assert(is_equal_approx(game._control_duration_multiplier(wei_source), 1.08))
 	wei_target.slow = 0.20
 	wei_target.slow_time = 3.0
 	var wei_before := float(wei_target.hp)
 	game._damage(wei_source, wei_target, 100.0 / float(wei_source.stat_mult), "physical", "debuff bonus")
-	assert(is_equal_approx(wei_before - float(wei_target.hp), 115.0))
+	assert(is_equal_approx(wei_before - float(wei_target.hp), 108.0))
 
-	# Qun: the action gain multiplier makes the actual cooldown 15% shorter.
+	# Qun: the action gain multiplier makes the actual cooldown 8% shorter.
 	var qun_team := _team(game, QUN_IDS, "player")
 	var qun_enemy: Dictionary = game._make_roster_unit("enemy", "liubei")
 	qun_enemy.row = 0
@@ -114,7 +114,7 @@ func _initialize() -> void:
 	game.combat_units = qun_team + [qun_enemy]
 	game._reset_faction_battle_state()
 	game._apply_faction_bonuses(false)
-	assert(is_equal_approx(game._unit_action_gain_multiplier(qun_team[0]), 1.0 / 0.85))
+	assert(is_equal_approx(game._unit_action_gain_multiplier(qun_team[0]), 1.0 / 0.92))
 	var double_cast_triggered := false
 	for _attempt in 100:
 		game.visual_events.clear()

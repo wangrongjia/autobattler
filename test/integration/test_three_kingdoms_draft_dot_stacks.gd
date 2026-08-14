@@ -24,8 +24,7 @@ func _initialize() -> void:
 	game._hide_unit_inspector()
 	assert(game._can_drop_reserve(Vector2.ZERO, drag_data, 0))
 	game._drop_reserve(Vector2.ZERO, drag_data, 0)
-	assert(recruited.row == -1 and recruited.col == -1)
-	assert(game._find_by_id(game.player_units, str(recruited.id)) != null)
+	assert(game._find_by_id(game.player_units, str(recruited.id)) == null)
 
 	# Every burn/poison application has its own source, timer and value.
 	var poison_a: Dictionary = game._make_roster_unit("player", "yuji")

@@ -55,7 +55,7 @@ func _initialize() -> void:
 	assert(wu[0].action_gain_mult == 1.0)
 	assert(wu.all(func(unit): return bool(unit.four_heroes)))
 	assert(int(game.heroes.zhouyu.ability_params.tile_count) + int(game.heroes.zhouyu.ability_params.four_heroes_bonus_tiles) == 4)
-	assert(int(game.heroes.luxun.ability_params.four_heroes_bounces) == 3)
+	assert(int(game.heroes.luxun.ability_params.bounces) + int(game.heroes.luxun.ability_params.four_heroes_bonus_bounces) == 3)
 	var qun := _build_team(game, ["lvbu", "diaochan", "dongzhuo"])
 	game.combat_units = qun
 	game._apply_combo_bonds()

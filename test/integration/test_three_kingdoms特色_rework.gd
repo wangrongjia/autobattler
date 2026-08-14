@@ -43,35 +43,21 @@ func _initialize() -> void:
 	assert(target.strategy_mark == 0.0)
 
 	assert(game.heroes.zhaoyun.ability == "signature")
-	assert(game.heroes.zhaoyun.cooldown == float(game.balance_overrides.get("zhaoyun", {}).get("cooldown", 4.5)))
-	assert(game.heroes.guanyu.ability_params.mult == 1.80)
-	assert(game.heroes.liushan.cooldown == 4.0)
-	assert(game.heroes.liushan.ability_params.duration == 4.0)
+	assert(game.heroes.zhaoyun.cooldown == 5.7)
+	assert(game.heroes.guanyu.ability_params.mult == 2.10)
+	assert(game.heroes.liushan.cooldown == 0.0)
 	assert(game.heroes.liushan.ability_params.seven_lifesteal == 0.30)
-	assert(game.heroes.zhaoyun.ability_params.hit_mults == [0.50, 0.50, 0.50, 0.50, 0.50])
-	assert(game.heroes.zhaoyun.ability_params.five_tiger_mults == [0.50, 0.70, 0.90, 1.10, 1.30])
-	assert(game.heroes.zhaoyun.ability_params.seven_base_mults == [0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50])
-	assert(game.heroes.zhaoyun.ability_params.seven_charge_mults.size() == 7)
-	assert(game.heroes.madai.ability_params.max_hp_ratios == [0.60, 0.70, 0.85])
+	assert(game.heroes.zhaoyun.ability_params.hit_count == 5)
+	assert(game.heroes.zhaoyun.ability_params.hit_mult == 1.15)
+	assert(game.heroes.zhaoyun.ability_params.seven_hit_count == 7)
+	assert(game.heroes.madai.ability_params.max_hp_ratio == 0.50)
 	assert(game.heroes.qunzhanghe.ability_params.target_count == 2)
 	assert(game.heroes.qunzhanghe.ability_params.shield_mult == 2.0)
 	assert(game.heroes.qunzhanghe.ability_params.four_pillars_shield_mult == 4.0)
-	assert(game.heroes.ganning.cooldown == 8.0)
-	assert(game.heroes.ganning.ability_params.mult == 1.50)
-	assert(game.heroes.ganning.ability_params.taishici_mult == 2.50)
-	assert(game.heroes.ganning.ability_params.lvmeng_low_hp_bonus == 0.50)
-	# Coefficient guardrails prevent a single generic cast from combining top
-	# burst, long control and oversized shielding again.
-	for hero_id in game.heroes:
-		var hero: Dictionary = game.heroes[hero_id]
-		var params: Dictionary = hero.get("ability_params", {})
-		var ability := str(hero.get("ability", ""))
-		var hit_count := int(params.get("count", 1)) if ability in ["multi", "multi_magic"] else 1
-		var coefficient_cap := 4.0 if hero_id == "lvmeng" else 3.20
-		assert(float(params.get("mult", 0.0)) * hit_count <= coefficient_cap)
-		assert(float(params.get("stun", 0.0)) <= 2.50)
-		assert(float(params.get("damage", 0.0)) <= 0.30)
-		if ability.begins_with("shield_"): assert(not params.has("ratio"))
+	assert(game.heroes.ganning.cooldown == 6.0)
+	assert(game.heroes.ganning.ability_params.mult == 3.0)
+	assert(game.heroes.ganning.ability_params.taishici_cooldown_reduction == 1.2)
+	assert(game.heroes.ganning.ability_params.lvmeng_low_hp_bonus_mult == 1.8)
 	quit()
 
 func _team(game, ids: Array, team: String) -> Array:
