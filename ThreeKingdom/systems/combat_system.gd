@@ -1,7 +1,7 @@
 extends "res://ThreeKingdom/systems/game_flow.gd"
 
 func _ensure_unit_fields(unit: Dictionary) -> void:
-	var defaults := {"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0, "vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":0.0, "spell_ward":0, "cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0, "faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0, "faction_cooldown_reduction":0.0, "shu_damage_stacks":0, "four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false, "burn_missing_hp_scale":false, "burn_effects":[], "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0, "freeze":0.0, "freeze_shatter_per_second":0.0, "poison":0.0, "poison_ratio":0.0, "poison_clock":0.0, "poison_source":"", "poison_effects":[], "regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_damage_reduction":0.0, "regen_source":"", "timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_reduction":0.0, "timed_reduction_time":0.0, "timed_action_bonus":0.0, "timed_action_time":0.0, "rear_damage_reduction":0.0, "rear_damage_reduction_time":0.0, "front_damage_reduction":0.0, "front_damage_reduction_time":0.0, "all_lifesteal":0.0, "all_lifesteal_time":0.0, "bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0, "skill_value_bonus":0.0, "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "hebei_damage_stacks":0, "charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0, "skill_debuff_time":0.0, "zhangbao_revives_used":0}
+	var defaults := {"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0, "vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":0.0, "spell_ward":0, "cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0, "faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0, "faction_cooldown_reduction":0.0, "shu_damage_stacks":0, "four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false, "burn_missing_hp_scale":false, "burn_effects":[], "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0, "freeze":0.0, "freeze_shatter_damage":0.0, "freeze_source_id":"", "poison":0.0, "poison_ratio":0.0, "poison_clock":0.0, "poison_source":"", "poison_effects":[], "regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_damage_reduction":0.0, "regen_source":"", "timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_reduction":0.0, "timed_reduction_time":0.0, "timed_action_bonus":0.0, "timed_action_time":0.0, "rear_damage_reduction":0.0, "rear_damage_reduction_time":0.0, "front_damage_reduction":0.0, "front_damage_reduction_time":0.0, "all_lifesteal":0.0, "all_lifesteal_time":0.0, "bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0, "skill_value_bonus":0.0, "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "hebei_damage_stacks":0, "charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0, "skill_debuff_time":0.0, "zhangbao_revives_used":0}
 	for key in defaults:
 		if not unit.has(key): unit[key] = defaults[key]
 
@@ -209,21 +209,25 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 		var xiahouyuan = _combat_hero(team, "xiahouyuan")
 		if xiahouyuan != null:
 			var xhy_cd := float(heroes.xiahouyuan.cooldown)
-			if _roster_has_all(active, ["xiahouyuan", "caoren"]): xhy_cd -= 0.5
-			if _roster_has_all(active, ["xiahouyuan", "xiahoudun"]): xhy_cd -= 0.5
+			var cd_reduction := float(heroes.xiahouyuan.ability_params.get("bond_cooldown_reduction", 0.5))
+			if _roster_has_all(active, ["xiahouyuan", "caoren"]): xhy_cd -= cd_reduction
+			if _roster_has_all(active, ["xiahouyuan", "xiahoudun"]): xhy_cd -= cd_reduction
 			xiahouyuan.bond_cooldown = xhy_cd
 		var guojia = _combat_hero(team, "guojia")
 		if guojia != null:
 			var guo_cd := float(heroes.guojia.cooldown)
-			for ally_id in ["simayi", "xunyu", "jiaxu"]:
-				if _roster_has_all(active, ["guojia", ally_id]): guo_cd -= 0.5
+			if _roster_has_all(active, ["guojia", "jiaxu"]): guo_cd -= float(heroes.guojia.ability_params.get("jiaxu_cooldown_reduction", 1.6))
 			guojia.bond_cooldown = guo_cd
 		var xunyu = _combat_hero(team, "xunyu")
 		if xunyu != null:
 			var xun_cd := float(heroes.xunyu.cooldown)
-			for ally_id in ["simayi", "guojia", "jiaxu"]:
-				if _roster_has_all(active, ["xunyu", ally_id]): xun_cd -= 0.4
+			if _roster_has_all(active, ["xunyu", "jiaxu"]): xun_cd -= float(heroes.xunyu.ability_params.get("jiaxu_cooldown_reduction", 1.6))
 			xunyu.bond_cooldown = xun_cd
+		var jiaxu = _combat_hero(team, "jiaxu")
+		if jiaxu != null:
+			var jia_cd := float(heroes.jiaxu.cooldown)
+			if _roster_has_all(active, ["jiaxu", "xunyu"]): jia_cd -= float(heroes.jiaxu.ability_params.get("xunyu_cooldown_reduction", 1.6))
+			jiaxu.bond_cooldown = jia_cd
 		if _roster_has_all(active, ["sunjian", "sunce", "sunquan", "sunshangxiang"]):
 			for id in ["sunjian", "sunce", "sunquan", "sunshangxiang"]: _combat_hero(team, id).sun_legacy = true
 			_combat_hero(team, "sunshangxiang").bond_cooldown = float(heroes.sunshangxiang.ability_params.get("sun_legacy_cooldown", 6.0))
@@ -918,7 +922,7 @@ func _wei_pair_count(team: String, hero_id: String, partners: Array) -> int:
 func _cast_xiahouyuan_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.xiahouyuan.ability_params
 	var bond_count := _wei_pair_count(unit.team, "xiahouyuan", ["caoren", "xiahoudun"])
-	var stun_duration := float(params.get("stun", 1.5)) + 0.5 * bond_count
+	var stun_duration := float(params.get("stun", 1.0)) + float(params.get("bond_stun_bonus", 0.5)) * bond_count
 	var targets := _random_unique_living_enemies(unit, int(params.get("target_count", 2)))
 	var visual_group := "xiahouyuan_suppression:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
 	if targets.is_empty():
@@ -931,36 +935,45 @@ func _cast_xiahouyuan_skill(unit: Dictionary) -> void:
 func _cast_caoren_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.caoren.ability_params
 	var bond_count := _wei_pair_count(unit.team, "caoren", ["xiahouyuan", "xiahoudun"])
-	var target_count := int(params.get("target_count", 2)) + bond_count
-	var stun_duration := float(params.get("stun", 1.5)) + 0.5 * bond_count
+	var target_count := int(params.get("target_count", 2)) + int(params.get("bond_bonus_targets", 1)) * bond_count
+	var stun_duration := float(params.get("stun", 1.0)) + float(params.get("bond_stun_bonus", 0.5)) * bond_count
 	var targets := _random_unique_living_enemies(unit, target_count, BOARD_ROWS - 1)
 	var visual_group := "caoren_rear_guard:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
 	for target in targets:
 		_damage(unit, target, _unit_skill_stat_value(unit) * float(params.get("mult", 1.50)), "physical", t("樊城镇远", "Rearward Bulwark"), visual_group, "multi_target")
 		_apply_skill_stun(unit, target, stun_duration)
-	unit.rear_damage_reduction = (float(params.get("rear_reduction", 0.20)) + 0.10 * bond_count) * _unit_skill_effect_multiplier(unit)
-	unit.rear_damage_reduction_time = float(params.get("guard_time", 6.0))
+	unit.rear_damage_reduction = (float(params.get("rear_reduction_skill_ratio", 0.20)) + float(params.get("bond_reduction_skill_ratio", 0.10)) * bond_count) * _unit_skill_effect_multiplier(unit)
+	unit.rear_damage_reduction_time = float(params.get("guard_time", 5.0))
 	unit.cast_count = int(unit.get("cast_count", 0)) + 1
 
 func _cast_xiahoudun_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.xiahoudun.ability_params
 	var bond_count := _wei_pair_count(unit.team, "xiahoudun", ["xiahouyuan", "caoren"])
-	var target_count := int(params.get("target_count", 2)) + bond_count
-	var stun_duration := float(params.get("stun", 1.5)) + 0.5 * bond_count
+	var target_count := int(params.get("target_count", 2)) + int(params.get("bond_bonus_targets", 1)) * bond_count
+	var stun_duration := float(params.get("stun", 1.5)) + float(params.get("bond_stun_bonus", 0.5)) * bond_count
 	var targets := _random_unique_living_enemies(unit, target_count, 0)
 	var visual_group := "xiahoudun_front_guard:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
 	for target in targets:
 		_damage(unit, target, _unit_skill_stat_value(unit) * float(params.get("mult", 1.50)), "physical", t("刚烈镇前", "Vanguard Bulwark"), visual_group, "multi_target")
 		_apply_skill_stun(unit, target, stun_duration)
-	unit.front_damage_reduction = (float(params.get("front_reduction", 0.20)) + 0.10 * bond_count) * _unit_skill_effect_multiplier(unit)
-	unit.front_damage_reduction_time = float(params.get("guard_time", 6.5))
+	unit.front_damage_reduction = (float(params.get("front_reduction_skill_ratio", 0.20)) + float(params.get("bond_reduction_skill_ratio", 0.10)) * bond_count) * _unit_skill_effect_multiplier(unit)
+	unit.front_damage_reduction_time = float(params.get("guard_time", 5.0))
 	unit.cast_count = int(unit.get("cast_count", 0)) + 1
 
 func _cast_simayi_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.simayi.ability_params
-	var bond_count := _wei_pair_count(unit.team, "simayi", ["guojia", "xunyu", "jiaxu"])
-	var targets := _random_unique_living_enemies(unit, int(params.get("target_count", 2)) + bond_count)
-	var mult := float(params.get("mult", 1.75)) + 0.25 * bond_count
+	var with_guojia := _pair_active(unit.team, "simayi", "guojia")
+	var with_xunyu := _pair_active(unit.team, "simayi", "xunyu")
+	var with_jiaxu := _pair_active(unit.team, "simayi", "jiaxu")
+	var target_count := int(params.get("target_count", 2))
+	if with_guojia: target_count += int(params.get("guojia_bonus_targets", 1))
+	if with_xunyu: target_count += int(params.get("xunyu_bonus_targets", 1))
+	var targets := _random_unique_living_enemies(unit, target_count)
+	var mult := float(params.get("mult", 3.20))
+	if with_guojia: mult -= float(params.get("guojia_damage_penalty_mult", 0.40))
+	if with_xunyu: mult -= float(params.get("xunyu_damage_penalty_mult", 0.40))
+	if with_jiaxu: mult += float(params.get("jiaxu_damage_bonus_mult", 0.80))
+	mult = maxf(mult, 0.0)
 	var visual_group := "simayi_thunder:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
 	if targets.is_empty(): _hit_ruler(unit, _unit_skill_stat_value(unit) * mult, _random_enemy_tile(unit), t("雷霆谋断空击", "Thunder Judgment missed"), visual_group, "multi_target")
 	for target in targets:
@@ -969,13 +982,20 @@ func _cast_simayi_skill(unit: Dictionary) -> void:
 
 func _cast_guojia_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.guojia.ability_params
-	var bond_count := _wei_pair_count(unit.team, "guojia", ["simayi", "xunyu", "jiaxu"])
-	var targets := _random_unique_living_enemies(unit, int(params.get("target_count", 2)) + bond_count)
-	var duration := float(params.get("freeze", 4.0)) * _unit_effect_multiplier(unit) * _control_duration_multiplier(unit)
+	var with_simayi := _pair_active(unit.team, "guojia", "simayi")
+	var with_xunyu := _pair_active(unit.team, "guojia", "xunyu")
+	var target_count := int(params.get("target_count", 2)) + (int(params.get("simayi_bonus_targets", 1)) if with_simayi else 0)
+	var targets := _random_unique_living_enemies(unit, target_count)
+	var base_duration := float(params.get("freeze", 3.0))
+	if with_simayi: base_duration -= float(params.get("simayi_duration_penalty", 0.5))
+	if with_xunyu: base_duration += float(params.get("xunyu_duration_bonus", 1.2))
+	var duration := maxf(0.0, base_duration) * _unit_effect_multiplier(unit) * _control_duration_multiplier(unit)
+	var shatter_damage := _unit_scaled_skill_value(unit) * float(params.get("shatter_mult", 1.50))
 	var visual_group := "guojia_freeze:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
 	for target in targets:
 		target.freeze = maxf(float(target.get("freeze", 0.0)), duration)
-		target.freeze_shatter_per_second = float(params.get("shatter_per_second", 400.0)) * _unit_skill_effect_multiplier(unit)
+		target.freeze_shatter_damage = maxf(float(target.get("freeze_shatter_damage", 0.0)), shatter_damage)
+		target.freeze_source_id = str(unit.id)
 		_add_stat(unit, "control", duration)
 		visual_events.append({"kind":"skill", "source_id":unit.id, "target_id":target.id, "amount":roundi(duration * 10.0), "style":"magic", "visual_group":visual_group, "group_style":"simultaneous"})
 	unit.cast_count = int(unit.get("cast_count", 0)) + 1
@@ -991,23 +1011,36 @@ func _random_unique_living_allies(unit: Dictionary, count: int) -> Array:
 
 func _cast_xunyu_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.xunyu.ability_params
-	var bond_count := _wei_pair_count(unit.team, "xunyu", ["simayi", "guojia", "jiaxu"])
-	var targets := _random_unique_living_allies(unit, int(params.get("target_count", 2)) + bond_count)
+	var with_simayi := _pair_active(unit.team, "xunyu", "simayi")
+	var with_guojia := _pair_active(unit.team, "xunyu", "guojia")
+	var target_count := int(params.get("target_count", 2)) + (int(params.get("simayi_bonus_targets", 1)) if with_simayi else 0)
+	var targets := _random_unique_living_allies(unit, target_count)
+	var action_bonus_ratio := float(params.get("action_bonus_skill_ratio", 0.40))
+	if with_simayi: action_bonus_ratio -= float(params.get("simayi_action_penalty_skill_ratio", 0.05))
+	if with_guojia: action_bonus_ratio += float(params.get("guojia_action_bonus_skill_ratio", 0.12))
+	var action_bonus := maxf(0.0, action_bonus_ratio) * _unit_skill_effect_multiplier(unit)
 	var visual_group := "xunyu_haste:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
 	for target in targets:
-		target.timed_action_bonus = maxf(float(target.get("timed_action_bonus", 0.0)), float(params.get("action_bonus", 0.20)) * _unit_skill_effect_multiplier(unit))
-		target.timed_action_time = maxf(float(target.get("timed_action_time", 0.0)), float(params.get("duration", 6.0)))
-		visual_events.append({"kind":"skill", "source_id":unit.id, "target_id":target.id, "amount":20, "style":"magic", "nonblocking":true, "visual_group":visual_group, "group_style":"simultaneous"})
+		target.timed_action_bonus = maxf(float(target.get("timed_action_bonus", 0.0)), action_bonus)
+		target.timed_action_time = maxf(float(target.get("timed_action_time", 0.0)), float(params.get("duration", 4.4)))
+		visual_events.append({"kind":"skill", "source_id":unit.id, "target_id":target.id, "amount":roundi(action_bonus * 100.0), "style":"magic", "nonblocking":true, "visual_group":visual_group, "group_style":"simultaneous"})
 	unit.cast_count = int(unit.get("cast_count", 0)) + 1
 
 func _cast_jiaxu_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.jiaxu.ability_params
-	var bond_count := _wei_pair_count(unit.team, "jiaxu", ["simayi", "guojia", "xunyu"])
-	var targets := _random_unique_living_enemies(unit, int(params.get("target_count", 2)) + bond_count)
-	var duration := float(params.get("duration", 5.0)) + 0.5 * bond_count
+	var with_simayi := _pair_active(unit.team, "jiaxu", "simayi")
+	var with_guojia := _pair_active(unit.team, "jiaxu", "guojia")
+	var target_count := int(params.get("target_count", 2)) + (int(params.get("simayi_bonus_targets", 1)) if with_simayi else 0)
+	var targets := _random_unique_living_enemies(unit, target_count)
+	var duration := float(params.get("duration", 4.0))
+	if with_simayi: duration -= float(params.get("simayi_duration_penalty", 1.0))
+	if with_guojia: duration += float(params.get("guojia_duration_bonus", 1.0))
+	var poison_skill_ratio := float(params.get("poison_skill_ratio", 0.02))
+	if with_guojia: poison_skill_ratio += float(params.get("guojia_poison_bonus_skill_ratio", 0.005))
+	var poison_ratio := poison_skill_ratio * _unit_skill_effect_multiplier(unit)
 	var visual_group := "jiaxu_poison:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
 	for target in targets:
-		_add_poison_effect(unit, target, duration, float(params.get("poison_ratio", 0.01)) * _unit_skill_effect_multiplier(unit))
+		_add_poison_effect(unit, target, duration, poison_ratio)
 		visual_events.append({"kind":"skill", "source_id":unit.id, "target_id":target.id, "amount":roundi(duration * 10.0), "style":"magic", "visual_group":visual_group, "group_style":"poison_apply"})
 	unit.cast_count = int(unit.get("cast_count", 0)) + 1
 
@@ -2012,7 +2045,8 @@ func _clear_all_debuffs(target: Dictionary) -> void:
 	target.fear_damage_ratio = 0.0
 	target.fear_clock = 0.0
 	target.freeze = 0.0
-	target.freeze_shatter_per_second = 0.0
+	target.freeze_shatter_damage = 0.0
+	target.freeze_source_id = ""
 	target.poison = 0.0
 	target.poison_ratio = 0.0
 	target.poison_clock = 0.0
@@ -2313,11 +2347,13 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 			value *= 1.15
 	var freeze_remaining := float(target.get("freeze", 0.0))
 	if freeze_remaining > 0.0:
-		var shatter_damage := freeze_remaining * float(target.get("freeze_shatter_per_second", 400.0))
+		var shatter_damage := float(target.get("freeze_shatter_damage", 0.0))
+		var freeze_source_id := str(target.get("freeze_source_id", ""))
 		target.freeze = 0.0
-		target.freeze_shatter_per_second = 0.0
+		target.freeze_shatter_damage = 0.0
+		target.freeze_source_id = ""
 		value += shatter_damage
-		visual_events.append({"kind":"skill", "source_id":"" if source == null else source.id, "target_id":target.id, "amount":roundi(shatter_damage), "style":"magic"})
+		visual_events.append({"kind":"skill", "source_id":freeze_source_id, "target_id":target.id, "amount":roundi(shatter_damage), "style":"magic"})
 		_log(t("冰封提前破碎，追加 ", "Freeze shatters early for ") + str(roundi(shatter_damage)) + t(" 点伤害。", " extra damage."))
 	var total_reduction: float = max(float(target.damage_reduction), float(target.get("timed_reduction", 0.0)))
 	total_reduction = max(total_reduction, float(target.get("regen_damage_reduction", 0.0)))

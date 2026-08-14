@@ -1343,12 +1343,12 @@ func _bond_graph_data(faction: String) -> Dictionary:
 				["swift_bulwark", "神速镇远", "Swift Bulwark", ["xiahouyuan", "caoren"], "2人", "2 heroes", "夏侯渊冷却-0.5秒、眩晕+0.5秒；曹仁目标+1、眩晕+0.5秒、后军减伤+0.1*兵略值%。", "Xiahou Yuan gains -0.5s cooldown and +0.5s stun; Cao Ren gains 1 target, +0.5s stun, and +0.1*Strategy% rear damage reduction."],
 				["xiahou_brothers", "夏侯同心", "Xiahou Brothers", ["xiahouyuan", "xiahoudun"], "2人", "2 heroes", "夏侯渊冷却-0.5秒、眩晕+0.5秒；夏侯惇目标+1、眩晕+0.5秒、前军减伤+0.1*兵略值%。", "Xiahou Yuan gains -0.5s cooldown and +0.5s stun; Xiahou Dun gains 1 target, +0.5s stun, and +0.1*Strategy% vanguard damage reduction."],
 				["twin_bulwarks", "魏武双壁", "Twin Bulwarks", ["caoren", "xiahoudun"], "2人", "2 heroes", "曹仁与夏侯惇各自目标+1、眩晕+0.5秒、对应兵种减伤+0.1*兵略值%。", "Cao Ren and Xiahou Dun each gain 1 target, +0.5s stun, and +0.1*Strategy% reduction against their guarded row."],
-				["thunder_frost", "雷霆冰策", "Thunder and Frost", ["simayi", "guojia"], "2人", "2 heroes", "司马懿目标+1、伤害倍率+25%；郭嘉目标+1、冷却-0.5秒。", "Sima Yi gains 1 target and +25% Strategy ratio; Guo Jia gains 1 target and -0.5s cooldown."],
-				["thunder_royal", "鹰视王佐", "Eagle Eye and Royal Aid", ["simayi", "xunyu"], "2人", "2 heroes", "司马懿目标+1、伤害倍率+25%；荀彧目标+1、冷却-0.4秒。", "Sima Yi gains 1 target and +25% Strategy ratio; Xun Yu gains 1 target and -0.4s cooldown."],
-				["thunder_venom", "鹰视毒谋", "Eagle Eye and Venom", ["simayi", "jiaxu"], "2人", "2 heroes", "司马懿目标+1、伤害倍率+25%；贾诩目标+1、中毒+0.5秒。", "Sima Yi gains 1 target and +25% Strategy ratio; Jia Xu gains 1 target and +0.5s poison."],
-				["frost_royal", "遗计王佐", "Frozen Royal Plan", ["guojia", "xunyu"], "2人", "2 heroes", "郭嘉目标+1、冷却-0.5秒；荀彧目标+1、冷却-0.4秒。", "Guo Jia gains 1 target and -0.5s cooldown; Xun Yu gains 1 target and -0.4s cooldown."],
-				["frost_venom", "冰毒奇策", "Frost and Venom", ["guojia", "jiaxu"], "2人", "2 heroes", "郭嘉目标+1、冷却-0.5秒；贾诩目标+1、中毒+0.5秒。", "Guo Jia gains 1 target and -0.5s cooldown; Jia Xu gains 1 target and +0.5s poison."],
-				["royal_venom", "王佐毒策", "Royal Venom", ["xunyu", "jiaxu"], "2人", "2 heroes", "荀彧目标+1、冷却-0.4秒；贾诩目标+1、中毒+0.5秒。", "Xun Yu gains 1 target and -0.4s cooldown; Jia Xu gains 1 target and +0.5s poison."]
+				["thunder_frost", "雷霆冰策", "Thunder and Frost", ["simayi", "guojia"], "2人", "2 heroes", "司马懿目标+1、伤害减少40%兵略值；郭嘉目标+1、冻结减少0.5秒。", "Sima Yi gains 1 target but loses 40% Strategy damage; Guo Jia gains 1 target but loses 0.5s freeze."],
+				["thunder_royal", "鹰视王佐", "Eagle Eye and Royal Aid", ["simayi", "xunyu"], "2人", "2 heroes", "司马懿目标+1、伤害减少40%兵略值；荀彧目标+1、加速减少0.05×兵略值%。", "Sima Yi gains 1 target but loses 40% Strategy damage; Xun Yu gains 1 target but loses 0.05×Strategy% speed."],
+				["thunder_venom", "鹰视毒谋", "Eagle Eye and Venom", ["simayi", "jiaxu"], "2人", "2 heroes", "司马懿伤害增加80%兵略值；贾诩目标+1、中毒减少1秒。", "Sima Yi gains 80% Strategy damage; Jia Xu gains 1 target but loses 1s poison duration."],
+				["frost_royal", "遗计王佐", "Frozen Royal Plan", ["guojia", "xunyu"], "2人", "2 heroes", "郭嘉冻结增加1.2秒；荀彧加速增加0.12×兵略值%。", "Guo Jia gains 1.2s freeze; Xun Yu gains 0.12×Strategy% speed."],
+				["frost_venom", "冰毒奇策", "Frost and Venom", ["guojia", "jiaxu"], "2人", "2 heroes", "郭嘉冷却减少1.6秒；贾诩中毒增加1秒、每秒伤害增加0.005×兵略值%最大生命。", "Guo Jia loses 1.6s cooldown; Jia Xu gains 1s duration and 0.005×Strategy% max-HP damage per second."],
+				["royal_venom", "王佐毒策", "Royal Venom", ["xunyu", "jiaxu"], "2人", "2 heroes", "荀彧与贾诩的技能冷却均减少1.6秒。", "Xun Yu and Jia Xu each lose 1.6s cooldown."]
 			]
 		},
 		"wu":{
@@ -1818,10 +1818,10 @@ func _skill_detail(hero_id: String) -> String:
 		"xiahouyuan": return t("神速震袭：随机攻击2名敌军，造成220%兵略值伤害并眩晕1秒。", "Swift Suppression: Strike 2 random enemies for 220% Strategy and stun for 1s.")
 		"caoren": return t("樊城镇远：随机攻击2名敌方后军，造成200%兵略值伤害并眩晕1秒；释放后5秒内受到敌方后军的伤害减少0.2*兵略值%。", "Rearward Bulwark: Strike 2 enemy rearguards for 200% Strategy and stun for 1s; for 5s, take 0.2*Strategy% less damage from rearguards.")
 		"xiahoudun": return t("刚烈镇前：随机攻击2名敌方前军，造成240%兵略值伤害并眩晕1.5秒；释放后5秒内受到敌方前军的伤害减少0.2*兵略值%。", "Vanguard Bulwark: Strike 2 enemy vanguards for 240% Strategy and stun for 1.5s; for 5s, take 0.2*Strategy% less damage from vanguards.")
-		"simayi": return t("雷霆谋断：对随机2名敌人释放雷击，造成175%兵略值伤害。", "Thunder Judgment: Strike 2 random enemies with lightning for 175% Strategy damage.")
-		"guojia": return t("遗计冰封：随机冻结2名敌人4秒，期间行动条停止；冻结期间受到伤害会提前解冻，并额外受到剩余秒数×400点伤害。", "Frozen Legacy: Freeze 2 random enemies for 4s, stopping their gauges; damage shatters the freeze for 400 extra damage per remaining second.")
-		"xunyu": return t("王佐疾策：随机使2名友军行动条速度提高20%，持续6秒。", "Royal Acceleration: Grant 2 random allies 20% gauge speed for 6s.")
-		"jiaxu": return t("毒士奇谋：使随机2名敌军中毒5秒，每秒损失1%最大生命值。", "Venomous Scheme: Poison 2 random enemies for 5s, dealing 1% max HP per second.")
+		"simayi": return t("雷霆谋断：对随机2名敌人释放雷击，造成320%兵略值伤害。", "Thunder Judgment: Strike 2 random enemies with lightning for 320% Strategy damage.")
+		"guojia": return t("遗计冰封：随机冻结2名敌人3秒，期间行动条停止；冻结期间受到伤害会提前解冻，并受到郭嘉150%兵略值伤害。", "Frozen Legacy: Freeze 2 random enemies for 3s, stopping their gauges; taking damage ends the freeze and deals 150% of Guo Jia's Strategy as damage.")
+		"xunyu": return t("王佐疾策：随机使2名友军行动条速度提高0.4×兵略值%，持续4.4秒。", "Royal Acceleration: Grant 2 random allies gauge speed equal to 0.4×Strategy% for 4.4s.")
+		"jiaxu": return t("毒士奇谋：使随机2名敌军中毒4秒，每秒损失0.02×兵略值%最大生命值。", "Venomous Scheme: Poison 2 random enemies for 4s, dealing 0.02×Strategy% max HP each second.")
 		"sunjian": return t("猛虎绝命：每回合首次消耗40%当前生命，之后每次消耗10%，攻击正前方敌军并造成等同于实际消耗生命100%的伤害。", "Tiger's Resolve: Spend 40% current HP on the first cast each round and 10% thereafter, dealing 100% of HP spent to the facing enemy.")
 		"sunce": return t("小霸王连击：攻击正前方及其左侧敌军，各造成200%兵略值伤害；自身每损失10%生命，伤害提高2%。", "Conqueror's Twin Assault: Hit the facing enemy and its left neighbor for 200% Strategy each; gain 2% damage per 10% HP missing.")
 		"sunquan": return t("江东制衡：随机对一名敌军造成其当前生命8%的伤害；自身最大生命提高200（最多为初始最大生命2倍），随后恢复10%已损失生命。", "Jiangdong Balance: Deal 8% of a random enemy's current HP; gain 200 max HP up to 2x initial max HP, then restore 10% missing HP.")
@@ -1898,7 +1898,7 @@ func _hero_bond_detail(hero_id: String) -> String:
 			["姐弟同心", "Sibling Bond", ["dailaidongzhu", "zhurong"], "火神飞刃的灼烧时长增加2秒，灼烧伤害提高至每秒100%兵略值。", "Flame Blade's burn gains 2 seconds and rises to 100% Strategy per second."]
 		],
 		"dailaidongzhu":[
-			["蛮王援军", "Barbarian Reinforcements", ["menghuo", "dailaidongzhu"], "蛮骨狼袭改为攻击行动条最高目标所在整列，每格造成320%兵略值伤害。", "Savage-Bone Wolf Assault strikes the highest-gauge target's entire column for 320% Strategy per tile."],
+			["蛮王援军", "Barbarian Reinforcements", ["menghuo", "dailaidongzhu"], "蛮骨狼袭改为攻击行动条最高目标所在整列，每格造成210%兵略值伤害。", "Savage-Bone Wolf Assault strikes the highest-gauge target's entire column for 320% Strategy per tile."],
 			["姐弟同心", "Sibling Bond", ["dailaidongzhu", "zhurong"], "蛮骨狼袭施加4秒、每秒50%兵略值的灼烧；若目标原本已灼烧，直接伤害额外增加50%兵略值。", "Savage-Bone Wolf Assault applies a 4s burn at 50% Strategy per second; against an already burning target, direct damage gains another 50% Strategy."]
 		],
 		"zhugeliang":[
@@ -1928,12 +1928,12 @@ func _hero_bond_detail(hero_id: String) -> String:
 		[["xiahouyuan", "caoren"], "神速镇远", "Swift Bulwark", {"xiahouyuan":["冷却缩短0.5秒，眩晕延长0.5秒。", "Cooldown -0.5s and stun +0.5s."], "caoren":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方后军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% rear damage reduction."]}],
 		[["xiahouyuan", "xiahoudun"], "夏侯同心", "Xiahou Brothers", {"xiahouyuan":["冷却缩短0.5秒，眩晕延长0.5秒。", "Cooldown -0.5s and stun +0.5s."], "xiahoudun":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方前军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% vanguard damage reduction."]}],
 		[["caoren", "xiahoudun"], "魏武双壁", "Twin Bulwarks", {"caoren":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方后军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% rear damage reduction."], "xiahoudun":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方前军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% vanguard damage reduction."]}],
-		[["simayi", "guojia"], "雷霆冰策", "Thunder and Frost", {"simayi":["雷击目标增加1名，伤害倍率提高25%兵略值。", "Gain 1 lightning target and +25% Strategy ratio."], "guojia":["冻结目标增加1名，冷却缩短0.5秒。", "Gain 1 freeze target and -0.5s cooldown."]}],
-		[["simayi", "xunyu"], "鹰视王佐", "Eagle Eye and Royal Aid", {"simayi":["雷击目标增加1名，伤害倍率提高25%兵略值。", "Gain 1 lightning target and +25% Strategy ratio."], "xunyu":["加速目标增加1名，冷却缩短0.4秒。", "Gain 1 acceleration target and -0.4s cooldown."]}],
-		[["simayi", "jiaxu"], "鹰视毒谋", "Eagle Eye and Venom", {"simayi":["雷击目标增加1名，伤害倍率提高25%兵略值。", "Gain 1 lightning target and +25% Strategy ratio."], "jiaxu":["中毒目标增加1名，持续时间延长0.5秒。", "Gain 1 poison target and +0.5s duration."]}],
-		[["guojia", "xunyu"], "遗计王佐", "Frozen Royal Plan", {"guojia":["冻结目标增加1名，冷却缩短0.5秒。", "Gain 1 freeze target and -0.5s cooldown."], "xunyu":["加速目标增加1名，冷却缩短0.4秒。", "Gain 1 acceleration target and -0.4s cooldown."]}],
-		[["guojia", "jiaxu"], "冰毒奇策", "Frost and Venom", {"guojia":["冻结目标增加1名，冷却缩短0.5秒。", "Gain 1 freeze target and -0.5s cooldown."], "jiaxu":["中毒目标增加1名，持续时间延长0.5秒。", "Gain 1 poison target and +0.5s duration."]}],
-		[["xunyu", "jiaxu"], "王佐毒策", "Royal Venom", {"xunyu":["加速目标增加1名，冷却缩短0.4秒。", "Gain 1 acceleration target and -0.4s cooldown."], "jiaxu":["中毒目标增加1名，持续时间延长0.5秒。", "Gain 1 poison target and +0.5s duration."]}],
+		[["simayi", "guojia"], "雷霆冰策", "Thunder and Frost", {"simayi":["雷击目标增加1名，伤害减少40%兵略值。", "Gain 1 lightning target but lose 40% Strategy damage."], "guojia":["冻结目标增加1名，冻结时间减少0.5秒。", "Gain 1 freeze target but lose 0.5s freeze duration."]}],
+		[["simayi", "xunyu"], "鹰视王佐", "Eagle Eye and Royal Aid", {"simayi":["雷击目标增加1名，伤害减少40%兵略值。", "Gain 1 lightning target but lose 40% Strategy damage."], "xunyu":["施法目标增加1名，行动条速度加成减少0.05×兵略值%。", "Gain 1 target but lose 0.05×Strategy% gauge speed."]}],
+		[["simayi", "jiaxu"], "鹰视毒谋", "Eagle Eye and Venom", {"simayi":["伤害增加80%兵略值。", "Gain 80% Strategy damage."], "jiaxu":["施法目标增加1名，中毒持续时间减少1秒。", "Gain 1 poison target but lose 1s duration."]}],
+		[["guojia", "xunyu"], "遗计王佐", "Frozen Royal Plan", {"guojia":["冻结时间增加1.2秒。", "Freeze duration gains 1.2s."], "xunyu":["行动条速度加成增加0.12×兵略值%。", "Gauge speed bonus gains 0.12×Strategy%."]}],
+		[["guojia", "jiaxu"], "冰毒奇策", "Frost and Venom", {"guojia":["技能冷却减少1.6秒。", "Cooldown is reduced by 1.6s."], "jiaxu":["中毒持续时间增加1秒，每秒伤害增加0.005×兵略值%最大生命。", "Poison gains 1s duration and 0.005×Strategy% max-HP damage per second."]}],
+		[["xunyu", "jiaxu"], "王佐毒策", "Royal Venom", {"xunyu":["技能冷却减少1.6秒。", "Cooldown is reduced by 1.6s."], "jiaxu":["技能冷却减少1.6秒。", "Cooldown is reduced by 1.6s."]}],
 		[["sunjian", "sunce", "sunquan", "sunshangxiang"], "孙氏之志", "Sun Legacy", {"sunjian":["技能当前生命消耗由首次40%/后续10%提高至80%/20%；阵亡后使存活吴将本回合伤害提高10%。", "Current-HP costs rise from 40%/10% to 80%/20%; on death, surviving Wu allies gain +10% damage for the round."], "sunce":["技能基础倍率由200%提高至400%；每损失10%生命获得4%伤害减免。", "Base skill damage rises from 200% to 400%; gain 4% damage reduction per 10% HP missing."], "sunquan":["每次最大生命提高400并额外提高等同于已损失生命10%的上限，最多达到初始最大生命4倍；随后恢复15%已损失生命。", "Each cast grants 400 plus 10% missing HP as max HP up to 4x initial max HP, then restores 15% missing HP."], "sunshangxiang":["冷却缩短至6秒；每次连射2击，每击150%兵略值；释放后兵略值提高2点。", "Cooldown becomes 6s; fire twice at 150% Strategy each and gain 2 Strategy after casting."]}],
 		[["daqiao", "xiaoqiao"], "江东双姝", "Jiangdong Sisters", {"daqiao":["治疗量提高50%，并追加1次65%效果的治疗。", "Healing +50% and add one heal at 65% effect."], "xiaoqiao":["天香缓阵的行动条减速由35%提高至60%。", "Gentle Breeze's gauge slow rises from 35% to 60%."]}],
 		[["lvmeng", "ganning"], "白衣奇袭", "White-Robed Ambush", {"lvmeng":["每次进入隐身后，下一次造成的伤害提高60%。", "After entering stealth, the next damage dealt gains +60%."], "ganning":["攻击生命值低于50%的敌人时，本次伤害提高50%。", "Deal 50% more damage when the target is below 50% HP."]}],
