@@ -424,6 +424,9 @@ func _build_unit_inspector() -> void:
 	unit_inspector_overlay.hide()
 
 func _toggle_unit_inspector(unit_id: String) -> void:
+	if unit_id == unit_inspector_unit_id and is_instance_valid(unit_inspector_overlay) and unit_inspector_overlay.visible:
+		_hide_unit_inspector()
+		return
 	unit_inspector_unit_id = unit_id
 	_refresh_unit_inspector()
 	if is_instance_valid(unit_inspector_overlay):
@@ -810,6 +813,12 @@ func _build_settings_overlay() -> void:
 	board_side_setting_options.add_item(t("棋盘居右", "Board on right"), 1)
 	board_side_setting_options.item_selected.connect(_set_board_side)
 	box.add_child(board_side_setting_options)
+	enemy_strategy_setting_options = OptionButton.new()
+	enemy_strategy_setting_options.custom_minimum_size = Vector2(360, 48)
+	for i in range(21):
+		enemy_strategy_setting_options.add_item(t("敌方兵略值：", "Enemy Strategy: ") + str(100 + i * 5), i)
+	enemy_strategy_setting_options.item_selected.connect(_set_enemy_strategy)
+	box.add_child(enemy_strategy_setting_options)
 	var close := _button(t("保存并返回", "SAVE & BACK"))
 	close.custom_minimum_size = Vector2(240, 48)
 	close.pressed.connect(_close_settings)
@@ -859,6 +868,10 @@ func _refresh_settings_ui() -> void:
 		board_side_setting_options.set_item_text(0, t("棋盘居左", "Board on left"))
 		board_side_setting_options.set_item_text(1, t("棋盘居右", "Board on right"))
 		board_side_setting_options.select(0 if board_side == "left" else 1)
+	if is_instance_valid(enemy_strategy_setting_options):
+		for i in range(21):
+			enemy_strategy_setting_options.set_item_text(i, t("敌方兵略值：", "Enemy Strategy: ") + str(100 + i * 5))
+		enemy_strategy_setting_options.select(int(enemy_strategy_bonus / 5))
 
 func _set_draft_faction_filter(index: int) -> void:
 	var factions := ["", "shu", "wei", "wu", "qun"]
@@ -880,6 +893,11 @@ func _set_board_side(index: int) -> void:
 	_save_settings()
 	_refresh_settings_ui()
 
+func _set_enemy_strategy(index: int) -> void:
+	enemy_strategy_bonus = clampi(index * 5, 0, 100)
+	_save_settings()
+	_refresh_settings_ui()
+
 func _apply_board_side_layout() -> void:
 	if not is_instance_valid(battle_workspace) or not is_instance_valid(battle_arena_panel) or not is_instance_valid(battle_info_panel): return
 	battle_workspace.move_child(battle_arena_panel, 0 if board_side == "left" else 1)
@@ -898,6 +916,7 @@ func _load_settings() -> void:
 		if draft_faction_filter not in ["", "shu", "wei", "wu", "qun"]: draft_faction_filter = ""
 		if enemy_faction_filter not in ["", "shu", "wei", "wu", "qun"]: enemy_faction_filter = ""
 		if board_side not in ["left", "right"]: board_side = "left"
+		enemy_strategy_bonus = clampi(int(config.get_value("battle", "enemy_strategy_bonus", 0)), 0, 100)
 	battle_speed = game_speed
 
 func _save_settings() -> void:
@@ -908,6 +927,7 @@ func _save_settings() -> void:
 	config.set_value("battle", "enemy_faction_filter", enemy_faction_filter)
 	config.set_value("interface", "show_hero_codex_images", show_hero_codex_images)
 	config.set_value("interface", "board_side", board_side)
+	config.set_value("battle", "enemy_strategy_bonus", enemy_strategy_bonus)
 	config.save(SETTINGS_PATH)
 
 func _build_encyclopedia() -> void:
@@ -1313,7 +1333,7 @@ func _render_encyclopedia() -> void:
 func _bond_graph_data(faction: String) -> Dictionary:
 	var data := {
 		"shu":{
-			"faction":["han_expedition", "蜀", "Shu", "2 / 5 / 8", "全体蜀将承伤降低2%/5%/8%。8人时，每次受伤后额外获得2%减伤，最多3层；自身释放技能后清空额外层数。", "All Shu heroes take 2%/5%/8% less damage. At 8, each damage instance adds another 2% reduction, up to 3 stacks; casting clears the extra stacks."],
+			"faction":["han_expedition", "蜀", "Shu", "2 / 5 / 8", "全体蜀将承伤降低2%/5%/8%。8人时，每次受伤叠加3%减伤，最多3层，每层持续3秒。", "All Shu heroes take 2%/5%/8% less damage. At 8, each hit adds 3% reduction up to 3 stacks, each lasting 3s."],
 			"bonds":[
 				["peach_garden", "桃园结义", "Peach Garden", ["liubei", "guanyu", "zhangfei"], "3人", "3 heroes", "刘备每秒治疗提高至150%兵略值；关羽按列斩实际伤害的30%自疗；张飞号令延长50%。", "Liu Bei heals at 150% Strategy per second; Guan Yu heals for 30% of actual cleave damage; Zhang Fei's command lasts 50% longer."],
 				["five_tigers", "五虎上将", "Five Tigers", ["guanyu", "zhangfei", "zhaoyun", "huangzhong", "machao"], "5人", "5 heroes", "关羽列斩460%；张飞号令延长50%且增伤变为0.3×兵略值%；赵云每刺+100%；黄忠锁定前军造成900%；马超施法后为同排友军提供0.4×自身兵略值，持续7.2秒。", "Guan Yu 460%; Zhang Fei gains duration and Strategy-scaled damage; Zhao Yun +100% each thrust; Huang Zhong 900% to vanguards; Ma Chao grants same-row Strategy for 7.2s."],
@@ -1332,7 +1352,7 @@ func _bond_graph_data(faction: String) -> Dictionary:
 			]
 		},
 		"wei":{
-			"faction":["wei_command", "魏", "Wei", "2 / 5 / 8", "全体魏将控制时长提高3%/8%/15%。8人时，对带有任意控制或减益的目标造成伤害提高15%。", "All Wei heroes gain 3%/8%/15% control duration. At 8, they deal 15% more damage to targets with any control or debuff."],
+			"faction":["wei_command", "魏", "Wei", "2 / 5 / 8", "全体魏将控制时长提高2%/5%/8%。8人时，对带有任意控制或减益的目标造成伤害提高8%。", "All Wei heroes gain 2%/5%/8% control duration. At 8, they deal 8% more damage to targets with any control or debuff."],
 			"bonds":[
 				["evil_of_old", "古之恶来", "Evil of Old", ["caocao", "dianwei"], "2人", "2 heroes", "曹操目标+1，命中后军时伤害增加100%兵略值、眩晕增加0.5秒；典韦目标+1、伤害减少30%兵略值。", "Cao Cao gains 1 target and, against rearguards, +100% Strategy damage and +0.5s stun; Dian Wei gains 1 target but loses 30% Strategy damage."],
 				["tiger_guard", "虎卫护主", "Tiger Guard", ["caocao", "xuchu"], "2人", "2 heroes", "曹操目标+1，命中前军时伤害增加100%兵略值、眩晕增加0.5秒；许褚目标+1、伤害减少40%兵略值。", "Cao Cao gains 1 target and, against vanguards, +100% Strategy damage and +0.5s stun; Xu Chu gains 1 target but loses 40% Strategy damage."],
@@ -1352,7 +1372,7 @@ func _bond_graph_data(faction: String) -> Dictionary:
 			]
 		},
 		"wu":{
-			"faction":["jiangdong_relay", "吴", "Wu", "2 / 5 / 8", "全体吴将最大生命提高2%/5%/8%。8人时，每场战斗首次有吴将即将阵亡，会均摊全体存活吴将的生命比例，并各自恢复10%最大生命。", "All Wu heroes gain 2%/5%/8% max HP. At 8, the first lethal hit each battle equalizes surviving Wu heroes' health ratios, then restores 10% max HP to each."],
+			"faction":["jiangdong_relay", "吴", "Wu", "2 / 5 / 8", "全体吴将最大生命提高2%/5%/8%。8人时，吴将濒死会均摊全体存活吴将的生命比例，并各自恢复5%最大生命（每30秒一次）。", "All Wu heroes gain 2%/5%/8% max HP. At 8, a lethal hit equalizes surviving Wu heroes' health ratios and restores 5% max HP to each (once per 30s)."],
 			"bonds":[
 				["wu_commanders", "四英杰", "Four Heroes", ["zhouyu", "luxun", "lusu", "lvmeng"], "4人", "4 heroes", "周瑜额外点燃2格；陆逊火球总共弹射3次；吕蒙使命中后军恐惧4秒；鲁肃改为治疗两名最低当前生命友军，各恢复20%最大生命并提高350最大生命。", "Zhou Yu ignites 2 extra tiles; Lu Xun's fireball bounces 3 times; Lu Meng fears the struck rearguard for 4s; Lu Su treats the two lowest-current-HP allies, restoring 20% max HP and granting 350 max HP to each for the battle."],
 				["sun_legacy", "孙氏之志", "Sun Legacy", ["sunjian", "sunce", "sunquan", "sunshangxiang"], "4人", "4 heroes", "孙坚自损与阵亡传承强化；孙策基础倍率提高至400%并获得残血减伤；孙权每次提高400+10%已损生命的最大生命、上限4倍并恢复15%已损生命；孙尚香改为6秒冷却、连射2次150%伤害且施法后兵略值+2。", "Empowers Sun Jian's sacrifice and Sun Ce's assault; Sun Quan gains 400 plus 10% missing HP as max HP up to 4x and restores 15% missing HP; Sun Shangxiang has a 6s cooldown, fires twice at 150%, and gains 2 Strategy per cast."],
@@ -1369,7 +1389,7 @@ func _bond_graph_data(faction: String) -> Dictionary:
 			]
 		},
 		"qun":{
-			"faction":["chaos_struggle", "群", "Qun", "2 / 5 / 8", "全体群雄武将技能冷却缩短3%/8%/15%。8人时，每次释放技能有20%概率连续释放两次。", "All Qun heroes gain 3%/8%/15% skill cooldown reduction. At 8, every cast has a 20% chance to cast twice in succession."],
+			"faction":["chaos_struggle", "群", "Qun", "2 / 5 / 8", "全体群雄武将技能冷却缩短2%/5%/8%。8人时，每次释放技能有8%概率连续释放两次。", "All Qun heroes gain 2%/5%/8% skill cooldown reduction. At 8, every cast has an 8% chance to cast twice in succession."],
 			"bonds":[
 				["tyrant_peerless", "暴虐无双", "Tyrant and Peerless", ["lvbu", "dongzhuo"], "2人", "2 heroes", "吕布按实际伤害的40%回血；董卓伤害提高至自身当前生命15%。", "Lu Bu heals for 40% of actual damage; Dong Zhuo rises to 15% of his current HP."],
 				["hero_beauty", "英雄美人", "Hero and Beauty", ["lvbu", "diaochan"], "2人", "2 heroes", "吕布每损失10%生命增伤4%；被貂蝉魅惑者每秒攻击相邻友军。", "Lu Bu gains 4% damage per 10% HP missing; charmed enemies attack adjacent allies each second."],
@@ -1861,10 +1881,10 @@ func _hero_bond_detail(hero_id: String) -> String:
 	var entries: Array[String] = []
 	var faction: String = heroes[hero_id].f
 	var faction_effects: Array = {
-		"shu":["2/5/8人时，本武将承伤降低2%/5%/8%；8人时受伤叠加2%额外减伤，最多3层，释放技能后清空。", "At 2/5/8, this hero takes 2%/5%/8% less damage; at 8, damage taken adds 2% reduction up to 3 stacks, cleared after casting."],
-		"wei":["2/5/8人时，本武将控制时长提高3%/8%/15%；8人时，对带有任意控制或减益的目标伤害提高15%。", "At 2/5/8, this hero gains 3%/8%/15% control duration; at 8, damage to any controlled or debuffed target increases by 15%."],
-		"wu":["2/5/8人时，本武将最大生命提高2%/5%/8%；8人时，每场战斗首次吴将濒死会触发全体吴将生命均摊并恢复10%最大生命。", "At 2/5/8, this hero gains 2%/5%/8% max HP; at 8, the first lethal hit each battle equalizes Wu health and restores 10% max HP."],
-		"qun":["2/5/8人时，本武将技能冷却缩短3%/8%/15%；8人时，每次释放技能有20%概率连续释放两次。", "At 2/5/8, this hero gains 3%/8%/15% cooldown reduction; at 8, each cast has a 20% chance to cast twice."]
+		"shu":["2/5/8人时，本武将承伤降低2%/5%/8%；8人时每次受伤叠加3%减伤，最多3层，每层持续3秒。", "At 2/5/8, this hero takes 2%/5%/8% less damage; at 8, each hit taken adds 3% reduction up to 3 stacks, each lasting 3s."],
+		"wei":["2/5/8人时，本武将控制时长提高2%/5%/8%；8人时，对带有任意控制或减益的目标伤害提高8%。", "At 2/5/8, this hero gains 2%/5%/8% control duration; at 8, damage to any controlled or debuffed target increases by 8%."],
+		"wu":["2/5/8人时，本武将最大生命提高2%/5%/8%；8人时，吴将濒死会触发全体吴将生命均摊并恢复5%最大生命（每30秒一次）。", "At 2/5/8, this hero gains 2%/5%/8% max HP; at 8, a lethal hit equalizes Wu health and restores 5% max HP (once per 30s)."],
+		"qun":["2/5/8人时，本武将技能冷却缩短2%/5%/8%；8人时，每次释放技能有8%概率连续释放两次。", "At 2/5/8, this hero gains 2%/5%/8% cooldown reduction; at 8, each cast has an 8% chance to cast twice."]
 	}[faction]
 	var peach: Array = ["liubei", "guanyu", "zhangfei"]
 	if peach.has(hero_id):
@@ -1964,10 +1984,10 @@ func _hero_bond_detail(hero_id: String) -> String:
 
 func _bond_detail(faction: String) -> String:
 	match faction:
-		"shu": return t("蜀：2/5/8人时承伤降低2%/5%/8%；8人时受击额外叠加2%减伤，最多3层，释放技能后清空。", "Shu: at 2/5/8, take 2%/5%/8% less damage; at 8, hits stack another 2% up to 3 times, cleared on cast.")
-		"wei": return t("魏：2/5/8人时控制时长提高3%/8%/15%；8人时对受控或带减益目标伤害提高15%。", "Wei: at 2/5/8, control duration gains 3%/8%/15%; at 8, deal 15% more damage to controlled or debuffed targets.")
-		"wu": return t("吴：2/5/8人时最大生命提高2%/5%/8%；8人时首次濒死触发生命均摊并恢复10%最大生命。", "Wu: at 2/5/8, gain 2%/5%/8% max HP; at 8, the first lethal hit equalizes health and restores 10% max HP.")
-		"qun": return t("群：2/5/8人时冷却缩短3%/8%/15%；8人时释放技能有20%概率连续释放两次。", "Qun: at 2/5/8, cooldown is reduced by 3%/8%/15%; at 8, casts have a 20% repeat chance.")
+		"shu": return t("蜀：2/5/8人时承伤降低2%/5%/8%；8人时每次受伤叠加3%减伤，最多3层，每层持续3秒。", "Shu: at 2/5/8, take 2%/5%/8% less damage; at 8, each hit adds 3% reduction up to 3 stacks, each lasting 3s.")
+		"wei": return t("魏：2/5/8人时控制时长提高2%/5%/8%；8人时对受控或带减益目标伤害提高8%。", "Wei: at 2/5/8, control duration gains 2%/5%/8%; at 8, deal 8% more damage to controlled or debuffed targets.")
+		"wu": return t("吴：2/5/8人时最大生命提高2%/5%/8%；8人时濒死触发生命均摊并恢复5%最大生命（每30秒一次）。", "Wu: at 2/5/8, gain 2%/5%/8% max HP; at 8, a lethal hit equalizes health and restores 5% max HP (once per 30s).")
+		"qun": return t("群：2/5/8人时冷却缩短2%/5%/8%；8人时释放技能有8%概率连续释放两次。", "Qun: at 2/5/8, cooldown is reduced by 2%/5%/8%; at 8, casts have an 8% repeat chance.")
 	return ""
 func _portrait_texture(hero_id: String) -> Texture2D:
 	if portrait_cache.has(hero_id): return portrait_cache[hero_id]
@@ -2539,18 +2559,15 @@ func _drop_board(_at_position: Vector2, data, row: int, col: int) -> void:
 
 func _can_drop_reserve(_at_position: Vector2, data, _index: int) -> bool:
 	if phase not in ["draft", "placement"] or not (data is Dictionary) or not data.has("unit_id"): return false
-	var source = _find_by_id(player_units, str(data.unit_id))
-	if source == null: return false
-	return int(source.row) < 0 or _reserve_units().size() < RESERVE_LIMIT
+	return _find_by_id(player_units, str(data.unit_id)) != null
 
 func _drop_reserve(_at_position: Vector2, data, index: int) -> void:
 	if not _can_drop_reserve(_at_position, data, index): return
 	var source: Dictionary = _find_by_id(player_units, str(data.unit_id))
 	if int(source.row) >= 0:
-		source.row = -1
-		source.col = -1
+		player_units.erase(source)
 		selected_unit = ""
-		_log(_hero_name(source.hero_id) + t(" 已从战场下阵到备战席。", " returned from the battlefield to reserve."))
+		_log(_hero_name(source.hero_id) + t(" 已从战场丢弃。", " has been dismissed from the battlefield."))
 		_render()
 		return
 	var reserves := _reserve_units()

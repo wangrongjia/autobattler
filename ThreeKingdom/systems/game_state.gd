@@ -168,9 +168,11 @@ var hero_codex_images_setting_button: Button # 武将图鉴图片显示开关
 var faction_setting_options: OptionButton  # 我方选将阵营过滤
 var enemy_faction_setting_options: OptionButton # 敌方随机阵营过滤
 var board_side_setting_options: OptionButton # 棋盘居左/居右
+var enemy_strategy_setting_options: OptionButton # 敌方兵略值加成
 var draft_faction_filter := ""     # 我方选将阵营过滤(空=全部, 或 shu/wei/wu/qun)
 var enemy_faction_filter := ""     # 敌方随机武将阵营过滤
 var board_side := "left"           # 棋盘位置:left=居左,right=居右
+var enemy_strategy_bonus := 0      # 敌方兵略值加成(0~100, 实际兵略值=100+此值)
 
 var heroes := {
 	"liubei":{"zh":"刘备", "en":"Liu Bei", "f":"shu", "hp":3740, "skill_value":100, "cooldown":6.0, "range":3, "skill":"Benevolent Renewal", "zh_skill":"仁德回春", "ability":"signature", "ability_params":{"duration":4.0, "heal_ratio":1.0, "peach_heal_ratio":1.5, "liushan_duration_bonus":0.30, "zhuge_damage_reduction":0.30}, "summary":"仁德回春：为当前生命比例最低的友军施加持续4秒、每秒100%兵略值的治疗。", "en_summary":"Regenerate the ally with the lowest HP ratio for 4s at 100% Strategy per second.", "detail_zh":"仁德回春：为当前生命比例最低的友军施加持续4秒、每秒100%兵略值的治疗。", "detail_en":"Regenerate the ally with the lowest HP ratio for 4s at 100% Strategy per second."},
@@ -503,7 +505,7 @@ func _make_roster_unit(team: String, hero_id: String) -> Dictionary:
 		"all_lifesteal":0.0, "all_lifesteal_time":0.0,
 		"skill_debuff":0.0, "kill_buff":0.0, "death_prevention":0.0,
 		"heal_multiplier":1.0, "charm_multiplier":1.0, "current_hp_ratio":0.06,
-		"skill_value_bonus":0.0, "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "hebei_damage_stacks":0,
+		"skill_value_bonus":(float(enemy_strategy_bonus) if team == "enemy" else 0.0), "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "hebei_damage_stacks":0,
 		"charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0,
 		"skill_debuff_time":0.0, "zhangbao_revives_used":0
 	}

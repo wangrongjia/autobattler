@@ -1,7 +1,7 @@
 extends "res://ThreeKingdom/systems/game_flow.gd"
 
 func _ensure_unit_fields(unit: Dictionary) -> void:
-	var defaults := {"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0, "vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":0.0, "spell_ward":0, "cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0, "faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0, "faction_cooldown_reduction":0.0, "shu_damage_stacks":0, "four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false, "burn_missing_hp_scale":false, "burn_effects":[], "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0, "freeze":0.0, "freeze_shatter_damage":0.0, "freeze_source_id":"", "poison":0.0, "poison_ratio":0.0, "poison_clock":0.0, "poison_source":"", "poison_effects":[], "regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_damage_reduction":0.0, "regen_source":"", "timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_reduction":0.0, "timed_reduction_time":0.0, "timed_action_bonus":0.0, "timed_action_time":0.0, "rear_damage_reduction":0.0, "rear_damage_reduction_time":0.0, "front_damage_reduction":0.0, "front_damage_reduction_time":0.0, "all_lifesteal":0.0, "all_lifesteal_time":0.0, "bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0, "skill_value_bonus":0.0, "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "hebei_damage_stacks":0, "charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0, "skill_debuff_time":0.0, "zhangbao_revives_used":0}
+	var defaults := {"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0, "vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":0.0, "spell_ward":0, "cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0, "faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0, "faction_cooldown_reduction":0.0, "shu_damage_stacks":0, "shu_damage_decay_time":0.0,"four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false, "burn_missing_hp_scale":false, "burn_effects":[], "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0, "freeze":0.0, "freeze_shatter_damage":0.0, "freeze_source_id":"", "poison":0.0, "poison_ratio":0.0, "poison_clock":0.0, "poison_source":"", "poison_effects":[], "regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_damage_reduction":0.0, "regen_source":"", "timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_reduction":0.0, "timed_reduction_time":0.0, "timed_action_bonus":0.0, "timed_action_time":0.0, "rear_damage_reduction":0.0, "rear_damage_reduction_time":0.0, "front_damage_reduction":0.0, "front_damage_reduction_time":0.0, "all_lifesteal":0.0, "all_lifesteal_time":0.0, "bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0, "skill_value_bonus":0.0, "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "hebei_damage_stacks":0, "charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0, "skill_debuff_time":0.0, "zhangbao_revives_used":0}
 	for key in defaults:
 		if not unit.has(key): unit[key] = defaults[key]
 
@@ -102,8 +102,8 @@ func _apply_faction_bonuses(announce := true) -> void:
 			var tier := _faction_tier_for_count(int(counts[faction])) if unit.alive else 0
 			unit.faction_tier = tier
 			unit.faction_damage_reduction = _faction_tier_value(tier, [0.02, 0.05, 0.08]) if faction == "shu" else 0.0
-			unit.faction_control_bonus = _faction_tier_value(tier, [0.03, 0.08, 0.15]) if faction == "wei" else 0.0
-			unit.faction_cooldown_reduction = _faction_tier_value(tier, [0.03, 0.08, 0.15]) if faction == "qun" else 0.0
+			unit.faction_control_bonus = _faction_tier_value(tier, [0.02, 0.05, 0.08]) if faction == "wei" else 0.0
+			unit.faction_cooldown_reduction = _faction_tier_value(tier, [0.02, 0.05, 0.08]) if faction == "qun" else 0.0
 			_set_wu_hp_bonus(unit, _faction_tier_value(tier, [0.02, 0.05, 0.08]) if faction == "wu" else 0.0)
 			if faction != "shu" or tier < 3:
 				unit.shu_damage_stacks = 0
@@ -446,6 +446,11 @@ func _resolve_effect_pause() -> void:
 
 func _process_statuses(delta: float = TICK) -> void:
 	var status_tick_id := str(floori(battle_time + 0.001))
+	for team in ["player", "enemy"]:
+		if faction_battle_state.has(team):
+			var st: Dictionary = faction_battle_state[team]
+			st.wu_equalize_cooldown = maxf(0.0, float(st.get("wu_equalize_cooldown", 0.0)) - delta)
+			faction_battle_state[team] = st
 	for unit in combat_units:
 		if not unit.alive: continue
 		_ensure_unit_fields(unit)
@@ -532,6 +537,13 @@ func _process_statuses(delta: float = TICK) -> void:
 		if unit.rear_damage_reduction_time <= 0.0: unit.rear_damage_reduction = 0.0
 		unit.front_damage_reduction_time = maxf(0.0, float(unit.get("front_damage_reduction_time", 0.0)) - delta)
 		if unit.front_damage_reduction_time <= 0.0: unit.front_damage_reduction = 0.0
+		if int(unit.get("shu_damage_stacks", 0)) > 0:
+			var decay := float(unit.get("shu_damage_decay_time", 0.0)) - delta
+			if decay <= 0.0:
+				unit.shu_damage_stacks = int(unit.get("shu_damage_stacks", 0)) - 1
+				unit.shu_damage_decay_time = 3.0 if int(unit.shu_damage_stacks) > 0 else 0.0
+			else:
+				unit.shu_damage_decay_time = decay
 		if float(unit.get("regen_time", 0.0)) > 0.0:
 			unit.regen_clock = float(unit.get("regen_clock", 0.0)) + delta
 			unit.regen_time = max(0.0, float(unit.regen_time) - delta)
@@ -595,9 +607,7 @@ func _perform_action(unit: Dictionary) -> void:
 	visual_events.append({"kind":"charge", "source_id":unit.id, "target_id":unit.id, "amount":0, "style":"magic"})
 	_cast_active_skill(unit)
 	_after_active_skill(unit)
-	if heroes[unit.hero_id].f == "shu":
-		unit.shu_damage_stacks = 0
-	if heroes[unit.hero_id].f == "qun" and int(unit.get("faction_tier", 0)) >= 3 and not _has_winner() and rng.randf() < 0.20:
+	if heroes[unit.hero_id].f == "qun" and int(unit.get("faction_tier", 0)) >= 3 and not _has_winner() and rng.randf() < 0.08:
 		_log("[color=#d59af0]" + t("【乱世争衡】触发连续施法！", "[Chaos Struggle] Double cast triggered!") + "[/color]")
 		visual_events.append({"kind":"charge", "source_id":unit.id, "target_id":unit.id, "amount":0, "style":"magic"})
 		_cast_active_skill(unit)
@@ -2296,14 +2306,14 @@ func _try_wu_equalize_and_recover(target: Dictionary) -> bool:
 	if heroes[target.hero_id].f != "wu" or int(target.get("faction_tier", 0)) < 3:
 		return false
 	if not faction_battle_state.has(target.team):
-		faction_battle_state[target.team] = {"wu_equalize_used":false}
+		faction_battle_state[target.team] = {"wu_equalize_cooldown":0.0}
 	var state: Dictionary = faction_battle_state[target.team]
-	if bool(state.get("wu_equalize_used", false)):
+	if float(state.get("wu_equalize_cooldown", 0.0)) > 0.0:
 		return false
 	var wu_allies := _team_units(target.team).filter(func(ally): return ally.alive and heroes[ally.hero_id].f == "wu")
 	if wu_allies.size() < FACTION_BOND_TIERS[2]:
 		return false
-	state.wu_equalize_used = true
+	state.wu_equalize_cooldown = 30.0
 	faction_battle_state[target.team] = state
 	var total_hp := 0.0
 	var total_max_hp := 0.0
@@ -2313,10 +2323,10 @@ func _try_wu_equalize_and_recover(target: Dictionary) -> bool:
 	var shared_ratio := clampf(total_hp / maxf(1.0, total_max_hp), 0.0, 1.0)
 	for ally in wu_allies:
 		var before := float(ally.hp)
-		ally.hp = minf(float(ally.max_hp), float(ally.max_hp) * shared_ratio + float(ally.max_hp) * 0.10)
+		ally.hp = minf(float(ally.max_hp), float(ally.max_hp) * shared_ratio + float(ally.max_hp) * 0.05)
 		var restored := maxf(0.0, float(ally.hp) - before)
 		visual_events.append({"kind":"heal", "source_id":target.id, "target_id":ally.id, "amount":round(restored), "style":"heal", "nonblocking":true})
-	_log("[color=#e58f78]" + t("【江东联动】首次濒死触发：吴将均摊生命并恢复10%最大生命！", "[Jiangdong Relay] First lethal hit equalizes Wu health and restores 10% max HP!") + "[/color]")
+	_log("[color=#e58f78]" + t("【江东联动】濒死触发：吴将均摊生命并恢复5%最大生命（每30秒一次）！", "[Jiangdong Relay] Lethal hit equalizes Wu health and restores 5% max HP (once per 30s)!") + "[/color]")
 	return target.hp > 0.0
 
 func _damage(source, target: Dictionary, amount: float, damage_type: String, label: String, visual_group := "", group_style := "", scales_with_skill := false, propagate_links := true) -> float:
@@ -2344,7 +2354,7 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 			value *= 1.0 + float(heroes.lvmeng.ability_params.get("ambush_next_damage_bonus", 0.60))
 			consumes_lvmeng_ambush = true
 		if heroes[source.hero_id].f == "wei" and int(source.get("faction_tier", 0)) >= 3 and _has_any_debuff(target):
-			value *= 1.15
+			value *= 1.08
 	var freeze_remaining := float(target.get("freeze", 0.0))
 	if freeze_remaining > 0.0:
 		var shatter_damage := float(target.get("freeze_shatter_damage", 0.0))
@@ -2368,7 +2378,7 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	value *= 1.0 - clampf(total_reduction, 0.0, 0.95)
 	var faction_reduction := float(target.get("faction_damage_reduction", 0.0))
 	if heroes[target.hero_id].f == "shu" and int(target.get("faction_tier", 0)) >= 3:
-		faction_reduction += 0.02 * clampi(int(target.get("shu_damage_stacks", 0)), 0, 3)
+		faction_reduction += 0.03 * clampi(int(target.get("shu_damage_stacks", 0)), 0, 3)
 	value *= 1.0 - clampf(faction_reduction, 0.0, 0.95)
 	if damage_type == "magic" and float(target.get("strategy_mark", 0.0)) > 0.0 and source != null:
 		value *= 1.30
@@ -2390,6 +2400,8 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		source.stealth_ambush_bonus_ready = false
 	if actual_damage > 0.0 and heroes[target.hero_id].f == "shu" and int(target.get("faction_tier", 0)) >= 3:
 		target.shu_damage_stacks = mini(3, int(target.get("shu_damage_stacks", 0)) + 1)
+		if float(target.get("shu_damage_decay_time", 0.0)) <= 0.0:
+			target.shu_damage_decay_time = 3.0
 	if actual_damage > 0.0 and bool(target.get("four_pillars", false)) and target.hero_id in ["yanliang", "wenchou"]:
 		target.hebei_damage_stacks = mini(20, int(target.get("hebei_damage_stacks", 0)) + 1)
 	if source != null: _apply_all_lifesteal(source, actual_damage)
