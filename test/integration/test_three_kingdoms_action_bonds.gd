@@ -61,7 +61,7 @@ func _initialize() -> void:
 	game._apply_combo_bonds()
 	assert(not qun[0].ghost_bond)
 	assert(qun[1].charm_multiplier == 1.0)
-	assert(is_equal_approx(float(qun[2].max_hp), float(game.heroes.dongzhuo.hp) * 1.50))
+	assert(is_equal_approx(float(qun[2].max_hp), float(game.heroes.dongzhuo.hp) * 1.40))
 	var dongzhuo_bond_hp := float(qun[2].max_hp)
 	game._apply_combo_bonds()
 	assert(is_equal_approx(float(qun[2].max_hp), dongzhuo_bond_hp))

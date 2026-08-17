@@ -12,7 +12,7 @@ const ACTION_MAX := 100.0          # 行动条上限:从 0 涨到 100 时武将�
 const FACTION_BOND_TIERS: Array[int] = [2, 5, 8] # 四阵营统一羁绊档位
 const DEFAULT_Strategy_COOLDOWN := 8.5 # 未单独配置武将的初始冷却；不是均衡实验室的调整下限
 const COOLDOWN_INPUT_MIN := 0.0     # 均衡实验室允许设置为 0，战斗计算处另行防止除零
-const HERO_COOLDOWN_DEFAULTS := {"liubei":6.0, "guanyu":6.3, "liushan":0.0, "zhangfei":6.6, "zhaoyun":5.7, "huangzhong":4.2, "machao":7.2, "zhugeliang":6.9, "jiangwei":4.5, "pangtong":5.4, "menghuo":5.7, "zhurong":5.1, "dailaidongzhu":4.9, "weiyan":5.4, "madai":21.0, "zhouyu":5.8, "luxun":5.8, "lvmeng":5.6, "lusu":5.6, "daqiao":6.2, "xiaoqiao":6.2, "taishici":6.0, "ganning":6.0, "huanggai":8.8, "sunjian":15.0, "sunce":5.2, "sunquan":5.2, "sunshangxiang":5.2, "dingfeng":5.4, "xusheng":5.8, "caocao":5.6, "dianwei":5.2, "xuchu":6.4, "zhangliao":6.8, "yuejin":6.0, "xuhuang":5.6, "zhanghe":5.2, "yujin":4.8, "xiahouyuan":5.2, "caoren":5.2, "xiahoudun":5.2, "simayi":6.4, "guojia":6.4, "xunyu":6.4, "jiaxu":6.4, "lvbu":6.4, "dongzhuo":5.5, "diaochan":7.0, "chengong":0.0, "gaoshun":6.2, "yanliang":4.0, "wenchou":4.0, "gaolan":0.0, "qunzhanghe":5.6, "huatuo":6.0, "yuji":6.6, "zuoci":6.0, "zhangjiao":6.0, "zhangliang":5.0, "zhangbao":0.0}
+const HERO_COOLDOWN_DEFAULTS := {"liubei":6.0, "guanyu":6.3, "liushan":0.0, "zhangfei":6.6, "zhaoyun":5.7, "huangzhong":4.2, "machao":7.2, "zhugeliang":6.9, "jiangwei":4.5, "pangtong":5.4, "menghuo":5.7, "zhurong":5.1, "dailaidongzhu":4.9, "weiyan":5.4, "madai":21.0, "zhouyu":5.8, "luxun":5.8, "lvmeng":5.6, "lusu":5.6, "daqiao":6.2, "xiaoqiao":6.2, "taishici":6.0, "ganning":6.0, "huanggai":8.8, "sunjian":15.0, "sunce":5.2, "sunquan":5.2, "sunshangxiang":5.2, "dingfeng":5.4, "xusheng":5.8, "caocao":5.6, "dianwei":5.2, "xuchu":6.4, "zhangliao":6.8, "yuejin":6.0, "xuhuang":5.6, "zhanghe":5.2, "yujin":4.8, "xiahouyuan":5.2, "caoren":5.2, "xiahoudun":5.2, "simayi":6.4, "guojia":6.4, "xunyu":6.4, "jiaxu":6.4, "lvbu":6.5, "dongzhuo":5.5, "diaochan":6.5, "chengong":0.0, "gaoshun":6.5, "yanliang":5.5, "wenchou":5.5, "gaolan":0.0, "qunzhanghe":6.0, "huatuo":5.5, "yuji":5.5, "zuoci":5.5, "zhangjiao":6.0, "zhangliang":6.0, "zhangbao":0.0}
 const RESERVE_LIMIT := 9           # 备战区(棋盘下方的替补区)最多放 9 名武将
 const BOARD_LIMIT := BOARD_COLUMNS * BOARD_ROWS  # 棋盘总格数 = 15
 const SAVE_PATH := "user://three_kingdoms_save.json"        # 存档文件路径(user:// 是玩家存档目录)
@@ -184,9 +184,9 @@ var heroes := {
 	"zhouyu":{"zh":"周瑜", "en":"Zhou Yu", "f":"wu", "hp":225, "skill_value":100, "cooldown":5.8, "range":3, "skill":"Red Cliffs", "zh_skill":"赤壁点火", "ability":"signature", "summary":"随机点燃敌方格子并造成持续伤害。", "en_summary":"Ignites random enemy tiles and deals damage over time."},
 	"luxun":{"zh":"陆逊", "en":"Lu Xun", "f":"wu", "hp":235, "skill_value":100, "cooldown":5.8, "range":3, "skill":"Flames of Camp", "zh_skill":"火烧连营", "ability":"signature", "summary":"火球命中目标并弹射相邻单元格。", "en_summary":"A fireball hits a target and bounces to an adjacent tile."},
 	"lusu":{"zh":"鲁肃", "en":"Lu Su", "f":"wu", "hp":260, "skill_value":100, "cooldown":5.6, "range":2, "skill":"Alliance", "zh_skill":"连横稳阵", "ability":"signature", "summary":"治疗当前生命总量最低的友军并提高其最大生命。", "en_summary":"Treats the ally with the lowest current HP total and raises max HP."},
-	"lvbu":{"zh":"吕布", "en":"Lu Bu", "f":"qun", "hp":5640, "skill_value":100, "cooldown":3.0, "range":1, "skill":"Peerless", "zh_skill":"无双横扫", "ability":"signature", "summary":"横扫敌方前军。", "en_summary":"Sweeps enemy vanguards."},
-	"diaochan":{"zh":"貂蝉", "en":"Diao Chan", "f":"qun", "hp":210, "skill_value":100, "cooldown":4.0, "range":3, "skill":"Beauty's Scheme", "zh_skill":"美人离间", "ability":"signature", "summary":"魅惑随机敌军。", "en_summary":"Charms a random enemy."},
-	"dongzhuo":{"zh":"董卓", "en":"Dong Zhuo", "f":"qun", "hp":3280, "skill_value":100, "cooldown":3.0, "range":2, "skill":"Tyrant's Levy", "zh_skill":"暴君横征", "ability":"signature", "summary":"按当前生命造成伤害。", "en_summary":"Deals damage based on current health."}
+	"lvbu":{"zh":"吕布", "en":"Lu Bu", "f":"qun", "hp":5640, "skill_value":100, "cooldown":6.5, "range":1, "skill":"Peerless", "zh_skill":"无双横扫", "ability":"signature", "summary":"横扫敌方前军。", "en_summary":"Sweeps enemy vanguards."},
+	"diaochan":{"zh":"貂蝉", "en":"Diao Chan", "f":"qun", "hp":210, "skill_value":100, "cooldown":6.5, "range":3, "skill":"Beauty's Scheme", "zh_skill":"美人离间", "ability":"signature", "summary":"魅惑随机敌军。", "en_summary":"Charms a random enemy."},
+	"dongzhuo":{"zh":"董卓", "en":"Dong Zhuo", "f":"qun", "hp":3280, "skill_value":100, "cooldown":5.5, "range":2, "skill":"Tyrant's Levy", "zh_skill":"暴君横征", "ability":"signature", "summary":"按当前生命造成伤害。", "en_summary":"Deals damage based on current health."}
 }
 
 # UI and combat hooks are implemented by focused subclasses. Declaring the
@@ -288,18 +288,18 @@ func _add_extended_roster() -> void:
 	_register_hero("ganning", "甘宁", "Gan Ning", "wu", 3260, 100, 6.0, 2, "Bell-Raider Twin Assault", "锦帆并击", "signature", {"mult":3.0, "lvmeng_low_hp_bonus_mult":1.80, "taishici_cooldown_reduction":1.2}, "锦帆并击：自身与同排左侧友军分别攻击一名随机敌方后军，各造成300%自身兵略值的伤害；友军协击不消耗行动条。", "Bell-Raider Twin Assault: Gan Ning and the ally to his left each strike a random enemy rearguard for 300% of their own Strategy without consuming the ally's gauge.")
 	_register_hero("huanggai", "黄盖", "Huang Gai", "wu", 4380, 100, 8.8, 1, "Bitter-Flesh Column", "苦肉焚阵", "signature", {"max_hp_cost":0.10, "mult":2.0, "damage_cost_ratio":0.40, "zhouyu_burn":5.0, "zhouyu_burn_ratio":0.50, "sunjian_max_hp_cost":0.15, "sunjian_damage_cost_ratio":0.50}, "苦肉焚阵：消耗10%最大生命，对随机敌方一列造成200%兵略值加实际消耗生命40%的伤害；生命不足时消耗全部生命并在攻击后阵亡。", "Bitter-Flesh Column: Spend 10% max HP to damage an enemy column for 200% Strategy plus 40% of HP spent; spend all remaining HP and die after attacking if insufficient.")
 
-	_register_hero("gaoshun", "高顺", "Gao Shun", "qun", 5360, 100, 3.4, 1, "Camp Crusher", "陷阵营", "shield_row", {"mult":1.00, "flat":25.0}, "为自身同排友军提供100%兵略值+25点护盾。", "Shield allies in his row for 100% Strategy + 25.")
-	_register_hero("chengong", "陈宫", "Chen Gong", "qun", 2980, 100, 3.0, 2, "Measured Assault", "智迟谋速", "buff_two", {"damage":0.15, "action":0.15}, "强化两名当前生命比例最低的友军，使其伤害与行动条速度提高15%。", "Empower the two lowest-HP allies with +15% damage and gauge speed.")
-	_register_hero("yanliang", "颜良", "Yan Liang", "qun", 5260, 100, 3.1, 1, "Hebei Retaliation", "河北反击", "multi_magic", {"count":2, "mult":0.9}, "反击2个随机格，每次造成90%兵略值魔法伤害。", "Counter 2 random tiles for 90% Strategy magic damage each.")
-	_register_hero("wenchou", "文丑", "Wen Chou", "qun", 5260, 100, 3.1, 1, "Reflected Edge", "返锋", "shield_single", {"mult":1.30, "flat":35.0}, "为当前生命比例最低的友军提供130%兵略值+35点护盾。", "Shield the lowest-HP ally for 130% Strategy + 35.")
-	_register_hero("qunzhanghe", "群张郃", "Zhang He (Qun)", "qun", 300, 100, 3.2, 2, "Purple Ward", "紫盾", "shield_column", {"mult":1.20, "flat":30.0}, "为自身同列友军提供120%兵略值+30点护盾。", "Shield allies in his column for 120% Strategy + 30.")
-	_register_hero("gaolan", "高览", "Gao Lan", "qun", 245, 100, 3.0, 3, "Arcane Blades", "法刃加持", "buff_row_melee", {"damage":0.20}, "使自身同排的近战友军伤害提高20%。", "Increase damage of melee allies in his row by 20%.")
-	_register_hero("huatuo", "华佗", "Hua Tuo", "qun", 2680, 100, 6.0, 3, "Threefold Remedy", "青囊三济", "signature", {"target_count":3, "heal_mult":1.0}, "治疗当前生命最低的三名友军，各恢复100%兵略值生命。", "Heal the three allies with the lowest current HP for 100% Strategy each.")
-	_register_hero("yuji", "于吉", "Yu Ji", "qun", 3580, 100, 6.6, 2, "Venomous Immortal Art", "蛊毒仙术", "signature", {"target_count":2, "poison_ratio":0.005, "duration":4.0}, "随机使两名敌军中毒4秒，每秒损失0.5%最大生命。", "Poison two random enemies for 4s, dealing 0.5% max HP each second.")
-	_register_hero("zuoci", "左慈", "Zuo Ci", "qun", 2720, 100, 6.0, 3, "Immortal Aid", "遁甲济世", "signature", {"target_count":2, "heal_mult":1.5, "thunder_mult":1.5}, "治疗当前生命最低的两名友军，各恢复150%兵略值生命。", "Heal the two allies with the lowest current HP for 150% Strategy each.")
-	_register_hero("zhangjiao", "张角", "Zhang Jiao", "qun", 230, 100, 6.0, 3, "Yellow Sky Thunder", "黄天雷引", "signature", {"target_count":2, "mult":2.0, "zhangliang_bonus_mult":0.5, "zhangbao_bonus_targets":1, "zhangbao_stun_chance":0.5, "zhangbao_stun":1.0}, "召唤雷电随机攻击两名敌军，各造成200%兵略值伤害。", "Call lightning on two random enemies for 200% Strategy damage each.")
-	_register_hero("zhangliang", "张梁", "Zhang Liang", "qun", 3520, 100, 5.0, 2, "Yellow Sky Weakening", "人公虚弱", "signature", {"target_count":2, "duration":5.0, "skill_reduction":0.5, "bond_bonus_targets":1}, "随机使两名敌军虚弱5秒，兵略值降低50%。", "Weaken two random enemies for 5s, reducing Strategy by 50%.")
-	_register_hero("zhangbao", "张宝", "Zhang Bao", "qun", 130, 100, 0.0, 1, "Earth General Detonation", "地公雷爆", "passive", {"target_count":2, "death_mult":2.0, "base_revives":1, "zhangjiao_splash_mult":0.5, "zhangliang_bonus_revives":1}, "阵亡时随机攻击两名敌军，各造成200%兵略值伤害，随后可满血复生一次。", "On death, strike two random enemies for 200% Strategy, then revive once at full HP.")
+	_register_hero("gaoshun", "高顺", "Gao Shun", "qun", 5360, 100, 6.5, 1, "Formation Resolve", "陷阵之志", "signature", {"target_count":2, "mult":2.20, "vulnerable":0.40, "vulnerable_time":3.5, "lvbu_bonus_targets":1, "chengong_bonus_duration":3.5}, "陷阵之志：随机攻击两名敌军，造成220%兵略值伤害并施加3.5秒易碎。", "Formation Resolve: Strike 2 enemies for 220% Strategy and inflict Fragile for 3.5s.")
+	_register_hero("chengong", "陈宫", "Chen Gong", "qun", 2980, 100, 0.0, 2, "Measured Formation", "智迟谋速", "passive", {"cooldown_reduction":1.0, "lvbu_bonus_reduction":0.7, "gaoshun_bonus_reduction":0.7}, "智迟谋速（被动）：陈宫及其同列友军的技能冷却减少1秒。", "Measured Formation: Chen Gong and allies in his column reduce cooldowns by 1s.")
+	_register_hero("yanliang", "颜良", "Yan Liang", "qun", 5260, 100, 5.5, 1, "Hebei Fierce Assault", "河北猛袭", "signature", {"target_count":2, "wenchou_bonus_targets":1, "mult":2.0, "wenchou_damage_penalty_mult":0.30, "four_pillars_bonus_targets":1, "four_pillars_damage_bonus_mult":1.20}, "河北猛袭：随机攻击两名敌方中军或后军，造成200%兵略值伤害。", "Hebei Fierce Assault: Strike 2 enemy midguards or rearguards for 200% Strategy.")
+	_register_hero("wenchou", "文丑", "Wen Chou", "qun", 5260, 100, 5.5, 1, "Hebei Breakthrough", "河北破阵", "signature", {"target_count":2, "yanliang_bonus_targets":1, "mult":3.0, "yanliang_damage_penalty_mult":0.50, "four_pillars_bonus_targets":1, "four_pillars_damage_bonus_mult":1.50}, "河北破阵：随机攻击两名敌方前军或中军，造成300%兵略值伤害。", "Hebei Breakthrough: Strike 2 enemy vanguards or midguards for 300% Strategy.")
+	_register_hero("qunzhanghe", "群张郃", "Zhang He (Qun)", "qun", 300, 100, 6.0, 2, "Hebei Ward", "河北护阵", "signature", {"target_count":2, "shield_mult":2.0, "gaolan_shield_bonus_mult":0.60, "four_pillars_bonus_targets":1, "four_pillars_shield_bonus_mult":1.0}, "河北护阵：为当前生命值最低的两名友军施加200%兵略值护盾。", "Hebei Ward: Shield the 2 allies with the lowest current HP for 200% Strategy.")
+	_register_hero("gaolan", "高览", "Gao Lan", "qun", 245, 100, 0.0, 3, "Column Valor", "列阵扬威", "passive", {"skill_bonus_ratio":0.20, "zhanghe_skill_bonus_ratio":0.25, "four_pillars_skill_bonus_ratio":0.25}, "列阵扬威（被动）：高览同列友军的兵略值增加0.2×高览兵略值。", "Column Valor: Allies in Gao Lan's column gain 20% of his Strategy.")
+	_register_hero("huatuo", "华佗", "Hua Tuo", "qun", 2680, 100, 5.5, 3, "Threefold Remedy", "青囊三济", "signature", {"target_count":3, "heal_mult":1.10, "yuji_bonus_mult":0.70, "zuoci_bonus_mult":0.30}, "青囊三济：治疗当前生命最低的三名友军，各恢复110%兵略值生命。", "Threefold Remedy: Heal the three allies with the lowest current HP for 110% Strategy each.")
+	_register_hero("yuji", "于吉", "Yu Ji", "qun", 3580, 100, 5.5, 2, "Venomous Immortal Art", "蛊毒仙术", "signature", {"target_count":2, "poison_stack_mult":1.40, "huatuo_bonus_targets":1, "zuoci_stack_bonus_mult":0.40}, "蛊毒仙术：对随机两名敌军施加递减中毒层数。", "Venomous Immortal Art: Apply decaying poison stacks to 2 random enemies.")
+	_register_hero("zuoci", "左慈", "Zuo Ci", "qun", 2720, 100, 5.5, 3, "Immortal Aid", "遁甲济世", "signature", {"target_count":2, "heal_mult":1.70, "huatuo_bonus_mult":0.50, "thunder_mult":1.0}, "遁甲济世：治疗当前生命最低的两名友军，各恢复170%兵略值生命。", "Immortal Aid: Heal the two allies with the lowest current HP for 170% Strategy each.")
+	_register_hero("zhangjiao", "张角", "Zhang Jiao", "qun", 230, 100, 6.0, 3, "Yellow Sky Thunder", "黄天雷引", "signature", {"target_count":2, "mult":3.0, "zhangliang_bonus_mult":1.20, "zhangbao_bonus_targets":1, "zhangbao_stun_chance":0.30, "zhangbao_stun":1.5}, "黄天雷引：召唤雷电随机攻击两名敌军，各造成300%兵略值伤害。", "Yellow Sky Thunder: Call lightning on two random enemies for 300% Strategy damage each.")
+	_register_hero("zhangliang", "张梁", "Zhang Liang", "qun", 3520, 100, 6.0, 2, "Yellow Sky Weakening", "人公虚弱", "signature", {"target_count":2, "duration":4.0, "skill_reduction":0.5, "zhangjiao_bonus_targets":1, "zhangbao_duration_bonus":2.5}, "人公虚弱：随机使两名敌军虚弱4秒，兵略值降低0.5×兵略值。", "Yellow Sky Weakening: Weaken 2 enemies for 4s.")
+	_register_hero("zhangbao", "张宝", "Zhang Bao", "qun", 130, 100, 0.0, 1, "Earth General Detonation", "地公雷爆", "passive", {"target_count":2, "death_mult":9.0, "base_revives":1, "revive_hp_ratio":0.50, "zhangjiao_splash_mult":0.90, "zhangliang_bonus_revives":1}, "地公雷爆（被动）：阵亡时随机攻击两名敌军，各造成900%兵略值伤害，随后以50%最大生命值复生一次。", "Earth General Detonation: Strike 2 enemies for 900% Strategy on death, then revive once at 50% max HP.")
 
 func _register_hero(id: String, zh: String, en: String, faction: String, hp: int, skill_value: int, cooldown: float, range_tier: int, skill: String, zh_skill: String, ability: String, params: Dictionary, detail_zh: String, detail_en: String) -> void:
 	heroes[id] = {"zh":zh, "en":en, "f":faction, "hp":hp, "skill_value":skill_value, "cooldown":maxf(COOLDOWN_INPUT_MIN, cooldown), "range":range_tier, "skill":skill, "zh_skill":zh_skill, "summary":detail_zh, "en_summary":detail_en, "ability":ability, "ability_params":params, "detail_zh":detail_zh, "detail_en":detail_en}
@@ -357,53 +357,53 @@ func _apply_existing_faction_skill_reworks() -> void:
 
 	heroes.lvbu.skill = "Peerless Sweep"
 	heroes.lvbu.zh_skill = "无双横扫"
-	_set_skill("lvbu", {"mult":1.75, "dongzhuo_heal":0.40, "missing_hp_step":0.10, "diaochan_bonus_per_step":0.04, "chengong_repeat_chance":0.50}, "无双横扫：攻击正前方敌方前军及其左右相邻格，造成175%兵略值伤害。", "Peerless Sweep: Strike the facing enemy vanguard and its neighbors for 175% Strategy damage.")
+	_set_skill("lvbu", {"mult":2.20, "dongzhuo_heal":0.20, "missing_hp_step":0.10, "diaochan_bonus_per_step":0.03, "chengong_repeat_chance":0.30}, "无双横扫：对正前方敌方前军及其左右相邻格造成220%兵略值伤害。", "Peerless Sweep: Strike the facing enemy vanguard and its neighbors for 220% Strategy damage.")
 	heroes.dongzhuo.skill = "Tyrant's Might"
 	heroes.dongzhuo.zh_skill = "暴君横征"
-	_set_skill("dongzhuo", {"current_hp_ratio":0.07, "lvbu_current_hp_ratio":0.15, "diaochan_max_hp_bonus":0.50}, "暴君横征：对正前方敌军造成自身当前生命值7%的物理伤害。", "Tyrant's Might: Deal damage equal to 7% of current HP.")
+	_set_skill("dongzhuo", {"current_hp_ratio":0.20, "lvbu_current_hp_ratio":0.30, "diaochan_max_hp_bonus":0.40}, "暴君横征：对正前方敌军造成自身当前生命值20%的伤害。", "Tyrant's Might: Deal damage equal to 20% of current HP.")
 	heroes.dongzhuo.range = 2
 	heroes.diaochan.skill = "Beauty's Scheme"
 	heroes.diaochan.zh_skill = "美人离间"
-	_set_skill("diaochan", {"duration":3.0, "dongzhuo_duration":6.0, "forced_attack_interval":1.0, "forced_attack_mult":1.0, "target_mode":"random"}, "美人离间：随机魅惑一名敌军3秒，使其行动条停止。", "Beauty's Scheme: Charm a random enemy for 3s.")
+	_set_skill("diaochan", {"duration":4.0, "dongzhuo_duration_bonus":2.0, "dongzhuo_self_heal_mult":2.0, "forced_attack_interval":1.0, "forced_attack_mult":1.0, "target_mode":"random"}, "美人离间：随机魅惑一名敌军4秒，使其行动条停止。", "Beauty's Scheme: Charm a random enemy for 4s.")
 	heroes.chengong.skill = "Measured Formation"
 	heroes.chengong.zh_skill = "智迟谋速"
 	heroes.chengong.ability = "passive"
-	_set_skill("chengong", {"cooldown_reduction":1.0, "lvbu_bonus_reduction":1.0, "gaoshun_bonus_reduction":1.0}, "智迟谋速（被动）：陈宫及其同列友军的技能冷却减少1秒。", "Measured Formation: Chen Gong and allies in his column reduce cooldowns.")
+	_set_skill("chengong", {"cooldown_reduction":1.0, "lvbu_bonus_reduction":0.7, "gaoshun_bonus_reduction":0.7}, "智迟谋速（被动）：陈宫及其同列友军的技能冷却减少1秒。", "Measured Formation: Chen Gong and allies in his column reduce cooldowns by 1s.")
 	heroes.gaoshun.skill = "Formation Resolve"
 	heroes.gaoshun.zh_skill = "陷阵之志"
-	_set_skill("gaoshun", {"target_count":2, "mult":1.50, "vulnerable":0.40, "vulnerable_time":3.0, "lvbu_bonus_targets":2, "chengong_bonus_duration":3.0}, "陷阵之志：随机攻击两名敌军，造成150%兵略值伤害并施加3秒易碎。", "Formation Resolve: Strike 2 enemies for 150% Strategy and make them Fragile.")
+	_set_skill("gaoshun", {"target_count":2, "mult":2.20, "vulnerable":0.40, "vulnerable_time":3.5, "lvbu_bonus_targets":1, "chengong_bonus_duration":3.5}, "陷阵之志：随机攻击两名敌军，造成220%兵略值伤害并施加3.5秒易碎，易碎目标受到伤害提高0.4×兵略值%。", "Formation Resolve: Strike 2 enemies for 220% Strategy and inflict Fragile for 3.5s.")
 	heroes.yanliang.skill = "Hebei Fierce Assault"
 	heroes.yanliang.zh_skill = "河北猛袭"
-	_set_skill("yanliang", {"target_count":2, "wenchou_bonus_targets":2, "mult":1.75, "hit_bonus":0.15, "hit_bonus_cap":3.0}, "河北猛袭：随机攻击两名敌方中军或后军，造成175%兵略值伤害。", "Hebei Fierce Assault: Strike 2 enemy midguards or rearguards for 175% Strategy.")
+	_set_skill("yanliang", {"target_count":2, "wenchou_bonus_targets":1, "mult":2.0, "wenchou_damage_penalty_mult":0.30, "four_pillars_bonus_targets":1, "four_pillars_damage_bonus_mult":1.20}, "河北猛袭：随机攻击两名敌方中军或后军，造成200%兵略值伤害。", "Hebei Fierce Assault: Strike 2 enemy midguards or rearguards for 200% Strategy.")
 	heroes.wenchou.skill = "Hebei Breakthrough"
 	heroes.wenchou.zh_skill = "河北破阵"
-	_set_skill("wenchou", {"target_count":2, "yanliang_bonus_targets":2, "max_hp_ratio":0.02, "hit_bonus":0.15, "hit_bonus_cap":3.0}, "河北破阵：随机攻击两名敌方前军或中军，造成其最大生命值2%的伤害。", "Hebei Breakthrough: Strike 2 enemies for 2% max HP.")
+	_set_skill("wenchou", {"target_count":2, "yanliang_bonus_targets":1, "mult":3.0, "yanliang_damage_penalty_mult":0.50, "four_pillars_bonus_targets":1, "four_pillars_damage_bonus_mult":1.50}, "河北破阵：随机攻击两名敌方前军或中军，造成300%兵略值伤害。", "Hebei Breakthrough: Strike 2 enemy vanguards or midguards for 300% Strategy.")
 	heroes.gaolan.skill = "Column Valor"
 	heroes.gaolan.zh_skill = "列阵扬威"
 	heroes.gaolan.ability = "passive"
-	_set_skill("gaolan", {"skill_bonus":20.0, "zhanghe_skill_bonus":40.0, "four_pillars_skill_bonus":40.0}, "列阵扬威（被动）：高览同列友军的兵略值增加20点。", "Column Valor: Allies in Gao Lan's column gain 20 Strategy.")
+	_set_skill("gaolan", {"skill_bonus_ratio":0.20, "zhanghe_skill_bonus_ratio":0.25, "four_pillars_skill_bonus_ratio":0.25}, "列阵扬威（被动）：高览同列友军的兵略值增加0.2×高览兵略值。", "Column Valor: Allies in Gao Lan's column gain 20% of Gao Lan's Strategy.")
 	heroes.qunzhanghe.skill = "Hebei Ward"
 	heroes.qunzhanghe.zh_skill = "河北护阵"
-	_set_skill("qunzhanghe", {"target_count":2, "gaolan_bonus_targets":2, "four_pillars_bonus_targets":2, "shield_mult":2.0, "four_pillars_shield_mult":4.0}, "河北护阵：为当前生命值最低的两名友军施加可抵消200%兵略值伤害的护盾。", "Hebei Ward: Shield the 2 allies with the lowest current HP for 200% Strategy.")
+	_set_skill("qunzhanghe", {"target_count":2, "shield_mult":2.0, "gaolan_shield_bonus_mult":0.60, "four_pillars_bonus_targets":1, "four_pillars_shield_bonus_mult":1.0}, "河北护阵：为当前生命值最低的两名友军施加可抵消200%兵略值伤害的护盾。", "Hebei Ward: Shield the 2 allies with the lowest current HP for 200% Strategy.")
 	heroes.huatuo.skill = "Threefold Remedy"
 	heroes.huatuo.zh_skill = "青囊三济"
-	_set_skill("huatuo", {"target_count":3, "heal_mult":1.0, "zuoci_bonus_mult":0.5}, "青囊三济：治疗当前生命值最低的三名友军，各恢复100%兵略值生命。", "Threefold Remedy: Heal the three allies with the lowest current HP for 100% Strategy each.")
+	_set_skill("huatuo", {"target_count":3, "heal_mult":1.10, "yuji_bonus_mult":0.70, "zuoci_bonus_mult":0.30}, "青囊三济：治疗当前生命值最低的三名友军，各恢复110%兵略值生命。", "Threefold Remedy: Heal the three allies with the lowest current HP for 110% Strategy each.")
 	heroes.yuji.skill = "Venomous Immortal Art"
 	heroes.yuji.zh_skill = "蛊毒仙术"
-	_set_skill("yuji", {"target_count":2, "poison_ratio":0.005, "duration":4.0, "bond_bonus_targets":1, "bond_bonus_duration":1.0}, "蛊毒仙术：随机使两名敌军中毒4秒，每秒损失0.5%最大生命。", "Venomous Immortal Art: Poison two random enemies for 4s.")
+	_set_skill("yuji", {"target_count":2, "poison_stack_mult":1.40, "huatuo_bonus_targets":1, "zuoci_stack_bonus_mult":0.40}, "蛊毒仙术：对随机两名敌军施加1.4×兵略值的中毒层数；每秒受到层数等量伤害，随后层数向下取整减半，降至0时清除。", "Venomous Immortal Art: Apply decaying poison stacks to 2 random enemies.")
 	heroes.zuoci.skill = "Immortal Aid"
 	heroes.zuoci.zh_skill = "遁甲济世"
-	_set_skill("zuoci", {"target_count":2, "heal_mult":1.5, "huatuo_bonus_mult":0.5, "thunder_mult":1.5}, "遁甲济世：治疗当前生命值最低的两名友军，各恢复150%兵略值生命。", "Immortal Aid: Heal two allies for 150% Strategy each.")
+	_set_skill("zuoci", {"target_count":2, "heal_mult":1.70, "huatuo_bonus_mult":0.50, "thunder_mult":1.0}, "遁甲济世：治疗当前生命值最低的两名友军，各恢复170%兵略值生命。", "Immortal Aid: Heal two allies for 170% Strategy each.")
 	heroes.zhangjiao.skill = "Yellow Sky Thunder"
 	heroes.zhangjiao.zh_skill = "黄天雷引"
-	_set_skill("zhangjiao", {"target_count":2, "mult":2.0, "zhangliang_bonus_mult":0.5, "zhangbao_bonus_targets":1, "zhangbao_stun_chance":0.5, "zhangbao_stun":1.0}, "黄天雷引：召唤雷电随机攻击两名敌军，各造成200%兵略值伤害。", "Yellow Sky Thunder: Call lightning on two random enemies for 200% Strategy damage each.")
+	_set_skill("zhangjiao", {"target_count":2, "mult":3.0, "zhangliang_bonus_mult":1.20, "zhangbao_bonus_targets":1, "zhangbao_stun_chance":0.30, "zhangbao_stun":1.5}, "黄天雷引：召唤雷电随机攻击两名敌军，各造成300%兵略值伤害。", "Yellow Sky Thunder: Call lightning on two random enemies for 300% Strategy damage each.")
 	heroes.zhangliang.skill = "Yellow Sky Weakening"
 	heroes.zhangliang.zh_skill = "人公虚弱"
-	_set_skill("zhangliang", {"target_count":2, "duration":5.0, "skill_reduction":0.5, "bond_bonus_targets":1}, "人公虚弱：随机使两名敌军虚弱5秒，兵略值降低50%。", "Yellow Sky Weakening: Weaken two random enemies for 5s, reducing Strategy by 50%.")
+	_set_skill("zhangliang", {"target_count":2, "duration":4.0, "skill_reduction":0.5, "zhangjiao_bonus_targets":1, "zhangbao_duration_bonus":2.5}, "人公虚弱：随机使两名敌军虚弱4秒，兵略值降低0.5×兵略值。", "Yellow Sky Weakening: Weaken two random enemies for 4s, reducing Strategy based on Zhang Liang's Strategy.")
 	heroes.zhangbao.skill = "Earth General Detonation"
 	heroes.zhangbao.zh_skill = "地公雷爆"
 	heroes.zhangbao.ability = "passive"
-	_set_skill("zhangbao", {"target_count":2, "death_mult":2.0, "base_revives":1, "zhangjiao_splash_mult":0.5, "zhangliang_bonus_revives":1}, "地公雷爆（被动）：阵亡时随机攻击两名敌军，各造成200%兵略值伤害，随后可满血复生一次。", "Earth General Detonation: Strike two enemies for 200% Strategy on death, then revive once.")
+	_set_skill("zhangbao", {"target_count":2, "death_mult":9.0, "base_revives":1, "revive_hp_ratio":0.50, "zhangjiao_splash_mult":0.90, "zhangliang_bonus_revives":1}, "地公雷爆（被动）：阵亡时随机攻击两名敌军，各造成900%兵略值伤害，随后以50%最大生命值复生一次。", "Earth General Detonation: Strike two enemies for 900% Strategy on death, then revive once at 50% max HP.")
 
 func _configure_combat_profiles() -> void:
 	for hero_id in HERO_COOLDOWN_DEFAULTS:
@@ -488,7 +488,7 @@ func _make_roster_unit(team: String, hero_id: String) -> Dictionary:
 		"action":0.0, "action_gain_mult":1.0, "shield":0.0, "burn":0.0, "burn_damage":0.0, "burn_clock":0.0, "burn_effects":[],
 		"burn_missing_hp_scale":false, "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0,
 		"freeze":0.0, "freeze_shatter_damage":0.0, "freeze_source_id":"",
-		"poison":0.0, "poison_ratio":0.0, "poison_clock":0.0, "poison_source":"", "poison_effects":[],
+		"poison":0.0, "poison_ratio":0.0, "poison_stacks":0, "poison_clock":0.0, "poison_source":"", "poison_effects":[],
 		"stun":0.0, "charm":0.0, "damage_reduction":0.0, "damage_buff":0.0,
 		"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0,
 		"vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":0.0, "spell_ward":0,
@@ -505,7 +505,7 @@ func _make_roster_unit(team: String, hero_id: String) -> Dictionary:
 		"all_lifesteal":0.0, "all_lifesteal_time":0.0,
 		"skill_debuff":0.0, "kill_buff":0.0, "death_prevention":0.0,
 		"heal_multiplier":1.0, "charm_multiplier":1.0, "current_hp_ratio":0.06,
-		"skill_value_bonus":(float(enemy_strategy_bonus) if team == "enemy" else 0.0), "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "hebei_damage_stacks":0,
+		"skill_value_bonus":(float(enemy_strategy_bonus) if team == "enemy" else 0.0), "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false,
 		"charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0,
 		"skill_debuff_time":0.0, "zhangbao_revives_used":0
 	}

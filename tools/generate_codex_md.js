@@ -38,39 +38,54 @@ const factionBondEffect = {
 // ── BASE_STATS from registered_hero_balance.gd ──
 const baseStats = {
 	caocao:{hp:5470,skill:100.0,cooldown:5.6,range:1}, caoren:{hp:5620,skill:100.0,cooldown:5.2,range:1},
-	chengong:{hp:2280,skill:38.0,cooldown:0.0,range:3}, dailaidongzhu:{hp:4610,skill:100.0,cooldown:4.9,range:2},
+	chengong:{hp:2280,skill:100.0,cooldown:0.0,range:3}, dailaidongzhu:{hp:4610,skill:100.0,cooldown:4.9,range:2},
 	daqiao:{hp:2760,skill:100.0,cooldown:6.2,range:3}, dianwei:{hp:5260,skill:100.0,cooldown:5.2,range:1},
-	diaochan:{hp:2520,skill:32.0,cooldown:7.0,range:3}, dingfeng:{hp:4020,skill:100.0,cooldown:5.4,range:1},
-	dongzhuo:{hp:4680,skill:52.0,cooldown:5.5,range:2}, ganning:{hp:2960,skill:100.0,cooldown:6.0,range:2},
-	gaolan:{hp:2940,skill:38.0,cooldown:0.0,range:3}, gaoshun:{hp:4380,skill:44.0,cooldown:6.2,range:1},
+	diaochan:{hp:2520,skill:100.0,cooldown:6.5,range:3}, dingfeng:{hp:4020,skill:100.0,cooldown:5.4,range:1},
+	dongzhuo:{hp:4680,skill:100.0,cooldown:5.5,range:2}, ganning:{hp:2960,skill:100.0,cooldown:6.0,range:2},
+	gaolan:{hp:2940,skill:100.0,cooldown:0.0,range:3}, gaoshun:{hp:4380,skill:100.0,cooldown:6.5,range:1},
 	guanyu:{hp:4320,skill:64.0,cooldown:8.5,range:1}, guojia:{hp:2520,skill:100.0,cooldown:6.4,range:3},
 	huanggai:{hp:4200,skill:100.0,cooldown:8.8,range:1}, huangzhong:{hp:2960,skill:51.0,cooldown:4.0,range:3},
-	huatuo:{hp:2280,skill:32.0,cooldown:6.0,range:3}, jiangwei:{hp:3600,skill:53.0,cooldown:6.5,range:1},
+	huatuo:{hp:2280,skill:100.0,cooldown:5.5,range:3}, jiangwei:{hp:3600,skill:53.0,cooldown:6.5,range:1},
 	jiaxu:{hp:2740,skill:100.0,cooldown:6.4,range:3}, liubei:{hp:3120,skill:40.0,cooldown:4.0,range:3},
 	liushan:{hp:2880,skill:31.0,cooldown:4.0,range:2}, lusu:{hp:3120,skill:100.0,cooldown:5.6,range:3},
-	luxun:{hp:2820,skill:100.0,cooldown:5.8,range:3}, lvbu:{hp:4680,skill:70.0,cooldown:6.4,range:2},
+	luxun:{hp:2820,skill:100.0,cooldown:5.8,range:3}, lvbu:{hp:4680,skill:100.0,cooldown:6.5,range:2},
 	lvmeng:{hp:3200,skill:100.0,cooldown:5.6,range:2}, machao:{hp:3000,skill:61.0,cooldown:7.5,range:2},
 	madai:{hp:2980,skill:40.0,cooldown:20.0,range:3}, menghuo:{hp:4320,skill:47.0,cooldown:6.6,range:1},
-	pangtong:{hp:2960,skill:42.0,cooldown:7.0,range:3}, qunzhanghe:{hp:3600,skill:41.0,cooldown:5.6,range:1},
+	pangtong:{hp:2960,skill:42.0,cooldown:7.0,range:3}, qunzhanghe:{hp:3600,skill:100.0,cooldown:6.0,range:1},
 	simayi:{hp:2740,skill:100.0,cooldown:6.4,range:3}, sunce:{hp:3720,skill:100.0,cooldown:5.2,range:1},
 	sunjian:{hp:3300,skill:100.0,cooldown:15.0,range:1}, sunquan:{hp:3420,skill:100.0,cooldown:5.2,range:3},
 	sunshangxiang:{hp:2760,skill:100.0,cooldown:5.2,range:3}, taishici:{hp:3200,skill:100.0,cooldown:6.0,range:2},
-	weiyan:{hp:3780,skill:55.0,cooldown:5.0,range:1}, wenchou:{hp:3900,skill:49.0,cooldown:4.0,range:1},
+	weiyan:{hp:3780,skill:55.0,cooldown:5.0,range:1}, wenchou:{hp:3900,skill:100.0,cooldown:5.5,range:1},
 	xiahoudun:{hp:5900,skill:100.0,cooldown:5.2,range:1}, xiahouyuan:{hp:2740,skill:100.0,cooldown:5.2,range:3},
 	xiaoqiao:{hp:2760,skill:100.0,cooldown:6.2,range:3}, xuchu:{hp:5040,skill:100.0,cooldown:6.4,range:1},
 	xuhuang:{hp:5040,skill:100.0,cooldown:5.6,range:1}, xunyu:{hp:2880,skill:100.0,cooldown:6.4,range:3},
-	xusheng:{hp:3960,skill:100.0,cooldown:5.8,range:1}, yanliang:{hp:4200,skill:47.0,cooldown:4.0,range:1},
-	yuejin:{hp:2660,skill:100.0,cooldown:6.0,range:3}, yuji:{hp:2580,skill:44.0,cooldown:6.6,range:3},
-	yujin:{hp:4970,skill:100.0,cooldown:4.8,range:1}, zhangbao:{hp:1560,skill:65.0,cooldown:0.0,range:1},
+	xusheng:{hp:3960,skill:100.0,cooldown:5.8,range:1}, yanliang:{hp:4200,skill:100.0,cooldown:5.5,range:1},
+	yuejin:{hp:2660,skill:100.0,cooldown:6.0,range:3}, yuji:{hp:2580,skill:100.0,cooldown:5.5,range:3},
+	yujin:{hp:4970,skill:100.0,cooldown:4.8,range:1}, zhangbao:{hp:1560,skill:100.0,cooldown:0.0,range:1},
 	zhangfei:{hp:4680,skill:44.0,cooldown:6.5,range:2}, zhanghe:{hp:4540,skill:100.0,cooldown:5.2,range:1},
-	zhangjiao:{hp:2760,skill:44.0,cooldown:6.0,range:3}, zhangliang:{hp:2520,skill:38.0,cooldown:5.0,range:3},
+	zhangjiao:{hp:2760,skill:100.0,cooldown:6.0,range:3}, zhangliang:{hp:2520,skill:100.0,cooldown:6.0,range:3},
 	zhangliao:{hp:4180,skill:100.0,cooldown:6.8,range:2}, zhaoyun:{hp:3200,skill:59.0,cooldown:6.0,range:2},
 	zhouyu:{hp:2700,skill:100.0,cooldown:5.8,range:3}, zhugeliang:{hp:2880,skill:27.0,cooldown:6.0,range:3},
-	zhurong:{hp:3580,skill:100.0,cooldown:5.1,range:3}, zuoci:{hp:2400,skill:38.0,cooldown:6.0,range:3}
+	zhurong:{hp:3580,skill:100.0,cooldown:5.1,range:3}, zuoci:{hp:2400,skill:100.0,cooldown:5.5,range:3}
 };
 
 // ── PARAM_OVERRIDES from registered_hero_balance.gd ──
 const paramOverrides = {
+	lvbu:{mult:2.2,dongzhuo_heal:0.2,missing_hp_step:0.1,diaochan_bonus_per_step:0.03,chengong_repeat_chance:0.3},
+	dongzhuo:{current_hp_ratio:0.2,lvbu_current_hp_ratio:0.3,diaochan_max_hp_bonus:0.4},
+	diaochan:{duration:4.0,dongzhuo_duration_bonus:2.0,dongzhuo_self_heal_mult:2.0,forced_attack_interval:1.0,forced_attack_mult:1.0},
+	chengong:{cooldown_reduction:1.0,lvbu_bonus_reduction:0.7,gaoshun_bonus_reduction:0.7},
+	gaoshun:{target_count:2,mult:2.2,vulnerable:0.4,vulnerable_time:3.5,lvbu_bonus_targets:1,chengong_bonus_duration:3.5},
+	yanliang:{target_count:2,wenchou_bonus_targets:1,mult:2.0,wenchou_damage_penalty_mult:0.3,four_pillars_bonus_targets:1,four_pillars_damage_bonus_mult:1.2},
+	wenchou:{target_count:2,yanliang_bonus_targets:1,mult:3.0,yanliang_damage_penalty_mult:0.5,four_pillars_bonus_targets:1,four_pillars_damage_bonus_mult:1.5},
+	gaolan:{skill_bonus_ratio:0.2,zhanghe_skill_bonus_ratio:0.25,four_pillars_skill_bonus_ratio:0.25},
+	qunzhanghe:{target_count:2,shield_mult:2.0,gaolan_shield_bonus_mult:0.6,four_pillars_bonus_targets:1,four_pillars_shield_bonus_mult:1.0},
+	huatuo:{target_count:3,heal_mult:1.1,yuji_bonus_mult:0.7,zuoci_bonus_mult:0.3},
+	yuji:{target_count:2,poison_stack_mult:1.4,huatuo_bonus_targets:1,zuoci_stack_bonus_mult:0.4},
+	zuoci:{target_count:2,heal_mult:1.7,huatuo_bonus_mult:0.5,thunder_mult:1.0},
+	zhangjiao:{target_count:2,mult:3.0,zhangliang_bonus_mult:1.2,zhangbao_bonus_targets:1,zhangbao_stun_chance:0.3,zhangbao_stun:1.5},
+	zhangliang:{target_count:2,duration:4.0,skill_reduction:0.5,zhangjiao_bonus_targets:1,zhangbao_duration_bonus:2.5},
+	zhangbao:{target_count:2,death_mult:9.0,base_revives:1,revive_hp_ratio:0.5,zhangjiao_splash_mult:0.9,zhangliang_bonus_revives:1},
 	caocao:{bond_bonus_targets:1.0,favored_damage_bonus_mult:1.0,favored_stun_bonus:0.5,mult:1.5,stun:1.25,target_count:2.0},
 	caoren:{bond_bonus_targets:1,bond_reduction_skill_ratio:0.1,bond_stun_bonus:0.5,guard_time:5.0,mult:2.0,rear_reduction_skill_ratio:0.2,stun:1.0,target_count:2},
 	dailaidongzhu:{mult:4.9,column_mult:3.2,burning_bonus_mult:0.5,bond_burn:4.0,bond_burn_ratio:0.5,target_mode:"highest_action"},
@@ -186,21 +201,21 @@ const skillDetail = {
 	huanggai:"苦肉焚阵：消耗10%最大生命，对随机敌方一列造成200%兵略值加实际消耗生命40%的伤害；生命不足时消耗全部生命并在攻击后阵亡。",
 	dingfeng:"雪中奋短兵：攻击射程内行动条最高的敌人，造成400%兵略值伤害并压退25%行动条。",
 	xusheng:"宿卫水阵：冲击敌方前军整排，造成100%兵略值伤害，并留下4秒水阵，使该排行动速度降低0.3×兵略值%。",
-	lvbu:"无双横扫：对正前方敌方前军及其左右相邻格造成175%技能强度伤害。",
-	diaochan:"美人离间：随机魅惑一名敌军3秒，使其行动条停止。",
-	dongzhuo:"暴君横征：对正前方敌军造成自身当前生命值7%的伤害。",
+	lvbu:"无双横扫：对正前方敌方前军及其左右相邻格造成220%兵略值伤害。",
+	diaochan:"美人离间：随机魅惑一名敌军4秒，使其行动条停止。",
+	dongzhuo:"暴君横征：对正前方敌军造成自身当前生命值20%的伤害。",
 	chengong:"智迟谋速（被动）：陈宫及其同列友军的技能冷却减少1秒。",
-	gaoshun:"陷阵之志：随机攻击两名敌军，造成150%技能强度伤害并施加3秒易碎，期间受到伤害提高40%。",
-	yanliang:"河北猛袭：随机攻击两名敌方中军或后军，造成175%技能强度伤害。",
-	wenchou:"河北破阵：随机攻击两名敌方前军或中军，造成目标最大生命值2%的伤害。",
-	gaolan:"列阵扬威（被动）：高览同列友军的技能强度增加20点。",
-	qunzhanghe:"河北护阵：为当前生命值最低的两名友军施加可抵消200%技能强度伤害的护盾。",
-	huatuo:"青囊三济：治疗当前生命值最低的三名友军，各恢复100%技能强度生命。",
-	yuji:"蛊毒仙术：随机使两名敌军中毒4秒，每秒损失0.5%最大生命。",
-	zuoci:"遁甲济世：治疗当前生命值最低的两名友军，各恢复150%技能强度生命。",
-	zhangjiao:"黄天雷引：召唤雷电随机攻击两名敌军，各造成200%技能强度伤害。",
-	zhangliang:"人公虚弱：随机使两名敌军虚弱5秒，技能强度降低50%。",
-	zhangbao:"地公雷爆（被动）：阵亡时随机攻击两名敌军，各造成200%技能强度伤害，随后可满血复生一次。"
+	gaoshun:"陷阵之志：随机攻击两名敌军，造成220%兵略值伤害并施加3.5秒易碎，易碎目标受到伤害提高0.4×兵略值%。",
+	yanliang:"河北猛袭：随机攻击两名敌方中军或后军，造成200%兵略值伤害。",
+	wenchou:"河北破阵：随机攻击两名敌方前军或中军，造成300%兵略值伤害。",
+	gaolan:"列阵扬威（被动）：高览同列友军的兵略值增加0.2×兵略值。",
+	qunzhanghe:"河北护阵：为当前生命值最低的两名友军施加可抵消200%兵略值伤害的护盾。",
+	huatuo:"青囊三济：治疗当前生命值最低的三名友军，各恢复110%兵略值生命。",
+	yuji:"蛊毒仙术：对随机两名敌军施加1.4×兵略值的中毒层数，每秒受到层数等量伤害，随后层数向下取整减半，降至0时清除。",
+	zuoci:"遁甲济世：治疗当前生命值最低的两名友军，各恢复170%兵略值生命。",
+	zhangjiao:"黄天雷引：召唤雷电随机攻击两名敌军，各造成300%兵略值伤害。",
+	zhangliang:"人公虚弱：随机使两名敌军虚弱4秒，兵略值降低0.5×兵略值。",
+	zhangbao:"地公雷爆（被动）：阵亡时随机攻击两名敌军，各造成900%兵略值伤害，随后以50%最大生命值复生一次。"
 };
 
 // ── Bond data (from _hero_bond_detail) ──
@@ -240,14 +255,14 @@ const comboDefs = [
 	[["zhangliao","yuejin"],"逍遥津先锋",{zhangliao:"回旋刃的每段伤害增加40%兵略值。",yuejin:"攻击目标增加1名。"}],
 	[["zhanghe","xuhuang"],"巧变开山",{zhanghe:"眩晕时长增加1秒。",xuhuang:"伤害增加80%兵略值。"}],
 	[["zhouyu","luxun","lusu","lvmeng"],"四英杰",{zhouyu:"赤壁点火额外选择2个格子，灼烧伤害增加50%兵略值。",luxun:"火球总弹射次数增加2次，并施加3秒、每秒30%兵略值的灼烧。",lusu:"治疗最低当前生命的2名友军，各恢复400%兵略值并提高500最大生命。",lvmeng:"命中的后军恐惧5秒，行动条停止且每秒受到4%最大生命伤害。"}],
-	[["lvbu","dongzhuo"],"暴虐无双",{lvbu:"按无双横扫对武将造成的实际伤害40%恢复自身生命；护盾和空格伤害不计入。",dongzhuo:"暴君横征伤害由自身当前生命7%提高至15%。"}],
-	[["lvbu","diaochan"],"英雄美人",{lvbu:"每损失10%生命，无双横扫伤害提高4%。",diaochan:"魅惑期间，目标每秒随机攻击一名相邻友军，造成被魅惑者100%技能强度伤害。"}],
-	[["lvbu","chengong"],"谋定无双",{lvbu:"无双横扫有50%概率连续释放两次。",chengong:"智迟谋速的冷却减少额外增加1秒。"}],
-	[["lvbu","gaoshun"],"飞将陷阵",{lvbu:"无双横扫追加攻击正前方敌军对应的中军及其左右相邻格。",gaoshun:"陷阵之志的目标额外增加2名。"}],
-	[["dongzhuo","diaochan"],"暴君倾城",{dongzhuo:"自身最大生命值提高50%。",diaochan:"美人离间的魅惑持续时间由3秒延长至6秒。"}],
-	[["chengong","gaoshun"],"谋陷并驱",{chengong:"智迟谋速的冷却减少额外增加1秒。",gaoshun:"陷阵之志的易碎持续时间由3秒延长至6秒。"}],
-	[["yanliang","wenchou"],"河北双雄",{yanliang:"河北猛袭的技能目标额外增加2名。",wenchou:"河北破阵的技能目标额外增加2名。"}],
-	[["gaolan","qunzhanghe"],"河北同袍",{gaolan:"同列友军的技能强度加成由20点提高至40点。",qunzhanghe:"河北护阵的目标额外增加2名。"}],
+	[["lvbu","dongzhuo"],"暴虐无双",{lvbu:"按无双横扫对武将造成的实际伤害20%恢复自身生命；护盾和空格伤害不计入。",dongzhuo:"暴君横征伤害提高至自身当前生命值30%。"}],
+	[["lvbu","diaochan"],"英雄美人",{lvbu:"每损失10%生命，无双横扫伤害提高3%。",diaochan:"魅惑期间，目标每秒随机攻击一名相邻友军，造成被魅惑者100%兵略值伤害。"}],
+	[["lvbu","chengong"],"谋定无双",{lvbu:"无双横扫有30%概率连续释放两次。",chengong:"智迟谋速的冷却减少额外增加0.7秒。"}],
+	[["lvbu","gaoshun"],"飞将陷阵",{lvbu:"无双横扫追加攻击正前方敌军对应的中军。",gaoshun:"陷阵之志的目标额外增加1名。"}],
+	[["dongzhuo","diaochan"],"暴君倾城",{dongzhuo:"自身最大生命值提高40%。",diaochan:"魅惑持续时间增加2秒，且貂蝉为自己恢复200%兵略值生命。"}],
+	[["chengong","gaoshun"],"谋陷并驱",{chengong:"智迟谋速的冷却减少额外增加0.7秒。",gaoshun:"陷阵之志的易碎持续时间增加3.5秒。"}],
+	[["yanliang","wenchou"],"河北双雄",{yanliang:"技能目标增加1名，伤害减少30%兵略值。",wenchou:"技能目标增加1名，伤害减少50%兵略值。"}],
+	[["gaolan","qunzhanghe"],"河北同袍",{gaolan:"同列友军的兵略值加成提高至0.25×兵略值。",qunzhanghe:"护盾值增加60%兵略值。"}],
 	[["zhangliao","yuejin","zhanghe","xuhuang","yujin"],"五子良将",{zhangliao:"回旋刃每段伤害增加80%兵略值；命中者受到的伤害增加0.4×兵略值%，持续5秒。",yuejin:"目标增加1名，伤害增加50%兵略值，并施加5秒重伤，使治疗和自身回复降低0.5×兵略值%。",zhanghe:"攻击扩散至主目标周围相连的两名随机敌军；伤害增加200%兵略值，目标攻击前已眩晕时额外增加400%兵略值。",xuhuang:"改为攻击随机一整排，眩晕时长增加2秒。",yujin:"施法目标增加1名，护盾值增加100%兵略值。"}],
 	[["xiahouyuan","caoren"],"神速镇远",{xiahouyuan:"冷却缩短0.5秒，眩晕延长0.5秒。",caoren:"目标增加1名，眩晕延长0.5秒，后军伤害减免提高0.1×兵略值%。"}],
 	[["xiahouyuan","xiahoudun"],"夏侯同心",{xiahouyuan:"冷却缩短0.5秒，眩晕延长0.5秒。",xiahoudun:"目标增加1名，眩晕延长0.5秒，前军伤害减免提高0.1×兵略值%。"}],
@@ -269,13 +284,13 @@ const comboDefs = [
 	[["taishici","ganning"],"江表双锋",{taishici:"造成的伤害增加60%兵略值。",ganning:"技能冷却减少1.2秒。"}],
 	[["luxun","sunquan"],"君臣同心",{luxun:"直接伤害增加80%兵略值，对已灼烧目标额外增加40%兵略值。",sunquan:"伤害改为孙权当前生命值的11%。"}],
 	[["dingfeng","xusheng"],"江表虎臣",{dingfeng:"伤害增加100%兵略值，压退改为70%行动条。",xusheng:"改为冲击随机一排，水阵持续时间增加3秒。"}],
-	[["yanliang","wenchou","qunzhanghe","gaolan"],"河北四庭柱",{yanliang:"技能间隔内每次实际受伤使下次技能伤害提高15%，最高提高300%，释放后清空。",wenchou:"技能间隔内每次实际受伤使下次技能伤害提高15%，最高提高300%，释放后清空。",qunzhanghe:"技能目标再增加2名，护盾由200%提高至400%技能强度。",gaolan:"光环改为同排和同列全部友军技能强度增加40点。"}],
-	[["huatuo","yuji"],"医道同源",{huatuo:"青囊三济会清除被治疗者身上的全部减益。",yuji:"蛊毒仙术增加1个目标，中毒持续时间由4秒延长至5秒。"}],
-	[["huatuo","zuoci"],"济世仙缘",{huatuo:"青囊三济的治疗倍率由100%提高至150%技能强度。",zuoci:"遁甲济世的治疗倍率由150%提高至200%技能强度。"}],
-	[["yuji","zuoci"],"方仙同门",{yuji:"蛊毒仙术增加1个目标，中毒持续时间增加1秒。",zuoci:"治疗时同时随机雷击两名敌军，各造成150%技能强度伤害。"}],
-	[["zhangjiao","zhangliang"],"天人同道",{zhangjiao:"黄天雷引的伤害倍率由200%提高至250%技能强度。",zhangliang:"人公虚弱增加1个目标。"}],
-	[["zhangjiao","zhangbao"],"天地雷契",{zhangjiao:"黄天雷引增加1个目标，每名受击者有50%概率眩晕1秒。",zhangbao:"地公雷爆会波及每个主目标周围上下、左右与斜对角相邻的武将，造成50%技能强度伤害。"}],
-	[["zhangliang","zhangbao"],"地人续命",{zhangliang:"人公虚弱增加1个目标。",zhangbao:"本场战斗额外复生一次，总共可复生两次。"}]
+	[["yanliang","wenchou","qunzhanghe","gaolan"],"河北四庭柱",{yanliang:"技能目标增加1名，伤害增加120%兵略值。",wenchou:"技能目标增加1名，伤害增加150%兵略值。",qunzhanghe:"技能目标增加1名，护盾增加100%兵略值。",gaolan:"光环改为同排和同列全部友军兵略值增加0.25×兵略值。"}],
+	[["huatuo","yuji"],"医道同源",{huatuo:"青囊三济治疗增加70%兵略值。",yuji:"蛊毒仙术增加1个目标。"}],
+	[["huatuo","zuoci"],"济世仙缘",{huatuo:"青囊三济增加30%兵略值，且清除目标全部减益。",zuoci:"遁甲济世的治疗倍率增加50%兵略值。"}],
+	[["yuji","zuoci"],"方仙同门",{yuji:"施加的中毒层数增加0.4×兵略值。",zuoci:"治疗时同时随机雷击两名敌军，各造成100%兵略值伤害。"}],
+	[["zhangjiao","zhangliang"],"天人同道",{zhangjiao:"黄天雷引的伤害增加120%兵略值。",zhangliang:"人公虚弱增加1个目标。"}],
+	[["zhangjiao","zhangbao"],"天地雷契",{zhangjiao:"黄天雷引增加1个目标，每名受击者有30%概率眩晕1.5秒。",zhangbao:"地公雷爆波及主目标周围八格武将，造成90%兵略值伤害。"}],
+	[["zhangliang","zhangbao"],"地人续命",{zhangliang:"人公虚弱持续时间增加2.5秒。",zhangbao:"可以额外复生1次。"}]
 ];
 
 // ── Computation helpers (mirroring GDScript logic) ──
@@ -349,21 +364,21 @@ function starSkillValues(id) {
 		case "xiaoqiao": v.push(fmt(`随机${params.target_count ?? 2}名后军：减速${(params.slow_skill_ratio ?? 0.35)*100}%，持续${(params.slow_time ?? 6.0).toFixed(1)}秒`)); break;
 		case "dingfeng": v.push(fmt(`行动条最高敌人受到${round(skillBase*(params.mult ?? 4.0))}伤害并压退${params.action_reduction ?? 25}%行动条`)); break;
 		case "xusheng": v.push(fmt(`前军整排每格${round(skillBase*(params.mult ?? 1.0))}伤害并减速${(params.slow_skill_ratio ?? 0.30)*100}%，持续${params.slow_time ?? 4}秒`)); break;
-		case "lvbu": v.push(fmt(`正面三格每格约${round(skillBase*(params.mult ?? 1.75))}物理伤害`)); break;
-		case "diaochan": v.push(fmt(`随机魅惑${(params.duration ?? 3.0).toFixed(2)}秒`)); break;
-		case "dongzhuo": v.push(fmt(`正前方受到董卓当前生命${(params.current_hp_ratio ?? 0.07)*100}%伤害`)); break;
+		case "lvbu": v.push(fmt(`正面三格每格约${round(skillBase*(params.mult ?? 2.2))}伤害`)); break;
+		case "diaochan": v.push(fmt(`随机魅惑${(params.duration ?? 4.0).toFixed(2)}秒`)); break;
+		case "dongzhuo": v.push(fmt(`正前方受到董卓当前生命${(params.current_hp_ratio ?? 0.2)*100}%伤害`)); break;
 		case "chengong": v.push(fmt(`同列友军技能冷却减少${(params.cooldown_reduction ?? 1.0).toFixed(1)}秒`)); break;
-		case "gaoshun": v.push(fmt(`随机${params.target_count ?? 2}人各受到${round(skillBase*(params.mult ?? 1.5))}伤害并易碎${(params.vulnerable_time ?? 3.0).toFixed(1)}秒`)); break;
-		case "yanliang": v.push(fmt(`随机${params.target_count ?? 2}名中/后军各受到${round(skillBase*(params.mult ?? 1.75))}伤害`)); break;
-		case "wenchou": v.push(fmt(`随机${params.target_count ?? 2}名前/中军各受到2%最大生命伤害`)); break;
-		case "gaolan": v.push(fmt(`同列友军技能强度+${params.skill_bonus ?? 20}`)); break;
+		case "gaoshun": v.push(fmt(`随机${params.target_count ?? 2}人各受到${round(skillBase*(params.mult ?? 2.2))}伤害并易碎${(params.vulnerable_time ?? 3.5).toFixed(1)}秒`)); break;
+		case "yanliang": v.push(fmt(`随机${params.target_count ?? 2}名中/后军各受到${round(skillBase*(params.mult ?? 2.0))}伤害`)); break;
+		case "wenchou": v.push(fmt(`随机${params.target_count ?? 2}名前/中军各受到${round(skillBase*(params.mult ?? 3.0))}伤害`)); break;
+		case "gaolan": v.push(fmt(`同列友军兵略值+${round(skillBase*(params.skill_bonus_ratio ?? 0.2))}`)); break;
 		case "qunzhanghe": v.push(fmt(`生命最低${params.target_count ?? 2}名友军各获得${round(skillBase*(params.shield_mult ?? 2.0))}护盾`)); break;
-		case "huatuo": v.push(fmt(`生命最低3名友军各恢复${round(skillBase)}生命`)); break;
-		case "yuji": v.push(`随机2人中毒4秒，每秒损失0.5%最大生命`); break;
-		case "zuoci": v.push(fmt(`生命最低2名友军各恢复${round(skillBase*1.5)}生命`)); break;
-		case "zhangjiao": v.push(fmt(`随机2人各受到${round(skillBase*2.0)}雷击伤害`)); break;
-		case "zhangliang": v.push(`随机2人技能强度降低50%，持续5秒`); break;
-		case "zhangbao": v.push(fmt(`每次阵亡随机2人各受到${round(skillBase*2.0)}伤害；基础复生1次`)); break;
+		case "huatuo": v.push(fmt(`生命最低3名友军各恢复${round(skillBase*(params.heal_mult ?? 1.1))}生命`)); break;
+		case "yuji": v.push(fmt(`随机2人获得${round(skillBase*(params.poison_stack_mult ?? 1.4))}层递减中毒`)); break;
+		case "zuoci": v.push(fmt(`生命最低2名友军各恢复${round(skillBase*(params.heal_mult ?? 1.7))}生命`)); break;
+		case "zhangjiao": v.push(fmt(`随机2人各受到${round(skillBase*(params.mult ?? 3.0))}雷击伤害`)); break;
+		case "zhangliang": v.push(`随机2人兵略值降低50%，持续4秒`); break;
+		case "zhangbao": v.push(fmt(`每次阵亡随机2人各受到${round(skillBase*(params.death_mult ?? 9.0))}伤害；以50%生命复生1次`)); break;
 		default:
 			if (["strike","strike_magic","drain","control","row","row_magic"].includes(ability))
 				v.push(fmt(`每个命中目标约${round(skillBase*(params.mult ?? 1.0))}伤害`));

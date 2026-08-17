@@ -510,7 +510,10 @@ func _inspector_debuffs(unit: Dictionary) -> String:
 	if not poisons.is_empty():
 		for index in poisons.size():
 			var effect: Dictionary = poisons[index]
-			lines.append(t("中毒", "Poison") + " #" + str(index + 1) + "  " + _inspector_number(float(effect.get("time", 0.0))) + "s · " + _inspector_number(float(effect.get("ratio", 0.0)) * 100.0) + "% Max HP/s")
+			if effect.has("stacks"):
+				lines.append(t("中毒", "Poison") + " #" + str(index + 1) + "  " + t("层数 ", "stacks ") + str(int(effect.get("stacks", 0))))
+			else:
+				lines.append(t("中毒", "Poison") + " #" + str(index + 1) + "  " + _inspector_number(float(effect.get("time", 0.0))) + "s · " + _inspector_number(float(effect.get("ratio", 0.0)) * 100.0) + "% Max HP/s")
 	elif float(unit.get("poison", 0.0)) > 0.0:
 		lines.append(t("中毒 ", "Poison ") + _inspector_number(float(unit.poison)) + "s · " + _inspector_number(float(unit.get("poison_ratio", 0.0)) * 100.0) + "% Max HP/s")
 	if float(unit.get("stun", 0.0)) > 0.0: lines.append(t("眩晕 ", "Stun ") + _inspector_number(float(unit.stun)) + "s")
@@ -1391,21 +1394,21 @@ func _bond_graph_data(faction: String) -> Dictionary:
 		"qun":{
 			"faction":["chaos_struggle", "群", "Qun", "2 / 5 / 8", "全体群雄武将技能冷却缩短2%/5%/8%。8人时，每次释放技能有8%概率连续释放两次。", "All Qun heroes gain 2%/5%/8% skill cooldown reduction. At 8, every cast has an 8% chance to cast twice in succession."],
 			"bonds":[
-				["tyrant_peerless", "暴虐无双", "Tyrant and Peerless", ["lvbu", "dongzhuo"], "2人", "2 heroes", "吕布按实际伤害的40%回血；董卓伤害提高至自身当前生命15%。", "Lu Bu heals for 40% of actual damage; Dong Zhuo rises to 15% of his current HP."],
-				["hero_beauty", "英雄美人", "Hero and Beauty", ["lvbu", "diaochan"], "2人", "2 heroes", "吕布每损失10%生命增伤4%；被貂蝉魅惑者每秒攻击相邻友军。", "Lu Bu gains 4% damage per 10% HP missing; charmed enemies attack adjacent allies each second."],
-				["peerless_strategy", "谋定无双", "Peerless Strategy", ["lvbu", "chengong"], "2人", "2 heroes", "吕布横扫有50%概率再释放一次；陈宫冷却光环额外减少1秒。", "Lu Bu has 50% chance to sweep twice; Chen Gong's aura reduces another 1s."],
-				["flying_formation", "飞将陷阵", "Flying General Formation", ["lvbu", "gaoshun"], "2人", "2 heroes", "吕布横扫追加中军三格；高顺技能额外攻击2人。", "Lu Bu also sweeps 3 midguard tiles; Gao Shun gains 2 targets."],
-				["tyrant_beauty", "暴君倾城", "Tyrant and Beauty", ["dongzhuo", "diaochan"], "2人", "2 heroes", "董卓最大生命提高50%；貂蝉魅惑延长至6秒。", "Dong Zhuo gains 50% max HP; Diao Chan's charm lasts 6s."],
-				["strategy_formation", "谋陷并驱", "Strategy and Formation", ["chengong", "gaoshun"], "2人", "2 heroes", "陈宫冷却光环额外减少1秒；高顺易碎延长至6秒。", "Chen Gong's aura reduces another 1s; Gao Shun's Fragile lasts 6s."],
-				["hebei_twins", "河北双雄", "Hebei Twin Champions", ["yanliang", "wenchou"], "2人", "2 heroes", "颜良、文丑的技能目标各增加2名。", "Yan Liang and Wen Chou each gain 2 targets."],
-				["hebei_comrades", "河北同袍", "Hebei Comrades", ["gaolan", "qunzhanghe"], "2人", "2 heroes", "高览同列兵略值加成提高至40；群张郃护盾目标增加2名。", "Gao Lan's column aura rises to +40 Strategy; Zhang He gains 2 shield targets."],
-				["hebei_pillars", "河北四庭柱", "Hebei Pillars", ["yanliang", "wenchou", "qunzhanghe", "gaolan"], "4人", "4 heroes", "颜良、文丑受击为下次技能叠加15%伤害，最高300%；高览扩大同排同列40兵略值；群张郃再加2目标且护盾提高至400%。", "Yan Liang and Wen Chou gain 15% next-cast damage per hit up to 300%; Gao Lan grants +40 Strategy across his row and column; Zhang He gains 2 more targets and 400% shields."],
-				["medicine_immortal", "医道同源", "Medicine and Immortality", ["huatuo", "yuji"], "2人", "2 heroes", "华佗治疗同时清除全部减益；于吉中毒目标+1且持续时间+1秒。", "Hua Tuo's healing cleanses all debuffs; Yu Ji gains 1 poison target and +1s duration."],
-				["immortal_healers", "济世仙缘", "Immortal Healers", ["huatuo", "zuoci"], "2人", "2 heroes", "华佗和左慈的治疗倍率各提高50%兵略值。", "Hua Tuo and Zuo Ci each gain +50% Strategy healing ratio."],
-				["fangshi_lineage", "方仙同门", "Immortal Lineage", ["yuji", "zuoci"], "2人", "2 heroes", "于吉中毒目标+1且持续时间+1秒；左慈治疗时追加两道150%天雷。", "Yu Ji gains 1 poison target and +1s duration; Zuo Ci adds two 150% Strategy thunderbolts."],
-				["heaven_man", "天人同道", "Heaven and Man", ["zhangjiao", "zhangliang"], "2人", "2 heroes", "张角雷击倍率提高50%；张梁虚弱目标+1。", "Zhang Jiao gains +50% Strategy ratio; Zhang Liang gains 1 weaken target."],
-				["heaven_earth", "天地雷契", "Heaven and Earth", ["zhangjiao", "zhangbao"], "2人", "2 heroes", "张角雷击目标+1且有50%概率眩晕1秒；张宝自爆波及目标周围八格。", "Zhang Jiao gains 1 target and 50% chance to stun for 1s; Zhang Bao's detonation splashes all eight neighboring tiles."],
-				["earth_man", "地人续命", "Earth and Man", ["zhangliang", "zhangbao"], "2人", "2 heroes", "张梁虚弱目标+1；张宝额外复生一次。", "Zhang Liang gains 1 weaken target; Zhang Bao gains one additional revival."]
+				["tyrant_peerless", "暴虐无双", "Tyrant and Peerless", ["lvbu", "dongzhuo"], "2人", "2 heroes", "吕布按横扫实际伤害的20%回血；董卓伤害提高至自身当前生命30%。", "Lu Bu heals for 20% of actual sweep damage; Dong Zhuo deals 30% of current HP."],
+				["hero_beauty", "英雄美人", "Hero and Beauty", ["lvbu", "diaochan"], "2人", "2 heroes", "吕布每损失10%生命增伤3%；被貂蝉魅惑者每秒攻击相邻友军。", "Lu Bu gains 3% damage per 10% HP missing; charmed enemies attack adjacent allies each second."],
+				["peerless_strategy", "谋定无双", "Peerless Strategy", ["lvbu", "chengong"], "2人", "2 heroes", "吕布横扫有30%概率再释放一次；陈宫冷却光环额外减少0.7秒。", "Lu Bu has a 30% repeat chance; Chen Gong's aura reduces another 0.7s."],
+				["flying_formation", "飞将陷阵", "Flying General Formation", ["lvbu", "gaoshun"], "2人", "2 heroes", "吕布横扫追加正前方对应中军；高顺技能额外攻击1人。", "Lu Bu also strikes the corresponding midguard; Gao Shun gains 1 target."],
+				["tyrant_beauty", "暴君倾城", "Tyrant and Beauty", ["dongzhuo", "diaochan"], "2人", "2 heroes", "董卓最大生命提高40%；貂蝉魅惑延长2秒并恢复自身200%兵略值生命。", "Dong Zhuo gains 40% max HP; Diao Chan gains 2s charm and heals herself for 200% Strategy."],
+				["strategy_formation", "谋陷并驱", "Strategy and Formation", ["chengong", "gaoshun"], "2人", "2 heroes", "陈宫冷却光环额外减少0.7秒；高顺易碎延长3.5秒。", "Chen Gong's aura reduces another 0.7s; Gao Shun's Fragile gains 3.5s."],
+				["hebei_twins", "河北双雄", "Hebei Twin Champions", ["yanliang", "wenchou"], "2人", "2 heroes", "颜良、文丑各增加1个目标，并分别减少30%/50%兵略值伤害。", "Yan Liang and Wen Chou each gain 1 target but lose 30%/50% Strategy damage."],
+				["hebei_comrades", "河北同袍", "Hebei Comrades", ["gaolan", "qunzhanghe"], "2人", "2 heroes", "高览同列加成提高至0.25×兵略值；群张郃护盾增加60%兵略值。", "Gao Lan's column aura rises to 0.25×Strategy; Zhang He's shield gains 60% Strategy."],
+				["hebei_pillars", "河北四庭柱", "Hebei Pillars", ["yanliang", "wenchou", "qunzhanghe", "gaolan"], "4人", "4 heroes", "颜良、文丑各增加1个目标并增加120%/150%兵略值伤害；高览扩大同排同列0.25×兵略值；群张郃目标+1、护盾增加100%兵略值。", "Yan Liang and Wen Chou gain a target and damage; Gao Lan expands his aura; Zhang He gains a target and 100% Strategy shielding."],
+				["medicine_immortal", "医道同源", "Medicine and Immortality", ["huatuo", "yuji"], "2人", "2 heroes", "华佗治疗增加70%兵略值；于吉中毒目标+1。", "Hua Tuo gains 70% Strategy healing; Yu Ji gains 1 poison target."],
+				["immortal_healers", "济世仙缘", "Immortal Healers", ["huatuo", "zuoci"], "2人", "2 heroes", "华佗治疗增加30%兵略值并清除全部减益；左慈治疗增加50%兵略值。", "Hua Tuo gains healing and cleansing; Zuo Ci gains 50% Strategy healing."],
+				["fangshi_lineage", "方仙同门", "Immortal Lineage", ["yuji", "zuoci"], "2人", "2 heroes", "于吉施加的中毒层数增加0.4×兵略值；左慈治疗时追加两道100%兵略值天雷。", "Yu Ji gains poison stacks; Zuo Ci adds two 100% Strategy thunderbolts."],
+				["heaven_man", "天人同道", "Heaven and Man", ["zhangjiao", "zhangliang"], "2人", "2 heroes", "张角伤害增加120%兵略值；张梁虚弱目标+1。", "Zhang Jiao gains 120% Strategy damage; Zhang Liang gains 1 target."],
+				["heaven_earth", "天地雷契", "Heaven and Earth", ["zhangjiao", "zhangbao"], "2人", "2 heroes", "张角目标+1且有30%概率眩晕1.5秒；张宝自爆以90%兵略值波及目标周围八格。", "Zhang Jiao gains 1 target and a 30% 1.5s stun chance; Zhang Bao splashes nearby units for 90% Strategy."],
+				["earth_man", "地人续命", "Earth and Man", ["zhangliang", "zhangbao"], "2人", "2 heroes", "张梁虚弱延长2.5秒；张宝额外复生一次。", "Zhang Liang's weaken gains 2.5s; Zhang Bao gains one additional revival."]
 			]
 		}
 	}
@@ -1857,21 +1860,21 @@ func _skill_detail(hero_id: String) -> String:
 		"huanggai": return t("苦肉焚阵：消耗10%最大生命，对随机敌方一列造成200%兵略值加实际消耗生命40%的伤害；生命不足时消耗全部生命并在攻击后阵亡。", "Bitter-Flesh Column: Spend 10% max HP to damage a random enemy column for 200% Strategy plus 40% of HP spent.")
 		"dingfeng": return t("雪中奋短兵：攻击射程内行动条最高的敌人，造成400%兵略值伤害并压退25%行动条。", "Snowbound Short Blades: Strike the reachable enemy with the highest gauge for 400% Strategy and push it back 25% gauge.")
 		"xusheng": return t("宿卫水阵：冲击敌方前军整排，造成100%兵略值伤害，并留下4秒水阵，使该排行动速度降低0.3×兵略值%。", "Guardian Water Formation: Strike the enemy vanguard row for 100% Strategy and slow its gauge speed by 0.3×Strategy% for 4s.")
-		"lvbu": return t("无双横扫：对正前方敌方前军及其左右相邻格造成175%兵略值伤害。", "Peerless Sweep: Strike the facing enemy vanguard and its left/right neighbors for 175% Strategy damage.")
-		"diaochan": return t("美人离间：随机魅惑一名敌军3秒，使其行动条停止。", "Beauty's Scheme: Charm a random enemy for 3s, stopping its action gauge.")
-		"dongzhuo": return t("暴君横征：对正前方敌军造成自身当前生命值7%的伤害。", "Tyrant's Might: Deal damage equal to 7% of Dong Zhuo's current HP to the facing enemy.")
+		"lvbu": return t("无双横扫：对正前方敌方前军及其左右相邻格造成220%兵略值伤害。", "Peerless Sweep: Strike the facing enemy vanguard and its left/right neighbors for 220% Strategy damage.")
+		"diaochan": return t("美人离间：随机魅惑一名敌军4秒，使其行动条停止。", "Beauty's Scheme: Charm a random enemy for 4s, stopping its action gauge.")
+		"dongzhuo": return t("暴君横征：对正前方敌军造成自身当前生命值20%的伤害。", "Tyrant's Might: Deal damage equal to 20% of Dong Zhuo's current HP to the facing enemy.")
 		"chengong": return t("智迟谋速（被动）：陈宫及其同列友军的技能冷却减少1秒。", "Measured Formation (Passive): Chen Gong and allies in his column reduce skill cooldowns by 1s.")
-		"gaoshun": return t("陷阵之志：随机攻击两名敌军，造成150%兵略值伤害并施加3秒易碎，期间受到伤害提高40%。", "Formation Resolve: Strike 2 random enemies for 150% Strategy and inflict 3s Fragile, increasing damage taken by 40%.")
-		"yanliang": return t("河北猛袭：随机攻击两名敌方中军或后军，造成175%兵略值伤害。", "Hebei Fierce Assault: Strike 2 random enemy midguards or rearguards for 175% Strategy damage.")
-		"wenchou": return t("河北破阵：随机攻击两名敌方前军或中军，造成目标最大生命值2%的伤害。", "Hebei Breakthrough: Strike 2 random enemy vanguards or midguards for 2% of each target's max HP.")
-		"gaolan": return t("列阵扬威（被动）：高览同列友军的兵略值增加20点。", "Column Valor (Passive): Allies in Gao Lan's column gain 20 Strategy.")
+		"gaoshun": return t("陷阵之志：随机攻击两名敌军，造成220%兵略值伤害并施加3.5秒易碎，易碎目标受到伤害提高0.4×兵略值%。", "Formation Resolve: Strike 2 random enemies for 220% Strategy and inflict 3.5s Fragile.")
+		"yanliang": return t("河北猛袭：随机攻击两名敌方中军或后军，造成200%兵略值伤害。", "Hebei Fierce Assault: Strike 2 random enemy midguards or rearguards for 200% Strategy damage.")
+		"wenchou": return t("河北破阵：随机攻击两名敌方前军或中军，造成300%兵略值伤害。", "Hebei Breakthrough: Strike 2 random enemy vanguards or midguards for 300% Strategy damage.")
+		"gaolan": return t("列阵扬威（被动）：高览同列友军的兵略值增加0.2×兵略值。", "Column Valor (Passive): Allies in Gao Lan's column gain 0.2× his Strategy.")
 		"qunzhanghe": return t("河北护阵：为当前生命值最低的两名友军施加可抵消200%兵略值伤害的护盾。", "Hebei Ward: Shield the 2 allies with the lowest current HP for 200% Strategy.")
-		"huatuo": return t("青囊三济：治疗当前生命值最低的三名友军，各恢复100%兵略值生命。", "Threefold Remedy: Heal the three allies with the lowest current HP for 100% Strategy each.")
-		"yuji": return t("蛊毒仙术：随机使两名敌军中毒4秒，每秒损失0.5%最大生命。", "Venomous Immortal Art: Poison two random enemies for 4s, dealing 0.5% max HP each second.")
-		"zuoci": return t("遁甲济世：治疗当前生命值最低的两名友军，各恢复150%兵略值生命。", "Immortal Aid: Heal the two allies with the lowest current HP for 150% Strategy each.")
-		"zhangjiao": return t("黄天雷引：召唤雷电随机攻击两名敌军，各造成200%兵略值伤害。", "Yellow Sky Thunder: Call lightning on two random enemies for 200% Strategy damage each.")
-		"zhangliang": return t("人公虚弱：随机使两名敌军虚弱5秒，兵略值降低50%。", "Yellow Sky Weakening: Weaken two random enemies for 5s, reducing Strategy by 50%.")
-		"zhangbao": return t("地公雷爆（被动）：阵亡时随机攻击两名敌军，各造成200%兵略值伤害，随后可满血复生一次。", "Earth General Detonation (Passive): On death, strike two random enemies for 200% Strategy, then revive once at full HP.")
+		"huatuo": return t("青囊三济：治疗当前生命值最低的三名友军，各恢复110%兵略值生命。", "Threefold Remedy: Heal the three allies with the lowest current HP for 110% Strategy each.")
+		"yuji": return t("蛊毒仙术：对随机两名敌军施加1.4×兵略值的中毒层数；每秒受到层数等量伤害，随后层数向下取整减半，降至0时清除。", "Venomous Immortal Art: Apply decaying poison stacks to two random enemies.")
+		"zuoci": return t("遁甲济世：治疗当前生命值最低的两名友军，各恢复170%兵略值生命。", "Immortal Aid: Heal the two allies with the lowest current HP for 170% Strategy each.")
+		"zhangjiao": return t("黄天雷引：召唤雷电随机攻击两名敌军，各造成300%兵略值伤害。", "Yellow Sky Thunder: Call lightning on two random enemies for 300% Strategy damage each.")
+		"zhangliang": return t("人公虚弱：随机使两名敌军虚弱4秒，兵略值降低0.5×兵略值。", "Yellow Sky Weakening: Weaken two random enemies for 4s, reducing Strategy based on Zhang Liang's Strategy.")
+		"zhangbao": return t("地公雷爆（被动）：阵亡时随机攻击两名敌军，各造成900%兵略值伤害，随后以50%最大生命值复生一次。", "Earth General Detonation (Passive): On death, strike two random enemies for 900% Strategy, then revive once at 50% max HP.")
 	return _true_damage_text(_skill_detail_legacy(hero_id))
 
 func _bond_entry(name_zh: String, name_en: String, member_ids: Array, effect_zh: String, effect_en: String) -> String:
@@ -1938,14 +1941,14 @@ func _hero_bond_detail(hero_id: String) -> String:
 		[["zhangliao", "yuejin"], "逍遥津先锋", "Hefei Vanguard", {"zhangliao":["回旋刃的每段伤害增加40%兵略值。", "Each boomerang pass gains 40% Strategy damage."], "yuejin":["攻击目标增加1名。", "Gain 1 target."]}],
 		[["zhanghe", "xuhuang"], "巧变开山", "Adaptive Vanguard", {"zhanghe":["眩晕时长增加1秒。", "Stun duration gains 1s."], "xuhuang":["伤害增加80%兵略值。", "Gain 80% Strategy damage."]}],
 		[["zhouyu", "luxun", "lusu", "lvmeng"], "四英杰", "Four Heroes", {"zhouyu":["额外选择2个格子，灼烧伤害增加50%兵略值。", "Gain 2 tiles and 50% Strategy burn damage."], "luxun":["总弹射次数增加2次，并施加3秒灼烧，每秒30%兵略值伤害。", "Gain 2 bounces and inflict a 3s burn at 30% Strategy per second."], "lusu":["治疗2名最低当前生命友军，各恢复400%兵略值并提高500最大生命。", "Heal the 2 lowest-current-HP allies for 400% Strategy and grant 500 max HP."], "lvmeng":["命中的后军恐惧5秒，行动条停止且每秒受到4%最大生命伤害。", "Fear the struck rearguard for 5s, stopping its gauge and dealing 4% max HP each second."]}],
-		[["lvbu", "dongzhuo"], "暴虐无双", "Tyrant and Peerless", {"lvbu":["按无双横扫对武将造成的实际伤害40%恢复自身生命；护盾和空格伤害不计入。", "Heal for 40% of actual hero HP damage from Peerless Sweep; shield and empty-tile damage do not count."], "dongzhuo":["暴君横征伤害由自身当前生命7%提高至15%。", "Tyrant's Might rises from 7% to 15% of current HP."]}],
-		[["lvbu", "diaochan"], "英雄美人", "Hero and Beauty", {"lvbu":["每损失10%生命，无双横扫伤害提高4%。", "Gain 4% Peerless Sweep damage per 10% HP missing."], "diaochan":["魅惑期间，目标每秒随机攻击一名相邻友军，造成被魅惑者100%兵略值伤害。", "Each second, the charmed target attacks a random adjacent ally for 100% of its own Strategy."]}],
-		[["lvbu", "chengong"], "谋定无双", "Peerless Strategy", {"lvbu":["无双横扫有50%概率连续释放两次。", "Peerless Sweep has a 50% chance to cast twice."], "chengong":["智迟谋速的冷却减少额外增加1秒。", "Measured Formation reduces cooldown by another 1s."]}],
-		[["lvbu", "gaoshun"], "飞将陷阵", "Flying General Formation", {"lvbu":["无双横扫追加攻击正前方敌军对应的中军及其左右相邻格。", "Peerless Sweep also hits the corresponding 3 midguard tiles."], "gaoshun":["陷阵之志的目标额外增加2名。", "Formation Resolve gains 2 targets."]}],
-		[["dongzhuo", "diaochan"], "暴君倾城", "Tyrant and Beauty", {"dongzhuo":["自身最大生命值提高50%。", "Gain 50% max HP."], "diaochan":["美人离间的魅惑持续时间由3秒延长至6秒。", "Beauty's Scheme charm increases from 3s to 6s."]}],
-		[["chengong", "gaoshun"], "谋陷并驱", "Strategy and Formation", {"chengong":["智迟谋速的冷却减少额外增加1秒。", "Measured Formation reduces cooldown by another 1s."], "gaoshun":["陷阵之志的易碎持续时间由3秒延长至6秒。", "Formation Resolve Fragile duration increases from 3s to 6s."]}],
-		[["yanliang", "wenchou"], "河北双雄", "Hebei Twin Champions", {"yanliang":["河北猛袭的技能目标额外增加2名。", "Hebei Fierce Assault gains 2 targets."], "wenchou":["河北破阵的技能目标额外增加2名。", "Hebei Breakthrough gains 2 targets."]}],
-		[["gaolan", "qunzhanghe"], "河北同袍", "Hebei Comrades", {"gaolan":["同列友军的兵略值加成由20点提高至40点。", "The column aura rises from +20 to +40 Strategy."], "qunzhanghe":["河北护阵的目标额外增加2名。", "Hebei Ward gains 2 targets."]}],
+		[["lvbu", "dongzhuo"], "暴虐无双", "Tyrant and Peerless", {"lvbu":["按无双横扫对武将造成的实际伤害20%恢复自身生命；护盾和空格伤害不计入。", "Heal for 20% of actual hero HP damage from Peerless Sweep; shield and empty-tile damage do not count."], "dongzhuo":["暴君横征伤害提高至自身当前生命值30%。", "Tyrant's Might rises to 30% of current HP."]}],
+		[["lvbu", "diaochan"], "英雄美人", "Hero and Beauty", {"lvbu":["每损失10%生命，无双横扫伤害提高3%。", "Gain 3% Peerless Sweep damage per 10% HP missing."], "diaochan":["魅惑期间，目标每秒随机攻击一名相邻友军，造成被魅惑者100%兵略值伤害。", "Each second, the charmed target attacks a random adjacent ally for 100% of its own Strategy."]}],
+		[["lvbu", "chengong"], "谋定无双", "Peerless Strategy", {"lvbu":["无双横扫有30%概率连续释放两次。", "Peerless Sweep has a 30% chance to cast twice."], "chengong":["智迟谋速的冷却减少额外增加0.7秒。", "Measured Formation reduces cooldown by another 0.7s."]}],
+		[["lvbu", "gaoshun"], "飞将陷阵", "Flying General Formation", {"lvbu":["无双横扫追加攻击正前方敌军对应的中军。", "Peerless Sweep also hits the corresponding midguard."], "gaoshun":["陷阵之志的目标额外增加1名。", "Formation Resolve gains 1 target."]}],
+		[["dongzhuo", "diaochan"], "暴君倾城", "Tyrant and Beauty", {"dongzhuo":["自身最大生命值提高40%。", "Gain 40% max HP."], "diaochan":["魅惑持续时间增加2秒，且貂蝉恢复200%兵略值生命。", "Charm gains 2s and Diao Chan heals herself for 200% Strategy."]}],
+		[["chengong", "gaoshun"], "谋陷并驱", "Strategy and Formation", {"chengong":["智迟谋速的冷却减少额外增加0.7秒。", "Measured Formation reduces cooldown by another 0.7s."], "gaoshun":["陷阵之志的易碎持续时间增加3.5秒。", "Formation Resolve Fragile duration gains 3.5s."]}],
+		[["yanliang", "wenchou"], "河北双雄", "Hebei Twin Champions", {"yanliang":["技能目标增加1名，伤害减少30%兵略值。", "Gain 1 target but lose 30% Strategy damage."], "wenchou":["技能目标增加1名，伤害减少50%兵略值。", "Gain 1 target but lose 50% Strategy damage."]}],
+		[["gaolan", "qunzhanghe"], "河北同袍", "Hebei Comrades", {"gaolan":["同列友军的兵略值加成提高至0.25×兵略值。", "The column aura rises to 0.25×Strategy."], "qunzhanghe":["护盾值增加60%兵略值。", "Shielding gains 60% Strategy."]}],
 		[["zhangliao", "yuejin", "zhanghe", "xuhuang", "yujin"], "五子良将", "Five Elite Generals", {"zhangliao":["回旋刃每段伤害增加80%兵略值；命中者受到的伤害增加0.4×兵略值%，持续5秒。", "Each pass gains 80% Strategy damage; hit enemies take 0.4×Strategy% more damage for 5s."], "yuejin":["目标增加1名，伤害增加50%兵略值，并施加5秒重伤，使治疗和自身回复降低0.5×兵略值%。", "Gain 1 target and 50% Strategy damage; inflict 5s Grievous Wounds reducing healing and self-recovery by 0.5×Strategy%."], "zhanghe":["攻击扩散至主目标周围相连的两名随机敌军；伤害增加200%兵略值，目标攻击前已眩晕时额外增加400%兵略值。", "Chain to 2 random enemies adjacent to the primary; gain 200% Strategy damage and another 400% if a target was already stunned."], "xuhuang":["改为攻击随机一整排，眩晕时长增加2秒。", "Strike a random entire row and gain 2s stun."], "yujin":["施法目标增加1名，护盾值增加100%兵略值。", "Gain 1 target and 100% Strategy shielding."]}],
 		[["xiahouyuan", "caoren"], "神速镇远", "Swift Bulwark", {"xiahouyuan":["冷却缩短0.5秒，眩晕延长0.5秒。", "Cooldown -0.5s and stun +0.5s."], "caoren":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方后军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% rear damage reduction."]}],
 		[["xiahouyuan", "xiahoudun"], "夏侯同心", "Xiahou Brothers", {"xiahouyuan":["冷却缩短0.5秒，眩晕延长0.5秒。", "Cooldown -0.5s and stun +0.5s."], "xiahoudun":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方前军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% vanguard damage reduction."]}],
@@ -1967,13 +1970,13 @@ func _hero_bond_detail(hero_id: String) -> String:
 		[["taishici", "ganning"], "江表双锋", "Twin Blades of Jiangbiao", {"taishici":["造成的伤害增加60%兵略值。", "Gain 60% Strategy damage."], "ganning":["技能冷却减少1.2秒。", "Cooldown is reduced by 1.2s."]}],
 		[["luxun", "sunquan"], "君臣同心", "Sovereign and Minister", {"luxun":["直接伤害增加80%兵略值，对已灼烧目标额外增加40%兵略值。", "Gain 80% Strategy damage and another 40% against burning targets."], "sunquan":["伤害改为孙权当前生命值的11%。", "Damage becomes 11% of Sun Quan's current HP."]}],
 		[["dingfeng", "xusheng"], "江表虎臣", "Tiger Ministers", {"dingfeng":["伤害增加100%兵略值，压退改为70%行动条。", "Gain 100% Strategy damage and push back 70% gauge."], "xusheng":["改为冲击随机一排，水阵持续时间增加3秒。", "Strike a random row and increase water formation duration by 3s."]}],
-		[["yanliang", "wenchou", "qunzhanghe", "gaolan"], "河北四庭柱", "Hebei Pillars", {"yanliang":["技能间隔内每次实际受伤使下次技能伤害提高15%，最高提高300%，释放后清空。", "Each actual hit between casts grants +15% next-cast damage up to +300%, cleared after casting."], "wenchou":["技能间隔内每次实际受伤使下次技能伤害提高15%，最高提高300%，释放后清空。", "Each actual hit between casts grants +15% next-cast damage up to +300%, cleared after casting."], "qunzhanghe":["技能目标再增加2名，护盾由200%提高至400%兵略值。", "Gain 2 more targets and raise shields from 200% to 400% Strategy."], "gaolan":["光环改为同排和同列全部友军兵略值增加40点。", "The aura grants +40 Strategy to all allies in Gao Lan's row and column."]}],
-		[["huatuo", "yuji"], "医道同源", "Medicine and Immortality", {"huatuo":["青囊三济会清除被治疗者身上的全部减益。", "Threefold Remedy cleanses every debuff from each healed ally."], "yuji":["蛊毒仙术增加1个目标，中毒持续时间由4秒延长至5秒。", "Venomous Immortal Art gains 1 target and lasts 5s instead of 4s."]}],
-		[["huatuo", "zuoci"], "济世仙缘", "Immortal Healers", {"huatuo":["青囊三济的治疗倍率由100%提高至150%兵略值。", "Threefold Remedy healing rises from 100% to 150% Strategy."], "zuoci":["遁甲济世的治疗倍率由150%提高至200%兵略值。", "Immortal Aid healing rises from 150% to 200% Strategy."]}],
-		[["yuji", "zuoci"], "方仙同门", "Immortal Lineage", {"yuji":["蛊毒仙术增加1个目标，中毒持续时间增加1秒。", "Venomous Immortal Art gains 1 target and +1s duration."], "zuoci":["治疗时同时随机雷击两名敌军，各造成150%兵略值伤害。", "Each heal also strikes 2 random enemies for 150% Strategy lightning damage."]}],
-		[["zhangjiao", "zhangliang"], "天人同道", "Heaven and Man", {"zhangjiao":["黄天雷引的伤害倍率由200%提高至250%兵略值。", "Yellow Sky Thunder rises from 200% to 250% Strategy."], "zhangliang":["人公虚弱增加1个目标。", "Yellow Sky Weakening gains 1 target."]}],
-		[["zhangjiao", "zhangbao"], "天地雷契", "Heaven and Earth", {"zhangjiao":["黄天雷引增加1个目标，每名受击者有50%概率眩晕1秒。", "Yellow Sky Thunder gains 1 target; each victim has a 50% chance to be stunned for 1s."], "zhangbao":["地公雷爆会波及每个主目标周围上下、左右与斜对角相邻的武将，造成50%兵略值伤害。", "Earth General Detonation splashes all eight neighboring units around each primary target for 50% Strategy."]}],
-		[["zhangliang", "zhangbao"], "地人续命", "Earth and Man", {"zhangliang":["人公虚弱增加1个目标。", "Yellow Sky Weakening gains 1 target."], "zhangbao":["本场战斗额外复生一次，总共可复生两次。", "Gain one additional revival, for two revivals per battle."]}]
+		[["yanliang", "wenchou", "qunzhanghe", "gaolan"], "河北四庭柱", "Hebei Pillars", {"yanliang":["技能目标增加1名，伤害增加120%兵略值。", "Gain 1 target and 120% Strategy damage."], "wenchou":["技能目标增加1名，伤害增加150%兵略值。", "Gain 1 target and 150% Strategy damage."], "qunzhanghe":["技能目标增加1名，护盾增加100%兵略值。", "Gain 1 target and 100% Strategy shielding."], "gaolan":["光环改为同排和同列全部友军兵略值增加0.25×兵略值。", "The aura grants 0.25×Strategy to all allies in Gao Lan's row and column."]}],
+		[["huatuo", "yuji"], "医道同源", "Medicine and Immortality", {"huatuo":["青囊三济治疗增加70%兵略值。", "Threefold Remedy gains 70% Strategy healing."], "yuji":["蛊毒仙术增加1个目标。", "Venomous Immortal Art gains 1 target."]}],
+		[["huatuo", "zuoci"], "济世仙缘", "Immortal Healers", {"huatuo":["治疗增加30%兵略值，并清除目标全部减益。", "Gain 30% Strategy healing and cleanse all debuffs."], "zuoci":["治疗倍率增加50%兵略值。", "Healing gains 50% Strategy."]}],
+		[["yuji", "zuoci"], "方仙同门", "Immortal Lineage", {"yuji":["施加的中毒层数增加0.4×兵略值。", "Applied poison stacks gain 0.4×Strategy."], "zuoci":["治疗时同时随机雷击两名敌军，各造成100%兵略值伤害。", "Each heal also strikes 2 random enemies for 100% Strategy lightning damage."]}],
+		[["zhangjiao", "zhangliang"], "天人同道", "Heaven and Man", {"zhangjiao":["黄天雷引的伤害增加120%兵略值。", "Yellow Sky Thunder gains 120% Strategy damage."], "zhangliang":["人公虚弱增加1个目标。", "Yellow Sky Weakening gains 1 target."]}],
+		[["zhangjiao", "zhangbao"], "天地雷契", "Heaven and Earth", {"zhangjiao":["黄天雷引增加1个目标，每名受击者有30%概率眩晕1.5秒。", "Yellow Sky Thunder gains 1 target; each victim has a 30% chance to be stunned for 1.5s."], "zhangbao":["地公雷爆波及每个主目标周围八格武将，造成90%兵略值伤害。", "Earth General Detonation splashes all eight neighboring units for 90% Strategy."]}],
+		[["zhangliang", "zhangbao"], "地人续命", "Earth and Man", {"zhangliang":["人公虚弱持续时间增加2.5秒。", "Yellow Sky Weakening gains 2.5s duration."], "zhangbao":["本场战斗额外复生一次。", "Gain one additional revival."]}]
 	]
 	for definition in combo_defs:
 		var members: Array = definition[0]
