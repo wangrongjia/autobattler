@@ -1368,9 +1368,9 @@ func _bond_graph_data(faction: String) -> Dictionary:
 				["twin_bulwarks", "魏武双壁", "Twin Bulwarks", ["caoren", "xiahoudun"], "2人", "2 heroes", "曹仁与夏侯惇各自目标+1、眩晕+0.5秒、对应兵种减伤+0.1*兵略值%。", "Cao Ren and Xiahou Dun each gain 1 target, +0.5s stun, and +0.1*Strategy% reduction against their guarded row."],
 				["thunder_frost", "雷霆冰策", "Thunder and Frost", ["simayi", "guojia"], "2人", "2 heroes", "司马懿目标+1、伤害减少40%兵略值；郭嘉目标+1、冻结减少0.5秒。", "Sima Yi gains 1 target but loses 40% Strategy damage; Guo Jia gains 1 target but loses 0.5s freeze."],
 				["thunder_royal", "鹰视王佐", "Eagle Eye and Royal Aid", ["simayi", "xunyu"], "2人", "2 heroes", "司马懿目标+1、伤害减少40%兵略值；荀彧目标+1、加速减少0.05×兵略值%。", "Sima Yi gains 1 target but loses 40% Strategy damage; Xun Yu gains 1 target but loses 0.05×Strategy% speed."],
-				["thunder_venom", "鹰视毒谋", "Eagle Eye and Venom", ["simayi", "jiaxu"], "2人", "2 heroes", "司马懿伤害增加80%兵略值；贾诩目标+1、中毒减少1秒。", "Sima Yi gains 80% Strategy damage; Jia Xu gains 1 target but loses 1s poison duration."],
+				["thunder_venom", "鹰视毒谋", "Eagle Eye and Venom", ["simayi", "jiaxu"], "2人", "2 heroes", "司马懿伤害增加80%兵略值；贾诩中毒层数衰减改为45%。", "Sima Yi gains 80% Strategy damage; Jia Xu's poison stack decay becomes 45%."],
 				["frost_royal", "遗计王佐", "Frozen Royal Plan", ["guojia", "xunyu"], "2人", "2 heroes", "郭嘉冻结增加1.2秒；荀彧加速增加0.12×兵略值%。", "Guo Jia gains 1.2s freeze; Xun Yu gains 0.12×Strategy% speed."],
-				["frost_venom", "冰毒奇策", "Frost and Venom", ["guojia", "jiaxu"], "2人", "2 heroes", "郭嘉冷却减少1.6秒；贾诩中毒增加1秒、每秒伤害增加0.005×兵略值%最大生命。", "Guo Jia loses 1.6s cooldown; Jia Xu gains 1s duration and 0.005×Strategy% max-HP damage per second."],
+				["frost_venom", "冰毒奇策", "Frost and Venom", ["guojia", "jiaxu"], "2人", "2 heroes", "郭嘉冷却减少1.6秒；贾诩目标+1、毒层数减少0.2×兵略值。", "Guo Jia loses 1.6s cooldown; Jia Xu gains 1 target but applies 0.2×Strategy fewer stacks."],
 				["royal_venom", "王佐毒策", "Royal Venom", ["xunyu", "jiaxu"], "2人", "2 heroes", "荀彧与贾诩的技能冷却均减少1.6秒。", "Xun Yu and Jia Xu each lose 1.6s cooldown."]
 			]
 		},
@@ -1844,7 +1844,7 @@ func _skill_detail(hero_id: String) -> String:
 		"simayi": return t("雷霆谋断：对随机2名敌人释放雷击，造成320%兵略值伤害。", "Thunder Judgment: Strike 2 random enemies with lightning for 320% Strategy damage.")
 		"guojia": return t("遗计冰封：随机冻结2名敌人3秒，期间行动条停止；冻结期间受到伤害会提前解冻，并受到郭嘉150%兵略值伤害。", "Frozen Legacy: Freeze 2 random enemies for 3s, stopping their gauges; taking damage ends the freeze and deals 150% of Guo Jia's Strategy as damage.")
 		"xunyu": return t("王佐疾策：随机使2名友军行动条速度提高0.4×兵略值%，持续4.4秒。", "Royal Acceleration: Grant 2 random allies gauge speed equal to 0.4×Strategy% for 4.4s.")
-		"jiaxu": return t("毒士奇谋：使随机2名敌军中毒4秒，每秒损失0.02×兵略值%最大生命值。", "Venomous Scheme: Poison 2 random enemies for 4s, dealing 0.02×Strategy% max HP each second.")
+		"jiaxu": return t("毒士奇谋：使随机2名敌军中毒，施加1.6×兵略值层毒（每秒受到等同当前层数的伤害，随后层数减半，直至归零）。", "Venomous Scheme: Poison 2 random enemies with 1.6×Strategy stacks; each second deals damage equal to current stacks, then stacks halve until zero.")
 		"sunjian": return t("猛虎绝命：消耗40%最大生命，攻击正前方敌军并造成等同于实际消耗生命100%的伤害。", "Tiger's Resolve: Spend 40% max HP and deal 100% of the HP actually spent to the facing enemy.")
 		"sunce": return t("小霸王连击：攻击正前方及其左侧敌军，各造成160%兵略值伤害；自身每损失10%生命，伤害提高4%。", "Conqueror's Twin Assault: Hit the facing enemy and its left neighbor for 160% Strategy each; gain 4% damage per 10% HP missing.")
 		"sunquan": return t("江东制衡：自身最大生命提高200（最多为初始最大生命2倍），随后恢复15%已损失生命，再随机对一名敌军造成孙权当前生命8%的伤害。", "Jiangdong Balance: Gain 200 max HP up to 2x initial max HP, restore 15% missing HP, then damage a random enemy for 8% of Sun Quan's current HP.")
@@ -1955,9 +1955,9 @@ func _hero_bond_detail(hero_id: String) -> String:
 		[["caoren", "xiahoudun"], "魏武双壁", "Twin Bulwarks", {"caoren":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方后军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% rear damage reduction."], "xiahoudun":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方前军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% vanguard damage reduction."]}],
 		[["simayi", "guojia"], "雷霆冰策", "Thunder and Frost", {"simayi":["雷击目标增加1名，伤害减少40%兵略值。", "Gain 1 lightning target but lose 40% Strategy damage."], "guojia":["冻结目标增加1名，冻结时间减少0.5秒。", "Gain 1 freeze target but lose 0.5s freeze duration."]}],
 		[["simayi", "xunyu"], "鹰视王佐", "Eagle Eye and Royal Aid", {"simayi":["雷击目标增加1名，伤害减少40%兵略值。", "Gain 1 lightning target but lose 40% Strategy damage."], "xunyu":["施法目标增加1名，行动条速度加成减少0.05×兵略值%。", "Gain 1 target but lose 0.05×Strategy% gauge speed."]}],
-		[["simayi", "jiaxu"], "鹰视毒谋", "Eagle Eye and Venom", {"simayi":["伤害增加80%兵略值。", "Gain 80% Strategy damage."], "jiaxu":["施法目标增加1名，中毒持续时间减少1秒。", "Gain 1 poison target but lose 1s duration."]}],
+		[["simayi", "jiaxu"], "鹰视毒谋", "Eagle Eye and Venom", {"simayi":["伤害增加80%兵略值。", "Gain 80% Strategy damage."], "jiaxu":["中毒层数衰减由50%改为45%（每次伤害后保留55%层数，100→55→30→16…→0）。", "Poison stack decay drops from 50% to 45% (each hit keeps 55% stacks: 100→55→30→16…→0)."]}],
 		[["guojia", "xunyu"], "遗计王佐", "Frozen Royal Plan", {"guojia":["冻结时间增加1.2秒。", "Freeze duration gains 1.2s."], "xunyu":["行动条速度加成增加0.12×兵略值%。", "Gauge speed bonus gains 0.12×Strategy%."]}],
-		[["guojia", "jiaxu"], "冰毒奇策", "Frost and Venom", {"guojia":["技能冷却减少1.6秒。", "Cooldown is reduced by 1.6s."], "jiaxu":["中毒持续时间增加1秒，每秒伤害增加0.005×兵略值%最大生命。", "Poison gains 1s duration and 0.005×Strategy% max-HP damage per second."]}],
+		[["guojia", "jiaxu"], "冰毒奇策", "Frost and Venom", {"guojia":["技能冷却减少1.6秒。", "Cooldown is reduced by 1.6s."], "jiaxu":["施法目标增加1名，但施加的毒层数减少0.2×兵略值。", "Gain 1 poison target but apply 0.2×Strategy fewer stacks."]}],
 		[["xunyu", "jiaxu"], "王佐毒策", "Royal Venom", {"xunyu":["技能冷却减少1.6秒。", "Cooldown is reduced by 1.6s."], "jiaxu":["技能冷却减少1.6秒。", "Cooldown is reduced by 1.6s."]}],
 		[["sunjian", "sunce", "sunquan", "sunshangxiang"], "孙氏之志", "Sun Legacy", {"sunjian":["改为消耗全部生命；阵亡后存活吴将本回合伤害提高12%，不可叠加。", "Spend all HP; surviving Wu allies gain 12% non-stacking damage for the round."], "sunce":["追加第二段攻击正前方和右侧敌军，正前方承受两次攻击。", "Add a second wave against the facing and right enemies; the facing enemy is hit twice."], "sunquan":["最大生命提高400，上限为初始最大生命3倍；随后恢复20%已损失生命。", "Gain 400 max HP up to 3x initial max HP, then restore 20% missing HP."], "sunshangxiang":["施法目标增加1名。", "Gain 1 target."]}],
 		[["daqiao", "xiaoqiao"], "江东双姝", "Jiangdong Sisters", {"daqiao":["追加1次150%兵略值的治疗。", "Add one 150% Strategy heal."], "xiaoqiao":["行动条减速增加0.12×兵略值%。", "Gauge slow gains 0.12×Strategy%."]}],

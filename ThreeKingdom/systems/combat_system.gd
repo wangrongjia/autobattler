@@ -13,26 +13,16 @@ func _sync_dot_summaries(unit: Dictionary) -> void:
 		burn_damage += float(effect.get("damage", 0.0))
 	unit.burn = burn_time
 	unit.burn_damage = burn_damage
-	var poison_time := 0.0
-	var poison_ratio := 0.0
 	var poison_stacks := 0
 	for effect in unit.get("poison_effects", []):
-		if effect.has("stacks"):
-			poison_time = maxf(poison_time, 1.0 if int(effect.get("stacks", 0)) > 0 else 0.0)
-			poison_stacks += int(effect.get("stacks", 0))
-		else:
-			poison_time = maxf(poison_time, float(effect.get("time", 0.0)))
-		poison_ratio += float(effect.get("ratio", 0.0))
-	unit.poison = poison_time
-	unit.poison_ratio = poison_ratio
+		poison_stacks += int(effect.get("stacks", 0))
+	unit.poison = 1.0 if poison_stacks > 0 else 0.0
 	unit.poison_stacks = poison_stacks
 
 func _migrate_legacy_dots(unit: Dictionary) -> void:
 	_ensure_unit_fields(unit)
 	if (unit.get("burn_effects", []) as Array).is_empty() and float(unit.get("burn", 0.0)) > 0.0:
 		unit.burn_effects = [{"source_id":"", "time":float(unit.burn), "clock":float(unit.get("burn_clock", 0.0)), "damage":float(unit.get("burn_damage", 0.0)), "missing_hp_scale":bool(unit.get("burn_missing_hp_scale", false)), "visual_group":str(unit.get("burn_visual_group", ""))}]
-	if (unit.get("poison_effects", []) as Array).is_empty() and float(unit.get("poison", 0.0)) > 0.0:
-		unit.poison_effects = [{"source_id":str(unit.get("poison_source", "")), "time":float(unit.poison), "clock":float(unit.get("poison_clock", 0.0)), "ratio":float(unit.get("poison_ratio", 0.0))}]
 
 func _add_burn_effect(source: Variant, target: Dictionary, duration: float, damage_per_second: float, missing_hp_scale := false, visual_group := "", missing_hp_step := 0.10, missing_hp_bonus_per_step := 0.05) -> void:
 	if target == null or not target.alive or duration <= 0.0 or damage_per_second <= 0.0: return
@@ -42,19 +32,21 @@ func _add_burn_effect(source: Variant, target: Dictionary, duration: float, dama
 	target.burn_effects = effects
 	_sync_dot_summaries(target)
 
-func _add_poison_effect(source: Variant, target: Dictionary, duration: float, max_hp_ratio_per_second: float) -> void:
-	if target == null or not target.alive or duration <= 0.0 or max_hp_ratio_per_second <= 0.0: return
-	_migrate_legacy_dots(target)
-	var effects: Array = target.get("poison_effects", [])
-	effects.append({"source_id":str(source.get("id", "")) if source != null else "", "time":duration, "clock":0.0, "ratio":max_hp_ratio_per_second})
-	target.poison_effects = effects
-	_sync_dot_summaries(target)
-
-func _add_decay_poison_effect(source: Variant, target: Dictionary, stacks: int) -> void:
+func _add_decay_poison_effect(source: Variant, target: Dictionary, stacks: int, retention := 0.5) -> void:
 	if target == null or not target.alive or stacks <= 0: return
 	_migrate_legacy_dots(target)
 	var effects: Array = target.get("poison_effects", [])
-	effects.append({"source_id":str(source.get("id", "")) if source != null else "", "clock":0.0, "stacks":stacks})
+	var merged := false
+	for effect in effects:
+		if effect.has("stacks"):
+			# 毒统一合并累加：已有 N 层再施加 M 层 = N+M 层；衰减率与伤害归属以后施加者为准。
+			effect.stacks = int(effect.get("stacks", 0)) + stacks
+			effect.retention = retention
+			effect.source_id = str(source.get("id", "")) if source != null else ""
+			merged = true
+			break
+	if not merged:
+		effects.append({"source_id":str(source.get("id", "")) if source != null else "", "clock":0.0, "stacks":stacks, "retention":retention})
 	target.poison_effects = effects
 	_sync_dot_summaries(target)
 
@@ -160,7 +152,7 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 		unit.one_rider = false
 		unit.fated_enemies = false
 		unit.flying_meteor = false
-		unit.skill_value_bonus = 0.0
+		unit.skill_value_bonus = float(enemy_strategy_bonus) if unit.team == "enemy" else 0.0
 		unit.liushan_aura_damage_bonus = 0.0
 		unit.liushan_aura_lifesteal = 0.0
 		unit.four_pillars = false
@@ -497,19 +489,11 @@ func _process_statuses(delta: float = TICK) -> void:
 			var effect: Dictionary = raw_effect
 			effect.clock = float(effect.get("clock", 0.0)) + delta
 			var poison_source = _find_by_id(combat_units, str(effect.get("source_id", "")))
-			if effect.has("stacks"):
-				while float(effect.clock) >= 1.0 and int(effect.get("stacks", 0)) > 0 and unit.alive:
-					effect.clock = float(effect.clock) - 1.0
-					_damage(poison_source, unit, float(effect.stacks), "magic", t("中毒", "Poison"), "status_poison:" + status_tick_id, "poison_tick", false)
-					effect.stacks = floori(float(effect.stacks) / 2.0)
-				if int(effect.get("stacks", 0)) > 0: active_poisons.append(effect)
-			else:
-				while float(effect.clock) >= 1.0 and float(effect.get("time", 0.0)) > 0.0 and unit.alive:
-					effect.clock = float(effect.clock) - 1.0
-					var poison_amount := float(unit.max_hp) * float(effect.get("ratio", 0.0))
-					_damage(poison_source, unit, poison_amount, "magic", t("中毒", "Poison"), "status_poison:" + status_tick_id, "poison_tick", false)
-				effect.time = maxf(0.0, float(effect.get("time", 0.0)) - delta)
-				if float(effect.time) > 0.0: active_poisons.append(effect)
+			while float(effect.clock) >= 1.0 and int(effect.get("stacks", 0)) > 0 and unit.alive:
+				effect.clock = float(effect.clock) - 1.0
+				_damage(poison_source, unit, float(effect.stacks), "magic", t("中毒", "Poison"), "status_poison:" + status_tick_id, "poison_tick", false)
+				effect.stacks = floori(float(effect.stacks) * float(effect.get("retention", 0.5)))
+			if int(effect.get("stacks", 0)) > 0: active_poisons.append(effect)
 		unit.poison_effects = active_poisons
 		_sync_dot_summaries(unit)
 		unit.freeze = maxf(0.0, float(unit.get("freeze", 0.0)) - delta)
@@ -1046,18 +1030,16 @@ func _cast_jiaxu_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.jiaxu.ability_params
 	var with_simayi := _pair_active(unit.team, "jiaxu", "simayi")
 	var with_guojia := _pair_active(unit.team, "jiaxu", "guojia")
-	var target_count := int(params.get("target_count", 2)) + (int(params.get("simayi_bonus_targets", 1)) if with_simayi else 0)
-	var targets := _random_unique_living_enemies(unit, target_count)
-	var duration := float(params.get("duration", 4.0))
-	if with_simayi: duration -= float(params.get("simayi_duration_penalty", 1.0))
-	if with_guojia: duration += float(params.get("guojia_duration_bonus", 1.0))
-	var poison_skill_ratio := float(params.get("poison_skill_ratio", 0.02))
-	if with_guojia: poison_skill_ratio += float(params.get("guojia_poison_bonus_skill_ratio", 0.005))
-	var poison_ratio := poison_skill_ratio * _unit_skill_effect_multiplier(unit)
+	var target_count := int(params.get("target_count", 2)) + (int(params.get("guojia_bonus_targets", 1)) if with_guojia else 0)
+	var poison_stacks := maxi(1, roundi(_unit_skill_stat_value(unit) * float(params.get("poison_stack_mult", 1.6))))
+	if with_guojia:
+		poison_stacks = maxi(1, poison_stacks - roundi(_unit_skill_stat_value(unit) * float(params.get("guojia_stack_penalty_ratio", 0.2))))
+	var retention := 0.55 if with_simayi else 0.5
 	var visual_group := "jiaxu_poison:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	var targets := _random_unique_living_enemies(unit, target_count)
 	for target in targets:
-		_add_poison_effect(unit, target, duration, poison_ratio)
-		visual_events.append({"kind":"skill", "source_id":unit.id, "target_id":target.id, "amount":roundi(duration * 10.0), "style":"magic", "visual_group":visual_group, "group_style":"poison_apply"})
+		_add_decay_poison_effect(unit, target, poison_stacks, retention)
+		visual_events.append({"kind":"skill", "source_id":unit.id, "target_id":target.id, "amount":poison_stacks, "style":"magic", "visual_group":visual_group, "group_style":"poison_apply"})
 	unit.cast_count = int(unit.get("cast_count", 0)) + 1
 
 func _cast_liubei_regen(unit: Dictionary) -> void:
