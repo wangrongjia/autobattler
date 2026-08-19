@@ -13,7 +13,7 @@ func _initialize() -> void:
 	assert(game.REGISTERED_HERO_BALANCE.BASE_STATS.size() == game.heroes.size())
 	assert(int(game.heroes.guanyu.hp) == 5180)
 	assert(float(game.heroes.guanyu.skill_value) == 100.0)
-	assert(float(game.heroes.caocao.cooldown) == 5.6)
+	assert(float(game.heroes.caocao.cooldown) == 11.2)
 	assert(int(game.heroes.zhouyu.range) == 3)
 	assert(not game.heroes.daqiao.ability_params.has("base_heal"))
 	var supported_abilities := ["signature", "strike", "strike_magic", "drain", "control", "row", "row_magic", "multi", "multi_magic", "heal", "heal_team", "shield_single", "shield_row", "shield_column", "buff_single", "buff_two", "buff_column", "buff_row_ranged", "buff_row_melee", "buff_self", "passive"]

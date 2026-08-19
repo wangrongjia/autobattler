@@ -39,10 +39,10 @@ func _initialize() -> void:
 	game.tick_timer.stop()
 
 	var cooldowns := {
-		"zhouyu":5.8, "luxun":5.8, "lvmeng":5.6, "lusu":5.6, "daqiao":6.2,
-		"xiaoqiao":6.2, "taishici":6.0, "ganning":6.0, "huanggai":8.8,
-		"sunjian":15.0, "sunce":5.2, "sunquan":5.2, "sunshangxiang":5.2,
-		"dingfeng":5.4, "xusheng":5.8
+		"zhouyu":11.6, "luxun":11.6, "lvmeng":11.2, "lusu":11.2, "daqiao":12.4,
+		"xiaoqiao":12.4, "taishici":12.0, "ganning":12.0, "huanggai":17.6,
+		"sunjian":30.0, "sunce":10.4, "sunquan":10.4, "sunshangxiang":10.4,
+		"dingfeng":10.8, "xusheng":11.6
 	}
 	for hero_id in WU_IDS:
 		assert(game.heroes.has(hero_id))
@@ -70,7 +70,7 @@ func _initialize() -> void:
 	assert(bool(game._combat_hero("player", "sunce").sunce_taishi))
 	assert(bool(game._combat_hero("player", "daqiao").sunce_daqiao))
 	assert(bool(game._combat_hero("player", "xusheng").dingfeng_xusheng))
-	_assert_close(game._unit_skill_cooldown(game._combat_hero("player", "ganning")), 4.8)
+	_assert_close(game._unit_skill_cooldown(game._combat_hero("player", "ganning")), 9.9)
 	_assert_close(float(game._combat_hero("player", "sunjian").action), game.ACTION_MAX)
 
 	# 太史慈：双羁绊完全体为3目标，每名230伤害，灼烧每秒20。
@@ -108,7 +108,7 @@ func _initialize() -> void:
 	game._cast_lvmeng_skill(lvmeng)
 	_assert_close(10000.0 - float(rear_target.hp), 650.0)
 	_assert_close(float(rear_target.shield), 1000.0)
-	_assert_close(float(rear_target.fear), 5.0)
+	_assert_close(float(rear_target.fear), 9.0)
 	_assert_close(float(rear_target.fear_damage_ratio), 0.04)
 	_assert_close(float(lvmeng.stealth), 0.0)
 
@@ -165,7 +165,7 @@ func _initialize() -> void:
 	game._cast_xiaoqiao_skill(xiao)
 	for target in x_targets:
 		_assert_close(float(target.slow), 0.47)
-		_assert_close(float(target.slow_time), 6.0)
+		_assert_close(float(target.slow_time), 10.8)
 
 	# 甘宁双羁绊：低血目标时自身和左侧友军各480伤害，冷却4.8秒。
 	var gan_left := _place(game, "player", "zhouyu", 1, 0)
@@ -177,7 +177,7 @@ func _initialize() -> void:
 	_set_combat(game, [gan_left, gan, gan_taishi, gan_lvmeng], [gan_target])
 	game._cast_ganning_skill(gan)
 	_assert_close(float(gan_target.hp), 3040.0)
-	_assert_close(game._unit_skill_cooldown(gan), 4.8)
+	_assert_close(game._unit_skill_cooldown(gan), 9.9)
 
 	# 黄盖双羁绊：15%最大生命，整列每格200兵略值+消耗生命50%，并附加5秒灼烧。
 	var huang := _place(game, "player", "huanggai", 0, 0, 1000.0)
@@ -248,7 +248,7 @@ func _initialize() -> void:
 	for target in water_hit:
 		_assert_close(10000.0 - float(target.hp), 100.0)
 		_assert_close(float(target.slow), 0.30)
-		_assert_close(float(target.slow_time), 7.0)
+		_assert_close(float(target.slow_time), 12.6)
 
 	# 孙坚孙氏：消耗全部生命、按实际消耗值攻击，并给予12%不可叠加增伤。
 	var jian := _place(game, "player", "sunjian", 0, 0, 1000.0)

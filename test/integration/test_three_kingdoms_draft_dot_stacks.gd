@@ -53,7 +53,7 @@ func _initialize() -> void:
 	game._apply_skill_stun(poison_a, target, 1.0)
 	assert(is_equal_approx(float(target.stun), 2.0))
 	game._apply_skill_stun(poison_a, target, 3.0)
-	assert(is_equal_approx(float(target.stun), 3.0))
+	assert(is_equal_approx(float(target.stun), 5.4))
 
 	game.tick_timer.stop()
 	quit()

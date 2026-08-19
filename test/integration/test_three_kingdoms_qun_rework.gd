@@ -7,10 +7,10 @@ func _initialize() -> void:
 	game.tick_timer.stop()
 
 	var expected_cooldowns := {
-		"lvbu":6.5, "diaochan":6.5, "dongzhuo":5.5, "gaoshun":6.5,
-		"chengong":0.0, "yanliang":5.5, "wenchou":5.5, "qunzhanghe":6.0,
-		"gaolan":0.0, "huatuo":5.5, "yuji":5.5, "zuoci":5.5,
-		"zhangjiao":6.0, "zhangliang":6.0, "zhangbao":0.0
+		"lvbu":13.0, "diaochan":13.0, "dongzhuo":11.0, "gaoshun":13.0,
+		"chengong":0.0, "yanliang":11.0, "wenchou":11.0, "qunzhanghe":12.0,
+		"gaolan":0.0, "huatuo":11.0, "yuji":11.0, "zuoci":11.0,
+		"zhangjiao":12.0, "zhangliang":12.0, "zhangbao":0.0
 	}
 	for hero_id in expected_cooldowns:
 		assert(is_equal_approx(float(game.heroes[hero_id].cooldown), float(expected_cooldowns[hero_id])))
@@ -57,8 +57,8 @@ func _initialize() -> void:
 	gaoshun.col = 0
 	game.combat_units = [chengong, lvbu, gaoshun]
 	game._apply_combo_bonds(false, false)
-	assert(is_equal_approx(float(lvbu.bond_cooldown), 4.1))
-	assert(is_equal_approx(float(gaoshun.bond_cooldown), 4.1))
+	assert(is_equal_approx(float(lvbu.bond_cooldown), 9.6))
+	assert(is_equal_approx(float(gaoshun.bond_cooldown), 9.6))
 	print("qun_rework:chengong_ok")
 
 	var diaochan := _unit(game, "player", "diaochan", 2, 4)
@@ -68,7 +68,7 @@ func _initialize() -> void:
 	game.combat_units = [diaochan, dongzhuo, lvbu, charmed_a, charmed_b]
 	game._cast_diaochan(diaochan)
 	var charmed := charmed_a if float(charmed_a.charm) > 0.0 else charmed_b
-	assert(is_equal_approx(float(charmed.charm), 6.0))
+	assert(is_equal_approx(float(charmed.charm), 10.8))
 	assert(is_equal_approx(float(diaochan.hp), 300.0))
 	print("qun_rework:diaochan_ok")
 
@@ -78,7 +78,7 @@ func _initialize() -> void:
 	game.combat_units = [gaoshun, lvbu, chengong] + fragile_targets
 	game._cast_gaoshun_skill(gaoshun)
 	assert(fragile_targets.all(func(target): return is_equal_approx(float(target.vulnerable), 0.40)))
-	assert(fragile_targets.all(func(target): return is_equal_approx(float(target.vulnerable_time), 7.0)))
+	assert(fragile_targets.all(func(target): return is_equal_approx(float(target.vulnerable_time), 12.6)))
 	print("qun_rework:gaoshun_ok")
 
 	var yanliang := _unit(game, "player", "yanliang", 0, 0)

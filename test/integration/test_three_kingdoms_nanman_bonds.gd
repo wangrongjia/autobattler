@@ -97,7 +97,7 @@ func _initialize() -> void:
 	expected_meng_damage += float(game.heroes.menghuo.skill_value) * float(meng_params.aftershock_mult)
 	for target in meng_targets:
 		assert(is_equal_approx(1000000.0 - float(target.hp), expected_meng_damage))
-		assert(is_equal_approx(float(target.stun), float(meng_params.burning_stun)))
+		assert(is_equal_approx(float(target.stun), game._scaled_control_duration(menghuo, float(meng_params.burning_stun), true)))
 		assert(is_equal_approx(float(target.action), 80.0 - float(meng_params.bond_action_reduction)))
 	var meng_damage_events: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(meng_damage_events.size() == 10)

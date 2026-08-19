@@ -1,19 +1,19 @@
 extends SceneTree
 
 const SHU_SCOPE := {
-	"liubei":{"hp":3740, "cooldown":6.0, "range":3, "params":{"duration":4.0, "heal_ratio":1.0}},
-	"guanyu":{"hp":5180, "cooldown":6.3, "range":1, "params":{"mult":2.10, "five_mult":4.60, "peach_heal":0.30}},
-	"zhangfei":{"hp":5620, "cooldown":6.6, "range":2, "params":{"damage_ratio":0.20, "duration":3.3}},
-	"zhaoyun":{"hp":3840, "cooldown":5.7, "range":2, "params":{"hit_count":5, "hit_mult":1.15, "seven_hit_count":7}},
+	"liubei":{"hp":3740, "cooldown":12.0, "range":3, "params":{"duration":4.0, "heal_ratio":1.0}},
+	"guanyu":{"hp":5180, "cooldown":12.6, "range":1, "params":{"mult":2.10, "five_mult":4.60, "peach_heal":0.30}},
+	"zhangfei":{"hp":5620, "cooldown":13.2, "range":2, "params":{"damage_ratio":0.20, "duration":3.3}},
+	"zhaoyun":{"hp":3840, "cooldown":11.4, "range":2, "params":{"hit_count":5, "hit_mult":1.15, "seven_hit_count":7}},
 	"liushan":{"hp":3460, "cooldown":0.0, "range":2, "params":{"damage_ratio":0.27, "liubei_damage_ratio":0.18}},
-	"huangzhong":{"hp":3550, "cooldown":4.2, "range":3, "params":{"mult":4.20, "five_mult":9.0}},
-	"machao":{"hp":3600, "cooldown":7.2, "range":2, "params":{"front_mult":2.60, "middle_mult":2.30, "back_mult":2.0}},
-	"madai":{"hp":3580, "cooldown":21.0, "range":3, "params":{"max_hp_ratio":0.50, "empty_ruler_damage":2000.0}},
-	"weiyan":{"hp":4540, "cooldown":5.4, "range":1, "params":{"mult":1.80, "meteor_heal":0.23, "fated_ally_heal":0.06}},
-	"zhugeliang":{"hp":3460, "cooldown":6.9, "range":3, "params":{"mult":2.30, "fire_mark_duration":10.0, "fire_mark_bonus":0.40}},
-	"jiangwei":{"hp":4320, "cooldown":4.5, "range":1, "params":{"mult":4.50, "bond_splash_mult":1.0}},
-	"pangtong":{"hp":3550, "cooldown":5.4, "range":3, "params":{"target_count":2, "mult":2.0, "link_duration":4.0, "link_ratio":0.30}},
-	"menghuo":{"hp":5180, "cooldown":5.7, "range":1, "params":{"mult":1.15, "stun":0.8, "aftershock_mult":0.35, "bond_action_reduction":8.0}},
+	"huangzhong":{"hp":3550, "cooldown":8.4, "range":3, "params":{"mult":4.20, "five_mult":9.0}},
+	"machao":{"hp":3600, "cooldown":14.4, "range":2, "params":{"front_mult":2.60, "middle_mult":2.30, "back_mult":2.0}},
+	"madai":{"hp":3580, "cooldown":42.0, "range":3, "params":{"max_hp_ratio":0.50, "empty_ruler_damage":2000.0}},
+	"weiyan":{"hp":4540, "cooldown":10.8, "range":1, "params":{"mult":1.80, "meteor_heal":0.23, "fated_ally_heal":0.06}},
+	"zhugeliang":{"hp":3460, "cooldown":13.8, "range":3, "params":{"mult":2.30, "fire_mark_duration":10.0, "fire_mark_bonus":0.40}},
+	"jiangwei":{"hp":4320, "cooldown":9.0, "range":1, "params":{"mult":4.50, "bond_splash_mult":1.0}},
+	"pangtong":{"hp":3550, "cooldown":10.8, "range":3, "params":{"target_count":2, "mult":2.0, "link_duration":4.0, "link_ratio":0.30}},
+	"menghuo":{"hp":5180, "cooldown":11.4, "range":1, "params":{"mult":1.15, "stun":0.8, "aftershock_mult":0.35, "bond_action_reduction":8.0}},
 }
 
 func _initialize() -> void:

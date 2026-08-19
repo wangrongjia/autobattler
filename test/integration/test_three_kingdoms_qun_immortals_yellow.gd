@@ -75,7 +75,7 @@ func _initialize() -> void:
 	var weakened: Array = enemies.filter(func(enemy): return float(enemy.skill_debuff_time) > 0.0)
 	assert(weakened.size() == 3)
 	assert(weakened.all(func(enemy): return is_equal_approx(float(enemy.skill_debuff), 0.5)))
-	assert(weakened.all(func(enemy): return is_equal_approx(float(enemy.skill_debuff_time), 6.5)))
+	assert(weakened.all(func(enemy): return is_equal_approx(float(enemy.skill_debuff_time), 11.7)))
 	print("qun_yellow:zhangliang_ok")
 
 	var killer := _unit(game, "enemy", "caocao", 0, 0)

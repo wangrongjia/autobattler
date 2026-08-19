@@ -1,6 +1,7 @@
 extends "res://ThreeKingdom/systems/combat_system.gd"
 
 var _encyclopedia_touch_origins := {}
+const CARD_BORDER_ROOT := "res://ThreeKingdom/animations/border/"
 
 func _is_mobile_ui() -> bool:
 	return OS.has_feature("mobile") or OS.has_feature("android") or OS.get_environment("THREE_KINGDOM_MOBILE_UI_TEST") == "1"
@@ -82,6 +83,10 @@ func _label(value: String, size := 16, color := Color("#e8e2cf")) -> Label:
 	return label
 
 func _build_ui() -> void:
+	skill_voice_player = AudioStreamPlayer.new()
+	skill_voice_player.name = "SkillVoicePlayer"
+	skill_voice_player.volume_db = -1.5
+	add_child(skill_voice_player)
 	var bg := TextureRect.new()
 	var gradient := Gradient.new()
 	gradient.colors = PackedColorArray([Color("#090b0f"), Color("#20130f"), Color("#080b10")])
@@ -1357,27 +1362,27 @@ func _bond_graph_data(faction: String) -> Dictionary:
 		"wei":{
 			"faction":["wei_command", "魏", "Wei", "2 / 5 / 8", "全体魏将控制时长提高2%/5%/8%。8人时，对带有任意控制或减益的目标造成伤害提高8%。", "All Wei heroes gain 2%/5%/8% control duration. At 8, they deal 8% more damage to targets with any control or debuff."],
 			"bonds":[
-				["evil_of_old", "古之恶来", "Evil of Old", ["caocao", "dianwei"], "2人", "2 heroes", "曹操目标+1，命中后军时伤害增加100%兵略值、眩晕增加0.5秒；典韦目标+1、伤害减少30%兵略值。", "Cao Cao gains 1 target and, against rearguards, +100% Strategy damage and +0.5s stun; Dian Wei gains 1 target but loses 30% Strategy damage."],
-				["tiger_guard", "虎卫护主", "Tiger Guard", ["caocao", "xuchu"], "2人", "2 heroes", "曹操目标+1，命中前军时伤害增加100%兵略值、眩晕增加0.5秒；许褚目标+1、伤害减少40%兵略值。", "Cao Cao gains 1 target and, against vanguards, +100% Strategy damage and +0.5s stun; Xu Chu gains 1 target but loses 40% Strategy damage."],
+				["evil_of_old", "古之恶来", "Evil of Old", ["caocao", "dianwei"], "2人", "2 heroes", "曹操目标+1，命中后军时伤害增加100%兵略值、眩晕增加0.9秒；典韦目标+1、伤害减少30%兵略值。", "Cao Cao gains 1 target and, against rearguards, +100% Strategy damage and +0.9s stun; Dian Wei gains 1 target but loses 30% Strategy damage."],
+				["tiger_guard", "虎卫护主", "Tiger Guard", ["caocao", "xuchu"], "2人", "2 heroes", "曹操目标+1，命中前军时伤害增加100%兵略值、眩晕增加0.9秒；许褚目标+1、伤害减少40%兵略值。", "Cao Cao gains 1 target and, against vanguards, +100% Strategy damage and +0.9s stun; Xu Chu gains 1 target but loses 40% Strategy damage."],
 				["twin_wei_guards", "魏武双卫", "Twin Wei Guards", ["dianwei", "xuchu"], "2人", "2 heroes", "典韦伤害增加80%兵略值；许褚伤害增加100%兵略值。", "Dian Wei gains 80% Strategy damage; Xu Chu gains 100% Strategy damage."],
 				["hefei_vanguard", "逍遥津先锋", "Hefei Vanguard", ["zhangliao", "yuejin"], "2人", "2 heroes", "张辽回旋刃每段伤害增加40%兵略值；乐进目标增加1名。", "Zhang Liao gains 40% Strategy damage per pass; Yue Jin gains 1 target."],
-				["adaptive_vanguard", "巧变开山", "Adaptive Vanguard", ["zhanghe", "xuhuang"], "2人", "2 heroes", "张郃眩晕增加1秒；徐晃伤害增加80%兵略值。", "Zhang He gains 1s stun; Xu Huang gains 80% Strategy damage."],
+				["adaptive_vanguard", "巧变开山", "Adaptive Vanguard", ["zhanghe", "xuhuang"], "2人", "2 heroes", "张郃眩晕增加1.8秒；徐晃伤害增加80%兵略值。", "Zhang He gains 1.8s stun; Xu Huang gains 80% Strategy damage."],
 				["five_elites", "五子良将", "Five Elite Generals", ["zhangliao", "yuejin", "zhanghe", "xuhuang", "yujin"], "5人", "5 heroes", "强化回旋刃易损、乱射重伤、连枪扩散、开山随机排控制与双目标护盾。", "Enhances Returning Blade vulnerability, Volley grievous wounds, spear chaining, random-row control, and two-target shields."],
-				["swift_bulwark", "神速镇远", "Swift Bulwark", ["xiahouyuan", "caoren"], "2人", "2 heroes", "夏侯渊冷却-0.5秒、眩晕+0.5秒；曹仁目标+1、眩晕+0.5秒、后军减伤+0.1*兵略值%。", "Xiahou Yuan gains -0.5s cooldown and +0.5s stun; Cao Ren gains 1 target, +0.5s stun, and +0.1*Strategy% rear damage reduction."],
-				["xiahou_brothers", "夏侯同心", "Xiahou Brothers", ["xiahouyuan", "xiahoudun"], "2人", "2 heroes", "夏侯渊冷却-0.5秒、眩晕+0.5秒；夏侯惇目标+1、眩晕+0.5秒、前军减伤+0.1*兵略值%。", "Xiahou Yuan gains -0.5s cooldown and +0.5s stun; Xiahou Dun gains 1 target, +0.5s stun, and +0.1*Strategy% vanguard damage reduction."],
-				["twin_bulwarks", "魏武双壁", "Twin Bulwarks", ["caoren", "xiahoudun"], "2人", "2 heroes", "曹仁与夏侯惇各自目标+1、眩晕+0.5秒、对应兵种减伤+0.1*兵略值%。", "Cao Ren and Xiahou Dun each gain 1 target, +0.5s stun, and +0.1*Strategy% reduction against their guarded row."],
-				["thunder_frost", "雷霆冰策", "Thunder and Frost", ["simayi", "guojia"], "2人", "2 heroes", "司马懿目标+1、伤害减少40%兵略值；郭嘉目标+1、冻结减少0.5秒。", "Sima Yi gains 1 target but loses 40% Strategy damage; Guo Jia gains 1 target but loses 0.5s freeze."],
+				["swift_bulwark", "神速镇远", "Swift Bulwark", ["xiahouyuan", "caoren"], "2人", "2 heroes", "夏侯渊冷却-0.9秒、眩晕+0.9秒；曹仁目标+1、眩晕+0.9秒、后军减伤+0.1*兵略值%。", "Xiahou Yuan gains -0.9s cooldown and +0.9s stun; Cao Ren gains 1 target, +0.9s stun, and +0.1*Strategy% rear damage reduction."],
+				["xiahou_brothers", "夏侯同心", "Xiahou Brothers", ["xiahouyuan", "xiahoudun"], "2人", "2 heroes", "夏侯渊冷却-0.9秒、眩晕+0.9秒；夏侯惇目标+1、眩晕+0.9秒、前军减伤+0.1*兵略值%。", "Xiahou Yuan gains -0.9s cooldown and +0.9s stun; Xiahou Dun gains 1 target, +0.9s stun, and +0.1*Strategy% vanguard damage reduction."],
+				["twin_bulwarks", "魏武双壁", "Twin Bulwarks", ["caoren", "xiahoudun"], "2人", "2 heroes", "曹仁与夏侯惇各自目标+1、眩晕+0.9秒、对应兵种减伤+0.1*兵略值%。", "Cao Ren and Xiahou Dun each gain 1 target, +0.9s stun, and +0.1*Strategy% reduction against their guarded row."],
+				["thunder_frost", "雷霆冰策", "Thunder and Frost", ["simayi", "guojia"], "2人", "2 heroes", "司马懿目标+1、伤害减少40%兵略值；郭嘉目标+1、冻结减少0.9秒。", "Sima Yi gains 1 target but loses 40% Strategy damage; Guo Jia gains 1 target but loses 0.9s freeze."],
 				["thunder_royal", "鹰视王佐", "Eagle Eye and Royal Aid", ["simayi", "xunyu"], "2人", "2 heroes", "司马懿目标+1、伤害减少40%兵略值；荀彧目标+1、加速减少0.05×兵略值%。", "Sima Yi gains 1 target but loses 40% Strategy damage; Xun Yu gains 1 target but loses 0.05×Strategy% speed."],
 				["thunder_venom", "鹰视毒谋", "Eagle Eye and Venom", ["simayi", "jiaxu"], "2人", "2 heroes", "司马懿伤害增加80%兵略值；贾诩中毒层数衰减改为45%。", "Sima Yi gains 80% Strategy damage; Jia Xu's poison stack decay becomes 45%."],
-				["frost_royal", "遗计王佐", "Frozen Royal Plan", ["guojia", "xunyu"], "2人", "2 heroes", "郭嘉冻结增加1.2秒；荀彧加速增加0.12×兵略值%。", "Guo Jia gains 1.2s freeze; Xun Yu gains 0.12×Strategy% speed."],
-				["frost_venom", "冰毒奇策", "Frost and Venom", ["guojia", "jiaxu"], "2人", "2 heroes", "郭嘉冷却减少1.6秒；贾诩目标+1、毒层数减少0.2×兵略值。", "Guo Jia loses 1.6s cooldown; Jia Xu gains 1 target but applies 0.2×Strategy fewer stacks."],
-				["royal_venom", "王佐毒策", "Royal Venom", ["xunyu", "jiaxu"], "2人", "2 heroes", "荀彧与贾诩的技能冷却均减少1.6秒。", "Xun Yu and Jia Xu each lose 1.6s cooldown."]
+				["frost_royal", "遗计王佐", "Frozen Royal Plan", ["guojia", "xunyu"], "2人", "2 heroes", "郭嘉冻结增加2.1秒；荀彧加速增加0.12×兵略值%。", "Guo Jia gains 2.1s freeze; Xun Yu gains 0.12×Strategy% speed."],
+				["frost_venom", "冰毒奇策", "Frost and Venom", ["guojia", "jiaxu"], "2人", "2 heroes", "郭嘉冷却减少2.8秒；贾诩目标+1、毒层数减少0.2×兵略值。", "Guo Jia loses 2.8s cooldown; Jia Xu gains 1 target but applies 0.2×Strategy fewer stacks."],
+				["royal_venom", "王佐毒策", "Royal Venom", ["xunyu", "jiaxu"], "2人", "2 heroes", "荀彧与贾诩的技能冷却均减少2.8秒。", "Xun Yu and Jia Xu each lose 2.8s cooldown."]
 			]
 		},
 		"wu":{
 			"faction":["jiangdong_relay", "吴", "Wu", "2 / 5 / 8", "全体吴将最大生命提高2%/5%/8%。8人时，吴将濒死会均摊全体存活吴将的生命比例，并各自恢复5%最大生命（每30秒一次）。", "All Wu heroes gain 2%/5%/8% max HP. At 8, a lethal hit equalizes surviving Wu heroes' health ratios and restores 5% max HP to each (once per 30s)."],
 			"bonds":[
-				["wu_commanders", "四英杰", "Four Heroes", ["zhouyu", "luxun", "lusu", "lvmeng"], "4人", "4 heroes", "周瑜额外点燃2格且灼烧增加50%兵略值；陆逊额外弹射2次并附加3秒灼烧；鲁肃治疗2名友军，各恢复400%兵略值并提高500最大生命；吕蒙使命中后军恐惧5秒。", "Empowers all four heroes' signature skills with extra tiles, bounces, healing, burning, or fear."],
+				["wu_commanders", "四英杰", "Four Heroes", ["zhouyu", "luxun", "lusu", "lvmeng"], "4人", "4 heroes", "周瑜额外点燃2格且灼烧增加50%兵略值；陆逊额外弹射2次并附加3秒灼烧；鲁肃治疗2名友军，各恢复400%兵略值并提高500最大生命；吕蒙使命中后军恐惧9秒。", "Empowers all four heroes' signature skills with extra tiles, bounces, healing, burning, or 9s fear."],
 				["sun_legacy", "孙氏之志", "Sun Legacy", ["sunjian", "sunce", "sunquan", "sunshangxiang"], "4人", "4 heroes", "孙坚消耗全部生命并使存活吴将本回合伤害提高12%且不可叠加；孙策追加第二段右侧攻击；孙权提高400最大生命、上限3倍并恢复20%已损生命；孙尚香目标+1。", "Sun Jian sacrifices himself for a non-stacking team damage boost; Sun Ce gains a second wave; Sun Quan improves growth and healing; Sun Shangxiang gains 1 target."],
 				["jiangdong_sisters", "江东双姝", "Jiangdong Sisters", ["daqiao", "xiaoqiao"], "2人", "2 heroes", "大乔追加1次150%兵略值治疗；小乔行动条减速增加0.12×兵略值%。", "Da Qiao adds a 150% Strategy heal; Xiao Qiao gains 0.12×Strategy% gauge slow."],
 				["white_raid", "白衣奇袭", "White-Robed Ambush", ["lvmeng", "ganning"], "2人", "2 heroes", "吕蒙伤害增加150%兵略值且无视护盾；甘宁攻击生命低于50%的敌人时伤害增加180%兵略值。", "Lu Meng gains 150% Strategy damage and ignores shields; Gan Ning gains 180% Strategy damage against enemies below 50% HP."],
@@ -1386,20 +1391,20 @@ func _bond_graph_data(faction: String) -> Dictionary:
 				["harmonious_zither", "琴瑟和鸣", "Harmonious Zither", ["zhouyu", "xiaoqiao"], "2人", "2 heroes", "周瑜灼烧延长3秒且每秒伤害增加30%兵略值；小乔目标增加1名。", "Zhou Yu's burn gains 3s and 30% Strategy damage; Xiao Qiao gains 1 target."],
 				["red_cliffs_ruse", "赤壁苦计", "Red Cliffs Ruse", ["zhouyu", "huanggai"], "2人", "2 heroes", "周瑜灼烧随目标已损生命提高，每损失10%整体灼烧伤害提高3%；黄盖附加5秒、每秒50%兵略值灼烧。", "Zhou Yu's burn gains 3% per 10% missing HP; Huang Gai adds a 5s burn at 50% Strategy per second."],
 				["jiangdong_pillars", "江东柱石", "Pillars of Jiangdong", ["huanggai", "sunjian"], "2人", "2 heroes", "黄盖消耗提高至15%最大生命，消耗生命伤害系数提高至50%；孙坚开局行动条充满。", "Huang Gai spends 15% max HP with a 50% spent-HP coefficient; Sun Jian starts at full gauge."],
-				["jiangbiao_blades", "江表双锋", "Twin Blades of Jiangbiao", ["taishici", "ganning"], "2人", "2 heroes", "太史慈伤害增加60%兵略值；甘宁冷却减少1.2秒。", "Taishi Ci gains 60% Strategy damage; Gan Ning's cooldown is reduced by 1.2s."],
+				["jiangbiao_blades", "江表双锋", "Twin Blades of Jiangbiao", ["taishici", "ganning"], "2人", "2 heroes", "太史慈伤害增加60%兵略值；甘宁冷却减少2.1秒。", "Taishi Ci gains 60% Strategy damage; Gan Ning's cooldown is reduced by 2.1s."],
 				["sovereign_minister", "君臣同心", "Sovereign and Minister", ["luxun", "sunquan"], "2人", "2 heroes", "陆逊直接伤害增加80%兵略值，对灼烧目标再增加40%兵略值；孙权伤害改为自身当前生命的11%。", "Lu Xun gains 80% Strategy damage and another 40% against burning targets; Sun Quan deals 11% of his current HP."],
-				["tiger_ministers", "江表虎臣", "Tiger Ministers", ["dingfeng", "xusheng"], "2人", "2 heroes", "丁奉伤害增加100%兵略值且压退70%行动条；徐盛改为随机一排，水阵延长3秒。", "Ding Feng gains 100% Strategy damage and pushes back 70% gauge; Xu Sheng targets a random row and gains 3s duration."]
+				["tiger_ministers", "江表虎臣", "Tiger Ministers", ["dingfeng", "xusheng"], "2人", "2 heroes", "丁奉伤害增加100%兵略值且压退70%行动条；徐盛改为随机一排，水阵延长5.4秒。", "Ding Feng gains 100% Strategy damage and pushes back 70% gauge; Xu Sheng targets a random row and gains 5.4s duration."]
 			]
 		},
 		"qun":{
-			"faction":["chaos_struggle", "群", "Qun", "2 / 5 / 8", "全体群雄武将技能冷却缩短2%/5%/8%。8人时，每次释放技能有8%概率连续释放两次。", "All Qun heroes gain 2%/5%/8% skill cooldown reduction. At 8, every cast has an 8% chance to cast twice in succession."],
+			"faction":["chaos_struggle", "群", "Qun", "2 / 5 / 8", "全体群雄武将技能冷却缩短3.6%/9%/14.4%。8人时，每次释放技能有8%概率连续释放两次。", "All Qun heroes gain 3.6%/9%/14.4% skill cooldown reduction. At 8, every cast has an 8% chance to cast twice in succession."],
 			"bonds":[
 				["tyrant_peerless", "暴虐无双", "Tyrant and Peerless", ["lvbu", "dongzhuo"], "2人", "2 heroes", "吕布按横扫实际伤害的20%回血；董卓伤害提高至自身当前生命30%。", "Lu Bu heals for 20% of actual sweep damage; Dong Zhuo deals 30% of current HP."],
 				["hero_beauty", "英雄美人", "Hero and Beauty", ["lvbu", "diaochan"], "2人", "2 heroes", "吕布每损失10%生命增伤3%；被貂蝉魅惑者每秒攻击相邻友军。", "Lu Bu gains 3% damage per 10% HP missing; charmed enemies attack adjacent allies each second."],
-				["peerless_strategy", "谋定无双", "Peerless Strategy", ["lvbu", "chengong"], "2人", "2 heroes", "吕布横扫有30%概率再释放一次；陈宫冷却光环额外减少0.7秒。", "Lu Bu has a 30% repeat chance; Chen Gong's aura reduces another 0.7s."],
+				["peerless_strategy", "谋定无双", "Peerless Strategy", ["lvbu", "chengong"], "2人", "2 heroes", "吕布横扫有30%概率再释放一次；陈宫冷却光环额外减少1.2秒。", "Lu Bu has a 30% repeat chance; Chen Gong's aura reduces another 1.2s."],
 				["flying_formation", "飞将陷阵", "Flying General Formation", ["lvbu", "gaoshun"], "2人", "2 heroes", "吕布横扫追加正前方对应中军；高顺技能额外攻击1人。", "Lu Bu also strikes the corresponding midguard; Gao Shun gains 1 target."],
-				["tyrant_beauty", "暴君倾城", "Tyrant and Beauty", ["dongzhuo", "diaochan"], "2人", "2 heroes", "董卓最大生命提高40%；貂蝉魅惑延长2秒并恢复自身200%兵略值生命。", "Dong Zhuo gains 40% max HP; Diao Chan gains 2s charm and heals herself for 200% Strategy."],
-				["strategy_formation", "谋陷并驱", "Strategy and Formation", ["chengong", "gaoshun"], "2人", "2 heroes", "陈宫冷却光环额外减少0.7秒；高顺易碎延长3.5秒。", "Chen Gong's aura reduces another 0.7s; Gao Shun's Fragile gains 3.5s."],
+				["tyrant_beauty", "暴君倾城", "Tyrant and Beauty", ["dongzhuo", "diaochan"], "2人", "2 heroes", "董卓最大生命提高40%；貂蝉魅惑延长3.6秒并恢复自身200%兵略值生命。", "Dong Zhuo gains 40% max HP; Diao Chan gains 3.6s charm and heals herself for 200% Strategy."],
+				["strategy_formation", "谋陷并驱", "Strategy and Formation", ["chengong", "gaoshun"], "2人", "2 heroes", "陈宫冷却光环额外减少1.2秒；高顺易碎延长6.3秒。", "Chen Gong's aura reduces another 1.2s; Gao Shun's Fragile gains 6.3s."],
 				["hebei_twins", "河北双雄", "Hebei Twin Champions", ["yanliang", "wenchou"], "2人", "2 heroes", "颜良、文丑各增加1个目标，并分别减少30%/50%兵略值伤害。", "Yan Liang and Wen Chou each gain 1 target but lose 30%/50% Strategy damage."],
 				["hebei_comrades", "河北同袍", "Hebei Comrades", ["gaolan", "qunzhanghe"], "2人", "2 heroes", "高览同列加成提高至0.25×兵略值；群张郃护盾增加60%兵略值。", "Gao Lan's column aura rises to 0.25×Strategy; Zhang He's shield gains 60% Strategy."],
 				["hebei_pillars", "河北四庭柱", "Hebei Pillars", ["yanliang", "wenchou", "qunzhanghe", "gaolan"], "4人", "4 heroes", "颜良、文丑各增加1个目标并增加120%/150%兵略值伤害；高览扩大同排同列0.25×兵略值；群张郃目标+1、护盾增加100%兵略值。", "Yan Liang and Wen Chou gain a target and damage; Gao Lan expands his aura; Zhang He gains a target and 100% Strategy shielding."],
@@ -1407,8 +1412,8 @@ func _bond_graph_data(faction: String) -> Dictionary:
 				["immortal_healers", "济世仙缘", "Immortal Healers", ["huatuo", "zuoci"], "2人", "2 heroes", "华佗治疗增加30%兵略值并清除全部减益；左慈治疗增加50%兵略值。", "Hua Tuo gains healing and cleansing; Zuo Ci gains 50% Strategy healing."],
 				["fangshi_lineage", "方仙同门", "Immortal Lineage", ["yuji", "zuoci"], "2人", "2 heroes", "于吉施加的中毒层数增加0.4×兵略值；左慈治疗时向两个随机射程内单元格追加100%兵略值天雷，空格伤害由主公承受。", "Yu Ji gains poison stacks; Zuo Ci adds 100% Strategy thunderbolts to 2 random reachable tiles, with empty-tile damage hitting the ruler."],
 				["heaven_man", "天人同道", "Heaven and Man", ["zhangjiao", "zhangliang"], "2人", "2 heroes", "张角伤害增加120%兵略值；张梁虚弱目标+1。", "Zhang Jiao gains 120% Strategy damage; Zhang Liang gains 1 target."],
-				["heaven_earth", "天地雷契", "Heaven and Earth", ["zhangjiao", "zhangbao"], "2人", "2 heroes", "张角目标+1且有30%概率眩晕1.5秒；张宝自爆以90%兵略值波及目标周围八格。", "Zhang Jiao gains 1 target and a 30% 1.5s stun chance; Zhang Bao splashes nearby units for 90% Strategy."],
-				["earth_man", "地人续命", "Earth and Man", ["zhangliang", "zhangbao"], "2人", "2 heroes", "张梁虚弱延长2.5秒；张宝额外复生一次。", "Zhang Liang's weaken gains 2.5s; Zhang Bao gains one additional revival."]
+				["heaven_earth", "天地雷契", "Heaven and Earth", ["zhangjiao", "zhangbao"], "2人", "2 heroes", "张角目标+1且有30%概率眩晕2.7秒；张宝自爆以90%兵略值波及目标周围八格。", "Zhang Jiao gains 1 target and a 30% 2.7s stun chance; Zhang Bao splashes nearby units for 90% Strategy."],
+				["earth_man", "地人续命", "Earth and Man", ["zhangliang", "zhangbao"], "2人", "2 heroes", "张梁虚弱延长4.5秒；张宝额外复生一次。", "Zhang Liang's weaken gains 4.5s; Zhang Bao gains one additional revival."]
 			]
 		}
 	}
@@ -1827,22 +1832,22 @@ func _skill_detail(hero_id: String) -> String:
 		"zhugeliang": return t("八阵奇谋：随机选择敌方格子，对目标及同列相邻格造成230%兵略值法术伤害。", "Eight-Formation Stratagem: Deal 230% Strategy magic damage to a random tile and its vertical neighbors.")
 		"jiangwei": return t("北伐：随机攻击一个射程内单元格，造成450%兵略值法术伤害；命中空格时等量伤害由主公承受。", "Northern Expedition: Deal 450% Strategy magic damage to a random reachable tile; empty-tile damage hits the ruler.")
 		"pangtong": return t("连环计：随机攻击两个射程内单元格，各造成200%兵略值伤害；命中的武将链接4秒并传导30%伤害，空格伤害由主公承受。", "Chain Scheme: Strike 2 random reachable tiles for 200% Strategy; hit heroes are linked for 4s and echo 30% damage, while empty-tile damage hits the ruler.")
-		"menghuo": return t("蛮王震地：攻击敌方前军整排，造成115%兵略值物理伤害并眩晕0.8秒。", "Barbarian Quake: Strike the enemy vanguard row for 115% Strategy damage and stun for 0.8s.")
+		"menghuo": return t("蛮王震地：攻击敌方前军整排，造成115%兵略值物理伤害并眩晕1.4秒。", "Barbarian Quake: Strike the enemy vanguard row for 115% Strategy damage and stun for 1.4s.")
 		"zhurong": return t("火神飞刃：随机攻击一个射程内单元格，造成300%兵略值法术伤害并灼烧3秒；空格伤害由主公承受，灼烧留在格中并可由后续上阵武将继承。", "Flame Blade: Strike a random reachable tile for 300% Strategy magic damage and burn it for 3s; empty-tile damage hits the ruler and the burn can transfer to a hero entering that tile.")
 		"dailaidongzhu": return t("蛮骨狼袭：随机攻击一个射程内单元格，造成490%兵略值物理伤害；命中空格时等量伤害由主公承受。", "Savage-Bone Wolf Assault: Strike a random reachable tile for 490% Strategy physical damage; empty-tile damage hits the ruler.")
-		"caocao": return t("魏武震慑：随机攻击两个射程内单元格，各造成150%兵略值伤害；命中武将时眩晕1.25秒，命中空格时等量伤害由主公承受。", "Dominion Stun: Strike 2 random reachable tiles for 150% Strategy; hit heroes are stunned for 1.25s and empty-tile damage hits the ruler.")
+		"caocao": return t("魏武震慑：随机攻击两个射程内单元格，各造成150%兵略值伤害；命中武将时眩晕2.2秒，命中空格时等量伤害由主公承受。", "Dominion Stun: Strike 2 random reachable tiles for 150% Strategy; hit heroes are stunned for 2.2s and empty-tile damage hits the ruler.")
 		"dianwei": return t("恶来袭后：随机攻击两个敌方后军单元格，各造成240%兵略值伤害；空格伤害由主公承受。", "Evil Guard Raid: Strike 2 random enemy rearguard tiles for 240% Strategy each; empty-tile damage hits the ruler.")
 		"xuchu": return t("虎卫破前：随机攻击两个敌方前军单元格，各造成320%兵略值伤害；前军无人时依次顺延，空格伤害由主公承受。", "Tiger Guard Break: Strike 2 random vanguard tiles for 320% Strategy each, advancing by rows when empty; empty-tile damage hits the ruler.")
 		"zhangliao": return t("威震回刃：攻击随机敌方一列，回旋刃飞出与返回各造成110%兵略值伤害。", "Returning Blade: Strike a random enemy column for 110% Strategy on both the outward and returning passes.")
 		"yuejin": return t("先登乱射：随机攻击三个射程内单元格，各造成200%兵略值伤害；空格伤害由主公承受。", "Vanguard Volley: Strike 3 random reachable tiles for 200% Strategy each; empty-tile damage hits the ruler.")
-		"xuhuang": return t("撼地开山：攻击敌方前军整排，造成80%兵略值伤害并眩晕1.5秒。", "Earth-Splitting Axe: Strike the enemy vanguard row for 80% Strategy damage and stun for 1.5s.")
-		"zhanghe": return t("巧变连枪：随机攻击一个敌方前军单元格，造成400%兵略值伤害；前军无人时依次顺延。命中武将眩晕1.5秒，空格伤害由主公承受。", "Coiling Spear Chain: Strike a random vanguard tile for 400% Strategy, advancing by rows when empty; stun a hit hero for 1.5s or damage the ruler on an empty tile.")
+		"xuhuang": return t("撼地开山：攻击敌方前军整排，造成80%兵略值伤害并眩晕2.7秒。", "Earth-Splitting Axe: Strike the enemy vanguard row for 80% Strategy damage and stun for 2.7s.")
+		"zhanghe": return t("巧变连枪：随机攻击一个敌方前军单元格，造成400%兵略值伤害；前军无人时依次顺延。命中武将眩晕2.7秒，空格伤害由主公承受。", "Coiling Spear Chain: Strike a random vanguard tile for 400% Strategy, advancing by rows when empty; stun a hit hero for 2.7s or damage the ruler on an empty tile.")
 		"yujin": return t("毅重护阵：为当前生命值最低的友军施加300%兵略值的护盾。", "Resolute Ward: Shield the ally with the lowest current HP for 300% Strategy.")
-		"xiahouyuan": return t("神速震袭：随机攻击两个射程内单元格，造成220%兵略值伤害；命中武将眩晕1秒，空格伤害由主公承受。", "Swift Suppression: Strike 2 random reachable tiles for 220% Strategy; stun hit heroes for 1s and deal empty-tile damage to the ruler.")
-		"caoren": return t("樊城镇远：随机攻击两个敌方后军单元格，造成200%兵略值伤害；命中武将眩晕1秒，空格伤害由主公承受。释放后获得5秒后军减伤。", "Rearward Bulwark: Strike 2 random rearguard tiles for 200% Strategy; stun hit heroes for 1s and damage the ruler on empty tiles, then gain rearguard damage reduction for 5s.")
-		"xiahoudun": return t("刚烈镇前：随机攻击两个敌方前军单元格，前军无人时依次顺延；造成240%兵略值伤害，命中武将眩晕1.5秒，空格伤害由主公承受。", "Vanguard Bulwark: Strike 2 random vanguard tiles, advancing by rows when empty, for 240% Strategy; stun hit heroes for 1.5s and damage the ruler on empty tiles.")
+		"xiahouyuan": return t("神速震袭：随机攻击两个射程内单元格，造成220%兵略值伤害；命中武将眩晕1.8秒，空格伤害由主公承受。", "Swift Suppression: Strike 2 random reachable tiles for 220% Strategy; stun hit heroes for 1.8s and deal empty-tile damage to the ruler.")
+		"caoren": return t("樊城镇远：随机攻击两个敌方后军单元格，造成200%兵略值伤害；命中武将眩晕1.8秒，空格伤害由主公承受。释放后获得5秒后军减伤。", "Rearward Bulwark: Strike 2 random rearguard tiles for 200% Strategy; stun hit heroes for 1.8s and damage the ruler on empty tiles, then gain rearguard damage reduction for 5s.")
+		"xiahoudun": return t("刚烈镇前：随机攻击两个敌方前军单元格，前军无人时依次顺延；造成240%兵略值伤害，命中武将眩晕2.7秒，空格伤害由主公承受。", "Vanguard Bulwark: Strike 2 random vanguard tiles, advancing by rows when empty, for 240% Strategy; stun hit heroes for 2.7s and damage the ruler on empty tiles.")
 		"simayi": return t("雷霆谋断：随机雷击两个射程内单元格，各造成320%兵略值伤害；空格伤害由主公承受。", "Thunder Judgment: Strike 2 random reachable tiles for 320% Strategy each; empty-tile damage hits the ruler.")
-		"guojia": return t("遗计冰封：随机选择两个射程内单元格；命中武将时冻结3秒，空格则不附加冻结。冻结目标受伤会提前解冻并受到150%兵略值伤害。", "Frozen Legacy: Choose 2 random reachable tiles; freeze hit heroes for 3s while empty tiles receive no freeze. Damage shatters the freeze for 150% Strategy.")
+		"guojia": return t("遗计冰封：随机选择两个射程内单元格；命中武将时冻结5.4秒，空格则不附加冻结。冻结目标受伤会提前解冻并受到150%兵略值伤害。", "Frozen Legacy: Choose 2 random reachable tiles; freeze hit heroes for 5.4s while empty tiles receive no freeze. Damage shatters the freeze for 150% Strategy.")
 		"xunyu": return t("王佐疾策：随机使2名友军行动条速度提高0.4×兵略值%，持续4.4秒。", "Royal Acceleration: Grant 2 random allies gauge speed equal to 0.4×Strategy% for 4.4s.")
 		"jiaxu": return t("毒士奇谋：随机向两个射程内单元格施加1.6×兵略值层毒。空格毒伤直接作用于主公；后续在该格上阵的武将继承剩余毒层。每秒造成当前层数伤害，随后层数减半。", "Venomous Scheme: Apply 1.6×Strategy poison stacks to 2 random reachable tiles. Poison on empty tiles damages the ruler and transfers its remaining stacks to a hero entering the tile; stacks halve after each tick.")
 		"sunjian": return t("猛虎绝命：消耗40%最大生命，攻击正前方单元格并造成等同于实际消耗生命100%的伤害；前军无人时依次顺延，空格伤害由主公承受。", "Tiger's Resolve: Spend 40% max HP and strike the facing tile for 100% of HP spent, advancing by rows when empty; empty-tile damage hits the ruler.")
@@ -1854,17 +1859,17 @@ func _skill_detail(hero_id: String) -> String:
 		"lvmeng": return t("白衣渡江：攻击敌方后军随机单元格，造成500%兵略值伤害。", "White-Robed Raid: Strike a random enemy rearguard for 500% Strategy damage.")
 		"lusu": return t("连横稳阵：为当前生命值最低的友军恢复320%兵略值生命，并使其最大生命提高200。", "Alliance: Heal the ally with the lowest current HP for 320% Strategy and grant 200 max HP.")
 		"daqiao": return t("国色流离：治疗生命最低的友军380%兵略值生命。", "River Blossom: Heal the ally with the lowest current HP for 380% Strategy.")
-		"xiaoqiao": return t("天香缓阵：随机选择两名敌方后军，使其减速6秒，期间行动条速度降低0.35×兵略值%。", "Gentle Breeze: Slow two random enemy rearguards for 6s by 0.35×Strategy%.")
+		"xiaoqiao": return t("天香缓阵：随机选择两名敌方后军，使其减速10.8秒，期间行动条速度降低0.35×兵略值%。", "Gentle Breeze: Slow two random enemy rearguards for 10.8s by 0.35×Strategy%.")
 		"taishici": return t("神亭烈戟：优先攻击射程内行动条最高的两名敌人，造成200%兵略值伤害并灼烧5秒；敌方空场时改为随机攻击两个射程内单元格，空格伤害由主公承受。", "Blazing Twin Halberds: Prioritize the 2 reachable enemies with the highest gauges for 200% Strategy and burn for 5s; if the enemy board is empty, strike 2 random reachable tiles and deal empty-tile damage to the ruler.")
 		"ganning": return t("锦帆并击：自身与同排左侧友军分别攻击一个随机敌方后军单元格，各造成300%自身兵略值伤害；空格伤害由主公承受，友军协击不消耗行动条。", "Bell-Raider Twin Assault: Gan Ning and his left ally each strike a random rearguard tile for 300% of their own Strategy; empty-tile damage hits the ruler and the assist costs no gauge.")
 		"huanggai": return t("苦肉焚阵：消耗10%最大生命，对随机敌方一列造成200%兵略值加实际消耗生命40%的伤害；生命不足时消耗全部生命并在攻击后阵亡。", "Bitter-Flesh Column: Spend 10% max HP to damage a random enemy column for 200% Strategy plus 40% of HP spent.")
 		"dingfeng": return t("雪中奋短兵：优先攻击射程内行动条最高的敌人，造成400%兵略值伤害并压退25%行动条；敌方空场时改为随机攻击一个射程内单元格，空格伤害由主公承受。", "Snowbound Short Blades: Prioritize the reachable enemy with the highest gauge for 400% Strategy and push it back 25%; if the enemy board is empty, strike a random reachable tile and damage the ruler.")
-		"xusheng": return t("宿卫水阵：冲击敌方前军整排，前军无人时依次顺延；每格造成100%兵略值伤害，空格伤害由主公承受，并使命中武将减速4秒，行动速度降低0.3×兵略值%。", "Guardian Water Formation: Strike the enemy vanguard row, advancing by rows when empty, for 100% Strategy per tile; empty-tile damage hits the ruler and hit heroes lose 0.3×Strategy% gauge speed for 4s.")
+		"xusheng": return t("宿卫水阵：冲击敌方前军整排，前军无人时依次顺延；每格造成100%兵略值伤害，空格伤害由主公承受，并使命中武将减速7.2秒，行动速度降低0.3×兵略值%。", "Guardian Water Formation: Strike the enemy vanguard row, advancing by rows when empty, for 100% Strategy per tile; empty-tile damage hits the ruler and hit heroes lose 0.3×Strategy% gauge speed for 7.2s.")
 		"lvbu": return t("无双横扫：攻击正前方单元格，造成220%兵略值伤害；敌方前军无人时依次顺延，空格伤害由主公承受。", "Peerless Sweep: Strike the facing tile for 220% Strategy, advancing by rows when empty; empty-tile damage hits the ruler.")
-		"diaochan": return t("美人离间：随机魅惑一名敌军4秒，使其行动条停止。", "Beauty's Scheme: Charm a random enemy for 4s, stopping its action gauge.")
+		"diaochan": return t("美人离间：随机魅惑一名敌军7.2秒，使其行动条停止。", "Beauty's Scheme: Charm a random enemy for 7.2s, stopping its action gauge.")
 		"dongzhuo": return t("暴君横征：攻击正前方单元格，造成自身当前生命值20%的伤害；敌方前军无人时依次顺延，空格伤害由主公承受。", "Tyrant's Might: Strike the facing tile for 20% of current HP, advancing by rows when empty; empty-tile damage hits the ruler.")
 		"chengong": return t("智迟谋速（被动）：陈宫及其同列友军的技能冷却减少1秒。", "Measured Formation (Passive): Chen Gong and allies in his column reduce skill cooldowns by 1s.")
-		"gaoshun": return t("陷阵之志：随机攻击两个敌方前军单元格，前军无人时依次顺延；造成220%兵略值伤害，命中武将施加3.5秒易碎，空格伤害由主公承受。", "Formation Resolve: Strike 2 random vanguard tiles, advancing by rows when empty, for 220% Strategy; hit heroes become Fragile for 3.5s and empty-tile damage hits the ruler.")
+		"gaoshun": return t("陷阵之志：随机攻击两个敌方前军单元格，前军无人时依次顺延；造成220%兵略值伤害，命中武将施加6.3秒易碎，空格伤害由主公承受。", "Formation Resolve: Strike 2 random vanguard tiles, advancing by rows when empty, for 220% Strategy; hit heroes become Fragile for 6.3s and empty-tile damage hits the ruler.")
 		"yanliang": return t("河北猛袭：随机攻击两个敌方中军或后军单元格，各造成200%兵略值伤害；空格伤害由主公承受。", "Hebei Fierce Assault: Strike 2 random midguard or rearguard tiles for 200% Strategy each; empty-tile damage hits the ruler.")
 		"wenchou": return t("河北破阵：随机攻击两个敌方前军或中军单元格，各造成300%兵略值伤害；空格伤害由主公承受。", "Hebei Breakthrough: Strike 2 random vanguard or midguard tiles for 300% Strategy each; empty-tile damage hits the ruler.")
 		"gaolan": return t("列阵扬威（被动）：高览同列友军的兵略值增加0.2×兵略值。", "Column Valor (Passive): Allies in Gao Lan's column gain 0.2× his Strategy.")
@@ -1873,7 +1878,7 @@ func _skill_detail(hero_id: String) -> String:
 		"yuji": return t("蛊毒仙术：随机向两个射程内单元格施加1.4×兵略值层毒。空格毒伤直接作用于主公，后续在该格上阵的武将继承剩余毒层；每秒结算后层数减半。", "Venomous Immortal Art: Apply 1.4×Strategy poison stacks to 2 random reachable tiles. Empty-tile poison damages the ruler and transfers to a hero entering the tile; stacks halve after each tick.")
 		"zuoci": return t("遁甲济世：治疗当前生命值最低的两名友军，各恢复170%兵略值生命。", "Immortal Aid: Heal the two allies with the lowest current HP for 170% Strategy each.")
 		"zhangjiao": return t("黄天雷引：召唤雷电随机攻击两个射程内单元格，各造成300%兵略值伤害；空格伤害由主公承受。", "Yellow Sky Thunder: Call lightning on 2 random reachable tiles for 300% Strategy each; empty-tile damage hits the ruler.")
-		"zhangliang": return t("人公虚弱：随机使两名敌军虚弱4秒，兵略值降低0.5×兵略值。", "Yellow Sky Weakening: Weaken two random enemies for 4s, reducing Strategy based on Zhang Liang's Strategy.")
+		"zhangliang": return t("人公虚弱：随机使两名敌军虚弱7.2秒，兵略值降低0.5×兵略值。", "Yellow Sky Weakening: Weaken two random enemies for 7.2s, reducing Strategy based on Zhang Liang's Strategy.")
 		"zhangbao": return t("地公雷爆（被动）：阵亡时随机攻击两个射程内单元格，当前排无人时依次顺延；各造成900%兵略值伤害，空格伤害由主公承受，随后以50%最大生命值复生一次。", "Earth General Detonation (Passive): On death, strike 2 random reachable tiles, advancing by rows when empty, for 900% Strategy; empty-tile damage hits the ruler, then revive once at 50% max HP.")
 	return _true_damage_text(_skill_detail_legacy(hero_id))
 
@@ -1889,7 +1894,7 @@ func _hero_bond_detail(hero_id: String) -> String:
 		"shu":["2/5/8人时，本武将承伤降低2%/5%/8%；8人时每次受伤叠加3%减伤，最多3层，每层持续3秒。", "At 2/5/8, this hero takes 2%/5%/8% less damage; at 8, each hit taken adds 3% reduction up to 3 stacks, each lasting 3s."],
 		"wei":["2/5/8人时，本武将控制时长提高2%/5%/8%；8人时，对带有任意控制或减益的目标伤害提高8%。", "At 2/5/8, this hero gains 2%/5%/8% control duration; at 8, damage to any controlled or debuffed target increases by 8%."],
 		"wu":["2/5/8人时，本武将最大生命提高2%/5%/8%；8人时，吴将濒死会触发全体吴将生命均摊并恢复5%最大生命（每30秒一次）。", "At 2/5/8, this hero gains 2%/5%/8% max HP; at 8, a lethal hit equalizes Wu health and restores 5% max HP (once per 30s)."],
-		"qun":["2/5/8人时，本武将技能冷却缩短2%/5%/8%；8人时，每次释放技能有8%概率连续释放两次。", "At 2/5/8, this hero gains 2%/5%/8% cooldown reduction; at 8, each cast has an 8% chance to cast twice."]
+		"qun":["2/5/8人时，本武将技能冷却缩短3.6%/9%/14.4%；8人时，每次释放技能有8%概率连续释放两次。", "At 2/5/8, this hero gains 3.6%/9%/14.4% cooldown reduction; at 8, each cast has an 8% chance to cast twice."]
 	}[faction]
 	var peach: Array = ["liubei", "guanyu", "zhangfei"]
 	if peach.has(hero_id):
@@ -1915,7 +1920,7 @@ func _hero_bond_detail(hero_id: String) -> String:
 		],
 		"menghuo":[
 			["七擒孟获", "Seven Captures", ["zhugeliang", "menghuo"], "蛮王震地结束后追加一次35%兵略值的整排余震，余震不重复眩晕。", "Barbarian Quake adds a 35% Strategy row-wide aftershock without a second stun."],
-			["南蛮夫妇", "Nanman Couple", ["menghuo", "zhurong"], "蛮王震地对灼烧目标伤害提高40%，并将这些目标的眩晕时间由0.8秒延长至1.2秒。", "Barbarian Quake deals +40% damage to burning targets and extends their stun from 0.8s to 1.2s."],
+			["南蛮夫妇", "Nanman Couple", ["menghuo", "zhurong"], "蛮王震地对灼烧目标伤害提高40%，并将这些目标的眩晕时间由1.4秒延长至2.1秒。", "Barbarian Quake deals +40% damage to burning targets and extends their stun from 1.4s to 2.1s."],
 			["蛮王援军", "Barbarian Reinforcements", ["menghuo", "dailaidongzhu"], "蛮王震地额外使每名命中武将损失8%行动条。", "Every hero hit by Barbarian Quake also loses 8% gauge."]
 		],
 		"zhurong":[
@@ -1935,30 +1940,30 @@ func _hero_bond_detail(hero_id: String) -> String:
 	}
 	for data in personal.get(hero_id, []): entries.append(_bond_entry(data[0], data[1], data[2], data[3], data[4]))
 	var combo_defs: Array = [
-		[["caocao", "dianwei"], "古之恶来", "Evil of Old", {"caocao":["技能目标数增加1；命中后军时伤害增加100%兵略值，眩晕时长增加0.5秒。", "Gain 1 target; against rearguards, gain 100% Strategy damage and 0.5s stun."], "dianwei":["攻击目标增加1，造成伤害减少30%兵略值。", "Gain 1 target, but lose 30% Strategy damage."]}],
-		[["caocao", "xuchu"], "虎卫护主", "Tiger Guard", {"caocao":["技能目标数增加1；命中前军时伤害增加100%兵略值，眩晕时长增加0.5秒。", "Gain 1 target; against vanguards, gain 100% Strategy damage and 0.5s stun."], "xuchu":["攻击目标增加1，造成伤害减少40%兵略值。", "Gain 1 target, but lose 40% Strategy damage."]}],
+		[["caocao", "dianwei"], "古之恶来", "Evil of Old", {"caocao":["技能目标数增加1；命中后军时伤害增加100%兵略值，眩晕时长增加0.9秒。", "Gain 1 target; against rearguards, gain 100% Strategy damage and 0.9s stun."], "dianwei":["攻击目标增加1，造成伤害减少30%兵略值。", "Gain 1 target, but lose 30% Strategy damage."]}],
+		[["caocao", "xuchu"], "虎卫护主", "Tiger Guard", {"caocao":["技能目标数增加1；命中前军时伤害增加100%兵略值，眩晕时长增加0.9秒。", "Gain 1 target; against vanguards, gain 100% Strategy damage and 0.9s stun."], "xuchu":["攻击目标增加1，造成伤害减少40%兵略值。", "Gain 1 target, but lose 40% Strategy damage."]}],
 		[["dianwei", "xuchu"], "魏武双卫", "Twin Wei Guards", {"dianwei":["造成伤害增加80%兵略值。", "Gain 80% Strategy damage."], "xuchu":["造成伤害增加100%兵略值。", "Gain 100% Strategy damage."]}],
 		[["zhangliao", "yuejin"], "逍遥津先锋", "Hefei Vanguard", {"zhangliao":["回旋刃的每段伤害增加40%兵略值。", "Each boomerang pass gains 40% Strategy damage."], "yuejin":["攻击目标增加1名。", "Gain 1 target."]}],
-		[["zhanghe", "xuhuang"], "巧变开山", "Adaptive Vanguard", {"zhanghe":["眩晕时长增加1秒。", "Stun duration gains 1s."], "xuhuang":["伤害增加80%兵略值。", "Gain 80% Strategy damage."]}],
-		[["zhouyu", "luxun", "lusu", "lvmeng"], "四英杰", "Four Heroes", {"zhouyu":["额外选择2个格子，灼烧伤害增加50%兵略值。", "Gain 2 tiles and 50% Strategy burn damage."], "luxun":["总弹射次数增加2次，并施加3秒灼烧，每秒30%兵略值伤害。", "Gain 2 bounces and inflict a 3s burn at 30% Strategy per second."], "lusu":["治疗2名最低当前生命友军，各恢复400%兵略值并提高500最大生命。", "Heal the 2 lowest-current-HP allies for 400% Strategy and grant 500 max HP."], "lvmeng":["命中的后军恐惧5秒，行动条停止且每秒受到4%最大生命伤害。", "Fear the struck rearguard for 5s, stopping its gauge and dealing 4% max HP each second."]}],
+		[["zhanghe", "xuhuang"], "巧变开山", "Adaptive Vanguard", {"zhanghe":["眩晕时长增加1.8秒。", "Stun duration gains 1.8s."], "xuhuang":["伤害增加80%兵略值。", "Gain 80% Strategy damage."]}],
+		[["zhouyu", "luxun", "lusu", "lvmeng"], "四英杰", "Four Heroes", {"zhouyu":["额外选择2个格子，灼烧伤害增加50%兵略值。", "Gain 2 tiles and 50% Strategy burn damage."], "luxun":["总弹射次数增加2次，并施加3秒灼烧，每秒30%兵略值伤害。", "Gain 2 bounces and inflict a 3s burn at 30% Strategy per second."], "lusu":["治疗2名最低当前生命友军，各恢复400%兵略值并提高500最大生命。", "Heal the 2 lowest-current-HP allies for 400% Strategy and grant 500 max HP."], "lvmeng":["命中的后军恐惧9秒，行动条停止且每秒受到4%最大生命伤害。", "Fear the struck rearguard for 9s, stopping its gauge and dealing 4% max HP each second."]}],
 		[["lvbu", "dongzhuo"], "暴虐无双", "Tyrant and Peerless", {"lvbu":["按无双横扫对武将造成的实际伤害20%恢复自身生命；护盾和空格伤害不计入。", "Heal for 20% of actual hero HP damage from Peerless Sweep; shield and empty-tile damage do not count."], "dongzhuo":["暴君横征伤害提高至自身当前生命值30%。", "Tyrant's Might rises to 30% of current HP."]}],
 		[["lvbu", "diaochan"], "英雄美人", "Hero and Beauty", {"lvbu":["每损失10%生命，无双横扫伤害提高3%。", "Gain 3% Peerless Sweep damage per 10% HP missing."], "diaochan":["魅惑期间，目标每秒随机攻击一名相邻友军，造成被魅惑者100%兵略值伤害。", "Each second, the charmed target attacks a random adjacent ally for 100% of its own Strategy."]}],
-		[["lvbu", "chengong"], "谋定无双", "Peerless Strategy", {"lvbu":["无双横扫有30%概率连续释放两次。", "Peerless Sweep has a 30% chance to cast twice."], "chengong":["智迟谋速的冷却减少额外增加0.7秒。", "Measured Formation reduces cooldown by another 0.7s."]}],
+		[["lvbu", "chengong"], "谋定无双", "Peerless Strategy", {"lvbu":["无双横扫有30%概率连续释放两次。", "Peerless Sweep has a 30% chance to cast twice."], "chengong":["智迟谋速的冷却减少额外增加1.2秒。", "Measured Formation reduces cooldown by another 1.2s."]}],
 		[["lvbu", "gaoshun"], "飞将陷阵", "Flying General Formation", {"lvbu":["无双横扫追加攻击正前方敌军对应的中军。", "Peerless Sweep also hits the corresponding midguard."], "gaoshun":["陷阵之志的目标额外增加1名。", "Formation Resolve gains 1 target."]}],
-		[["dongzhuo", "diaochan"], "暴君倾城", "Tyrant and Beauty", {"dongzhuo":["自身最大生命值提高40%。", "Gain 40% max HP."], "diaochan":["魅惑持续时间增加2秒，且貂蝉恢复200%兵略值生命。", "Charm gains 2s and Diao Chan heals herself for 200% Strategy."]}],
-		[["chengong", "gaoshun"], "谋陷并驱", "Strategy and Formation", {"chengong":["智迟谋速的冷却减少额外增加0.7秒。", "Measured Formation reduces cooldown by another 0.7s."], "gaoshun":["陷阵之志的易碎持续时间增加3.5秒。", "Formation Resolve Fragile duration gains 3.5s."]}],
+		[["dongzhuo", "diaochan"], "暴君倾城", "Tyrant and Beauty", {"dongzhuo":["自身最大生命值提高40%。", "Gain 40% max HP."], "diaochan":["魅惑持续时间增加3.6秒，且貂蝉恢复200%兵略值生命。", "Charm gains 3.6s and Diao Chan heals herself for 200% Strategy."]}],
+		[["chengong", "gaoshun"], "谋陷并驱", "Strategy and Formation", {"chengong":["智迟谋速的冷却减少额外增加1.2秒。", "Measured Formation reduces cooldown by another 1.2s."], "gaoshun":["陷阵之志的易碎持续时间增加6.3秒。", "Formation Resolve Fragile duration gains 6.3s."]}],
 		[["yanliang", "wenchou"], "河北双雄", "Hebei Twin Champions", {"yanliang":["技能目标增加1名，伤害减少30%兵略值。", "Gain 1 target but lose 30% Strategy damage."], "wenchou":["技能目标增加1名，伤害减少50%兵略值。", "Gain 1 target but lose 50% Strategy damage."]}],
 		[["gaolan", "qunzhanghe"], "河北同袍", "Hebei Comrades", {"gaolan":["同列友军的兵略值加成提高至0.25×兵略值。", "The column aura rises to 0.25×Strategy."], "qunzhanghe":["护盾值增加60%兵略值。", "Shielding gains 60% Strategy."]}],
-		[["zhangliao", "yuejin", "zhanghe", "xuhuang", "yujin"], "五子良将", "Five Elite Generals", {"zhangliao":["回旋刃每段伤害增加80%兵略值；命中者受到的伤害增加0.4×兵略值%，持续5秒。", "Each pass gains 80% Strategy damage; hit enemies take 0.4×Strategy% more damage for 5s."], "yuejin":["目标增加1名，伤害增加50%兵略值，并施加5秒重伤，使治疗和自身回复降低0.5×兵略值%。", "Gain 1 target and 50% Strategy damage; inflict 5s Grievous Wounds reducing healing and self-recovery by 0.5×Strategy%."], "zhanghe":["攻击扩散至主目标周围相连的两名随机敌军；伤害增加200%兵略值，目标攻击前已眩晕时额外增加400%兵略值。", "Chain to 2 random enemies adjacent to the primary; gain 200% Strategy damage and another 400% if a target was already stunned."], "xuhuang":["改为攻击随机一整排，眩晕时长增加2秒。", "Strike a random entire row and gain 2s stun."], "yujin":["施法目标增加1名，护盾值增加100%兵略值。", "Gain 1 target and 100% Strategy shielding."]}],
-		[["xiahouyuan", "caoren"], "神速镇远", "Swift Bulwark", {"xiahouyuan":["冷却缩短0.5秒，眩晕延长0.5秒。", "Cooldown -0.5s and stun +0.5s."], "caoren":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方后军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% rear damage reduction."]}],
-		[["xiahouyuan", "xiahoudun"], "夏侯同心", "Xiahou Brothers", {"xiahouyuan":["冷却缩短0.5秒，眩晕延长0.5秒。", "Cooldown -0.5s and stun +0.5s."], "xiahoudun":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方前军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% vanguard damage reduction."]}],
-		[["caoren", "xiahoudun"], "魏武双壁", "Twin Bulwarks", {"caoren":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方后军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% rear damage reduction."], "xiahoudun":["目标增加1名，眩晕延长0.5秒，释放技能后受到敌方前军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.5s stun, and +0.1*Strategy% vanguard damage reduction."]}],
-		[["simayi", "guojia"], "雷霆冰策", "Thunder and Frost", {"simayi":["雷击目标增加1名，伤害减少40%兵略值。", "Gain 1 lightning target but lose 40% Strategy damage."], "guojia":["冻结目标增加1名，冻结时间减少0.5秒。", "Gain 1 freeze target but lose 0.5s freeze duration."]}],
+		[["zhangliao", "yuejin", "zhanghe", "xuhuang", "yujin"], "五子良将", "Five Elite Generals", {"zhangliao":["回旋刃每段伤害增加80%兵略值；命中者受到的伤害增加0.4×兵略值%，持续9秒。", "Each pass gains 80% Strategy damage; hit enemies take 0.4×Strategy% more damage for 9s."], "yuejin":["目标增加1名，伤害增加50%兵略值，并施加9秒重伤，使治疗和自身回复降低0.5×兵略值%。", "Gain 1 target and 50% Strategy damage; inflict 9s Grievous Wounds reducing healing and self-recovery by 0.5×Strategy%."], "zhanghe":["攻击扩散至主目标周围相连的两名随机敌军；伤害增加200%兵略值，目标攻击前已眩晕时额外增加400%兵略值。", "Chain to 2 random enemies adjacent to the primary; gain 200% Strategy damage and another 400% if a target was already stunned."], "xuhuang":["改为攻击随机一整排，眩晕时长增加3.6秒。", "Strike a random entire row and gain 3.6s stun."], "yujin":["施法目标增加1名，护盾值增加100%兵略值。", "Gain 1 target and 100% Strategy shielding."]}],
+		[["xiahouyuan", "caoren"], "神速镇远", "Swift Bulwark", {"xiahouyuan":["冷却缩短0.9秒，眩晕延长0.9秒。", "Cooldown -0.9s and stun +0.9s."], "caoren":["目标增加1名，眩晕延长0.9秒，释放技能后受到敌方后军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.9s stun, and +0.1*Strategy% rear damage reduction."]}],
+		[["xiahouyuan", "xiahoudun"], "夏侯同心", "Xiahou Brothers", {"xiahouyuan":["冷却缩短0.9秒，眩晕延长0.9秒。", "Cooldown -0.9s and stun +0.9s."], "xiahoudun":["目标增加1名，眩晕延长0.9秒，释放技能后受到敌方前军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.9s stun, and +0.1*Strategy% vanguard damage reduction."]}],
+		[["caoren", "xiahoudun"], "魏武双壁", "Twin Bulwarks", {"caoren":["目标增加1名，眩晕延长0.9秒，释放技能后受到敌方后军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.9s stun, and +0.1*Strategy% rear damage reduction."], "xiahoudun":["目标增加1名，眩晕延长0.9秒，释放技能后受到敌方前军伤害减免提高0.1*兵略值%。", "Gain 1 target, +0.9s stun, and +0.1*Strategy% vanguard damage reduction."]}],
+		[["simayi", "guojia"], "雷霆冰策", "Thunder and Frost", {"simayi":["雷击目标增加1名，伤害减少40%兵略值。", "Gain 1 lightning target but lose 40% Strategy damage."], "guojia":["冻结目标增加1名，冻结时间减少0.9秒。", "Gain 1 freeze target but lose 0.9s freeze duration."]}],
 		[["simayi", "xunyu"], "鹰视王佐", "Eagle Eye and Royal Aid", {"simayi":["雷击目标增加1名，伤害减少40%兵略值。", "Gain 1 lightning target but lose 40% Strategy damage."], "xunyu":["施法目标增加1名，行动条速度加成减少0.05×兵略值%。", "Gain 1 target but lose 0.05×Strategy% gauge speed."]}],
 		[["simayi", "jiaxu"], "鹰视毒谋", "Eagle Eye and Venom", {"simayi":["伤害增加80%兵略值。", "Gain 80% Strategy damage."], "jiaxu":["中毒层数衰减由50%改为45%（每次伤害后保留55%层数，100→55→30→16…→0）。", "Poison stack decay drops from 50% to 45% (each hit keeps 55% stacks: 100→55→30→16…→0)."]}],
-		[["guojia", "xunyu"], "遗计王佐", "Frozen Royal Plan", {"guojia":["冻结时间增加1.2秒。", "Freeze duration gains 1.2s."], "xunyu":["行动条速度加成增加0.12×兵略值%。", "Gauge speed bonus gains 0.12×Strategy%."]}],
-		[["guojia", "jiaxu"], "冰毒奇策", "Frost and Venom", {"guojia":["技能冷却减少1.6秒。", "Cooldown is reduced by 1.6s."], "jiaxu":["施法目标增加1名，但施加的毒层数减少0.2×兵略值。", "Gain 1 poison target but apply 0.2×Strategy fewer stacks."]}],
-		[["xunyu", "jiaxu"], "王佐毒策", "Royal Venom", {"xunyu":["技能冷却减少1.6秒。", "Cooldown is reduced by 1.6s."], "jiaxu":["技能冷却减少1.6秒。", "Cooldown is reduced by 1.6s."]}],
+		[["guojia", "xunyu"], "遗计王佐", "Frozen Royal Plan", {"guojia":["冻结时间增加2.1秒。", "Freeze duration gains 2.1s."], "xunyu":["行动条速度加成增加0.12×兵略值%。", "Gauge speed bonus gains 0.12×Strategy%."]}],
+		[["guojia", "jiaxu"], "冰毒奇策", "Frost and Venom", {"guojia":["技能冷却减少2.8秒。", "Cooldown is reduced by 2.8s."], "jiaxu":["施法目标增加1名，但施加的毒层数减少0.2×兵略值。", "Gain 1 poison target but apply 0.2×Strategy fewer stacks."]}],
+		[["xunyu", "jiaxu"], "王佐毒策", "Royal Venom", {"xunyu":["技能冷却减少2.8秒。", "Cooldown is reduced by 2.8s."], "jiaxu":["技能冷却减少2.8秒。", "Cooldown is reduced by 2.8s."]}],
 		[["sunjian", "sunce", "sunquan", "sunshangxiang"], "孙氏之志", "Sun Legacy", {"sunjian":["改为消耗全部生命；阵亡后存活吴将本回合伤害提高12%，不可叠加。", "Spend all HP; surviving Wu allies gain 12% non-stacking damage for the round."], "sunce":["追加第二段攻击正前方和右侧敌军，正前方承受两次攻击。", "Add a second wave against the facing and right enemies; the facing enemy is hit twice."], "sunquan":["最大生命提高400，上限为初始最大生命3倍；随后恢复20%已损失生命。", "Gain 400 max HP up to 3x initial max HP, then restore 20% missing HP."], "sunshangxiang":["施法目标增加1名。", "Gain 1 target."]}],
 		[["daqiao", "xiaoqiao"], "江东双姝", "Jiangdong Sisters", {"daqiao":["追加1次150%兵略值的治疗。", "Add one 150% Strategy heal."], "xiaoqiao":["行动条减速增加0.12×兵略值%。", "Gauge slow gains 0.12×Strategy%."]}],
 		[["lvmeng", "ganning"], "白衣奇袭", "White-Robed Ambush", {"lvmeng":["伤害增加150%兵略值，且无视目标护盾。", "Gain 150% Strategy damage and ignore the target's shield."], "ganning":["攻击生命值低于50%的敌人时，伤害增加180%兵略值。", "Gain 180% Strategy damage against targets below 50% HP."]}],
@@ -1967,16 +1972,16 @@ func _hero_bond_detail(hero_id: String) -> String:
 		[["zhouyu", "xiaoqiao"], "琴瑟和鸣", "Harmonious Zither", {"zhouyu":["灼烧持续时间增加3秒，灼烧伤害增加30%兵略值。", "Burn duration gains 3s and burn damage gains 30% Strategy."], "xiaoqiao":["施法目标增加1名。", "Gain 1 target."]}],
 		[["zhouyu", "huanggai"], "赤壁苦计", "Red Cliffs Ruse", {"zhouyu":["灼烧伤害随目标已损生命提高，每损失10%生命，整体灼烧伤害提高3%。", "Burn damage gains 3% per 10% target HP missing."], "huanggai":["命中格灼烧5秒，每秒造成50%兵略值伤害；空格灼烧会伤害主公。", "Burn struck tiles for 5s at 50% Strategy per second; empty tiles damage the ruler."]}],
 		[["huanggai", "sunjian"], "江东柱石", "Pillars of Jiangdong", {"huanggai":["最大生命消耗提高至15%，伤害中的实际消耗生命系数提高至50%。", "Max-HP cost rises to 15% and the spent-HP coefficient rises to 50%."], "sunjian":["开局行动条充满。", "Start with a full gauge."]}],
-		[["taishici", "ganning"], "江表双锋", "Twin Blades of Jiangbiao", {"taishici":["造成的伤害增加60%兵略值。", "Gain 60% Strategy damage."], "ganning":["技能冷却减少1.2秒。", "Cooldown is reduced by 1.2s."]}],
+		[["taishici", "ganning"], "江表双锋", "Twin Blades of Jiangbiao", {"taishici":["造成的伤害增加60%兵略值。", "Gain 60% Strategy damage."], "ganning":["技能冷却减少2.1秒。", "Cooldown is reduced by 2.1s."]}],
 		[["luxun", "sunquan"], "君臣同心", "Sovereign and Minister", {"luxun":["直接伤害增加80%兵略值，对已灼烧目标额外增加40%兵略值。", "Gain 80% Strategy damage and another 40% against burning targets."], "sunquan":["伤害改为孙权当前生命值的11%。", "Damage becomes 11% of Sun Quan's current HP."]}],
-		[["dingfeng", "xusheng"], "江表虎臣", "Tiger Ministers", {"dingfeng":["伤害增加100%兵略值，压退改为70%行动条。", "Gain 100% Strategy damage and push back 70% gauge."], "xusheng":["改为冲击随机一排，水阵持续时间增加3秒。", "Strike a random row and increase water formation duration by 3s."]}],
+		[["dingfeng", "xusheng"], "江表虎臣", "Tiger Ministers", {"dingfeng":["伤害增加100%兵略值，压退改为70%行动条。", "Gain 100% Strategy damage and push back 70% gauge."], "xusheng":["改为冲击随机一排，水阵持续时间增加5.4秒。", "Strike a random row and increase water formation duration by 5.4s."]}],
 		[["yanliang", "wenchou", "qunzhanghe", "gaolan"], "河北四庭柱", "Hebei Pillars", {"yanliang":["技能目标增加1名，伤害增加120%兵略值。", "Gain 1 target and 120% Strategy damage."], "wenchou":["技能目标增加1名，伤害增加150%兵略值。", "Gain 1 target and 150% Strategy damage."], "qunzhanghe":["技能目标增加1名，护盾增加100%兵略值。", "Gain 1 target and 100% Strategy shielding."], "gaolan":["光环改为同排和同列全部友军兵略值增加0.25×兵略值。", "The aura grants 0.25×Strategy to all allies in Gao Lan's row and column."]}],
 		[["huatuo", "yuji"], "医道同源", "Medicine and Immortality", {"huatuo":["青囊三济治疗增加70%兵略值。", "Threefold Remedy gains 70% Strategy healing."], "yuji":["蛊毒仙术增加1个目标。", "Venomous Immortal Art gains 1 target."]}],
 		[["huatuo", "zuoci"], "济世仙缘", "Immortal Healers", {"huatuo":["治疗增加30%兵略值，并清除目标全部减益。", "Gain 30% Strategy healing and cleanse all debuffs."], "zuoci":["治疗倍率增加50%兵略值。", "Healing gains 50% Strategy."]}],
 		[["yuji", "zuoci"], "方仙同门", "Immortal Lineage", {"yuji":["施加的中毒层数增加0.4×兵略值。", "Applied poison stacks gain 0.4×Strategy."], "zuoci":["治疗时同时雷击两个随机射程内单元格，各造成100%兵略值伤害；空格伤害由主公承受。", "Each heal also strikes 2 random reachable tiles for 100% Strategy lightning damage; empty-tile damage hits the ruler."]}],
 		[["zhangjiao", "zhangliang"], "天人同道", "Heaven and Man", {"zhangjiao":["黄天雷引的伤害增加120%兵略值。", "Yellow Sky Thunder gains 120% Strategy damage."], "zhangliang":["人公虚弱增加1个目标。", "Yellow Sky Weakening gains 1 target."]}],
-		[["zhangjiao", "zhangbao"], "天地雷契", "Heaven and Earth", {"zhangjiao":["黄天雷引增加1个目标，每名受击者有30%概率眩晕1.5秒。", "Yellow Sky Thunder gains 1 target; each victim has a 30% chance to be stunned for 1.5s."], "zhangbao":["地公雷爆波及每个主目标周围八格武将，造成90%兵略值伤害。", "Earth General Detonation splashes all eight neighboring units for 90% Strategy."]}],
-		[["zhangliang", "zhangbao"], "地人续命", "Earth and Man", {"zhangliang":["人公虚弱持续时间增加2.5秒。", "Yellow Sky Weakening gains 2.5s duration."], "zhangbao":["本场战斗额外复生一次。", "Gain one additional revival."]}]
+		[["zhangjiao", "zhangbao"], "天地雷契", "Heaven and Earth", {"zhangjiao":["黄天雷引增加1个目标，每名受击者有30%概率眩晕2.7秒。", "Yellow Sky Thunder gains 1 target; each victim has a 30% chance to be stunned for 2.7s."], "zhangbao":["地公雷爆波及每个主目标周围八格武将，造成90%兵略值伤害。", "Earth General Detonation splashes all eight neighboring units for 90% Strategy."]}],
+		[["zhangliang", "zhangbao"], "地人续命", "Earth and Man", {"zhangliang":["人公虚弱持续时间增加4.5秒。", "Yellow Sky Weakening gains 4.5s duration."], "zhangbao":["本场战斗额外复生一次。", "Gain one additional revival."]}]
 	]
 	for definition in combo_defs:
 		var members: Array = definition[0]
@@ -1992,7 +1997,7 @@ func _bond_detail(faction: String) -> String:
 		"shu": return t("蜀：2/5/8人时承伤降低2%/5%/8%；8人时每次受伤叠加3%减伤，最多3层，每层持续3秒。", "Shu: at 2/5/8, take 2%/5%/8% less damage; at 8, each hit adds 3% reduction up to 3 stacks, each lasting 3s.")
 		"wei": return t("魏：2/5/8人时控制时长提高2%/5%/8%；8人时对受控或带减益目标伤害提高8%。", "Wei: at 2/5/8, control duration gains 2%/5%/8%; at 8, deal 8% more damage to controlled or debuffed targets.")
 		"wu": return t("吴：2/5/8人时最大生命提高2%/5%/8%；8人时濒死触发生命均摊并恢复5%最大生命（每30秒一次）。", "Wu: at 2/5/8, gain 2%/5%/8% max HP; at 8, a lethal hit equalizes health and restores 5% max HP (once per 30s).")
-		"qun": return t("群：2/5/8人时冷却缩短2%/5%/8%；8人时释放技能有8%概率连续释放两次。", "Qun: at 2/5/8, cooldown is reduced by 2%/5%/8%; at 8, casts have an 8% repeat chance.")
+		"qun": return t("群：2/5/8人时冷却缩短3.6%/9%/14.4%；8人时释放技能有8%概率连续释放两次。", "Qun: at 2/5/8, cooldown is reduced by 3.6%/9%/14.4%; at 8, casts have an 8% repeat chance.")
 	return ""
 func _portrait_texture(hero_id: String) -> Texture2D:
 	if portrait_cache.has(hero_id): return portrait_cache[hero_id]
@@ -2181,6 +2186,7 @@ func _render_board(board: GridContainer, units: Array, is_player: bool) -> void:
 			shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			card_layer.add_child(shade)
+			card_layer.add_child(_faction_border_overlay(str(hero.f), true, 0.92))
 			var badge := _cell_text(_faction_name(hero.f), 11, faction_color.lightened(0.25))
 			badge.position = Vector2(8, 6)
 			badge.size = Vector2(45, 17)
@@ -2330,6 +2336,21 @@ func _outlined_label(value: String, size: int, color: Color) -> Label:
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
 	return label
 
+func _faction_border_overlay(faction: String, landscape := true, opacity := 1.0) -> TextureRect:
+	var safe_faction := faction if faction in ["shu", "wei", "wu", "qun"] else "qun"
+	# The regenerated files are named opposite to their actual orientation:
+	# "draft" is the landscape frame and "compact" is the 2:3 draft frame.
+	var source: Texture2D = load(CARD_BORDER_ROOT + safe_faction + ("-draft.png" if landscape else "-compact.png"))
+	var border := TextureRect.new()
+	border.texture = source
+	border.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	border.stretch_mode = TextureRect.STRETCH_SCALE
+	border.name = "FactionBorder"
+	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	border.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	border.modulate.a = opacity
+	return border
+
 func _render_draft() -> void:
 	_clear_dynamic_children(draft_box)
 	draft_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -2379,13 +2400,7 @@ func _render_draft() -> void:
 		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		card.add_child(shade)
-		var faction := _outlined_label("【" + _faction_name(hero.f) + "】", 11, Color("#eee5d5"))
-		faction.set_anchors_preset(Control.PRESET_TOP_WIDE)
-		faction.offset_left = 10
-		faction.offset_right = -10
-		faction.offset_top = 8
-		faction.offset_bottom = 26
-		card.add_child(faction)
+		card.add_child(_faction_border_overlay(str(hero.f), false, 0.96))
 		var name_label := _outlined_label(_hero_name(id), 27, FACTION_COLORS[hero.f].lightened(0.32))
 		name_label.anchor_left = 0.0
 		name_label.anchor_right = 1.0
@@ -2400,16 +2415,16 @@ func _render_draft() -> void:
 		skill.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 		skill.offset_left = 10
 		skill.offset_right = -10
-		skill.offset_top = -45
-		skill.offset_bottom = -26
+		skill.offset_top = -65
+		skill.offset_bottom = -46
 		skill.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(skill)
 		var detail := _outlined_label(_skill_detail(id), 11, Color("#f2eee6"))
 		detail.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 		detail.offset_left = 12
 		detail.offset_right = -12
-		detail.offset_top = -172
-		detail.offset_bottom = -52
+		detail.offset_top = -196
+		detail.offset_bottom = -76
 		detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 		card.add_child(detail)
@@ -2417,8 +2432,8 @@ func _render_draft() -> void:
 		stats.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 		stats.offset_left = 10
 		stats.offset_right = -10
-		stats.offset_top = -24
-		stats.offset_bottom = -6
+		stats.offset_top = -44
+		stats.offset_bottom = -27
 		stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(stats)
 		card.disabled = battle_running or phase != "draft" or not _can_accept_hero(id)
@@ -2508,12 +2523,19 @@ func _render_reserve() -> void:
 		slot.add_theme_font_size_override("font_size", 11)
 		if index < reserves.size():
 			var unit: Dictionary = reserves[index]
-			slot.text = _hero_name(unit.hero_id) + "\nHP " + str(round(unit.hp))
+			slot.text = ""
 			slot.tooltip_text = t("拖拽到战场上阵；场上武将拖回此处可下阵；右键备战武将可出售", "Drag to deploy; drag a field unit here to return it; right-click a reserve unit to sell")
 			slot.modulate = Color("#f0c77a") if selected_unit == unit.id else Color.WHITE
 			slot.pressed.connect(_on_reserve_pressed.bind(unit.id))
 			slot.gui_input.connect(_on_reserve_input.bind(unit.id))
 			slot.set_drag_forwarding(_drag_unit.bind(unit.id, slot), _can_drop_reserve.bind(index), _drop_reserve.bind(index))
+			var hero: Dictionary = heroes[unit.hero_id]
+			slot.add_child(_faction_border_overlay(str(hero.f), true, 0.92))
+			var reserve_text := _outlined_label(_hero_name(unit.hero_id) + "\nHP " + str(round(unit.hp)), 11, Color("#f2eee6"))
+			reserve_text.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			reserve_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			reserve_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			slot.add_child(reserve_text)
 		else:
 			slot.text = "+"
 			slot.set_drag_forwarding(_drag_empty, _can_drop_reserve.bind(index), _drop_reserve.bind(index))
