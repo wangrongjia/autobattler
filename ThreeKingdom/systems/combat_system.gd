@@ -130,11 +130,14 @@ func _apply_faction_bonuses(announce := true) -> void:
 		for unit in _team_units(team):
 			var faction: String = heroes[unit.hero_id].f
 			var tier := _faction_tier_for_count(int(counts[faction])) if unit.alive else 0
+			var tier_bonus := _talent_faction_tier_bonus(team, faction)
+			var destiny_mult := _talent_bond_multiplier(team)
+			var tier_value := (_faction_tier_value(tier, [0.02, 0.05, 0.08]) + (tier_bonus if tier > 0 else 0.0)) * destiny_mult
 			unit.faction_tier = tier
-			unit.faction_damage_reduction = _faction_tier_value(tier, [0.02, 0.05, 0.08]) if faction == "shu" else 0.0
-			unit.faction_control_bonus = _faction_tier_value(tier, [0.02, 0.05, 0.08]) if faction == "wei" else 0.0
-			unit.faction_cooldown_reduction = _faction_tier_value(tier, [0.036, 0.09, 0.144]) if faction == "qun" else 0.0
-			_set_wu_hp_bonus(unit, _faction_tier_value(tier, [0.02, 0.05, 0.08]) if faction == "wu" else 0.0)
+			unit.faction_damage_reduction = tier_value if faction == "shu" else 0.0
+			unit.faction_control_bonus = tier_value if faction == "wei" else 0.0
+			unit.faction_cooldown_reduction = tier_value * BOND_COOLDOWN_REDUCTION_MULTIPLIER if faction == "qun" else 0.0
+			_set_wu_hp_bonus(unit, tier_value if faction == "wu" else 0.0)
 			if faction != "shu" or tier < 3:
 				unit.shu_damage_stacks = 0
 			if int(unit.faction_tier) > 0 and announce:
@@ -152,6 +155,10 @@ func _apply_opening_skills() -> void:
 	)
 	if not passive_units.is_empty():
 		_play_random_skill_voice(passive_units[rng.randi_range(0, passive_units.size() - 1)])
+	if _talent_opening_action_bonus():
+		var allies := combat_units.filter(func(unit): return unit.team == "player" and unit.alive)
+		allies.shuffle()
+		for index in mini(2, allies.size()): allies[index].action = minf(ACTION_MAX, float(allies[index].action) + 30.0)
 
 func _apply_combo_bonds(opening := true, announce := true) -> void:
 	for unit in combat_units:
@@ -180,7 +187,12 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 		unit.one_rider = false
 		unit.fated_enemies = false
 		unit.flying_meteor = false
-		unit.skill_value_bonus = float(enemy_strategy_bonus) if unit.team == "enemy" else 0.0
+		if unit.team == "enemy":
+			unit.skill_value_bonus = _challenge_strategy_bonus()
+		else:
+			var progression_bonus := _talent_stat_bonus(str(unit.hero_id))
+			var rune_bonus := _rune_stat_bonus(str(unit.hero_id))
+			unit.skill_value_bonus = float(progression_bonus.strategy) + float(rune_bonus.strategy)
 		unit.liushan_aura_damage_bonus = 0.0
 		unit.liushan_aura_lifesteal = 0.0
 		unit.four_pillars = false
@@ -380,7 +392,12 @@ func _unit_action_gain_multiplier(unit: Dictionary) -> float:
 
 func _unit_skill_cooldown(unit: Dictionary) -> float:
 	var bond_value := float(unit.get("bond_cooldown", 0.0))
-	return bond_value if bond_value > 0.0 else float(heroes[unit.hero_id].cooldown)
+	var original := float(heroes[unit.hero_id].cooldown)
+	var base := bond_value if bond_value > 0.0 else original
+	var talent_reduction := float(unit.get("talent_cooldown_reduction", 0.0))
+	# 符文带来的冷却缩减最多达到武将原始冷却的一半，超出部分舍弃。
+	var rune_reduction := minf(float(unit.get("rune_cooldown_reduction", 0.0)), original * 0.5)
+	return maxf(1.0, base - talent_reduction - rune_reduction)
 
 func _unit_has_active_skill(unit: Dictionary) -> bool:
 	return str(heroes[unit.hero_id].get("ability", "")) != "passive"
@@ -411,6 +428,9 @@ func _scaled_cooldown_reduction(reduction: float) -> float:
 
 func _battle_tick() -> void:
 	if not battle_running or battle_paused or action_in_progress: return
+	if _has_winner():
+		_finish_battle()
+		return
 	var already_ready := combat_units.filter(func(unit): return unit.alive and _unit_has_active_skill(unit) and unit.stun <= 0 and unit.charm <= 0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.get("freeze", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
 	if not already_ready.is_empty():
 		_begin_action(already_ready[0])
@@ -649,7 +669,8 @@ func _process_statuses(delta: float = TICK) -> void:
 				var ground_damage := float(effect.get("damage", 0.0))
 				if bool(effect.get("missing_hp_scale", false)):
 					var target_ruler_hp := enemy_ruler_hp if source.team == "player" else player_ruler_hp
-					var ruler_missing_ratio := 1.0 - float(target_ruler_hp) / maxf(1.0, float(RULER_MAX_HP))
+					var target_ruler_max := RULER_MAX_HP if source.team == "player" else _player_ruler_max_hp()
+					var ruler_missing_ratio := 1.0 - float(target_ruler_hp) / maxf(1.0, float(target_ruler_max))
 					ground_damage *= 1.0 + floorf(ruler_missing_ratio / maxf(0.001, float(effect.get("missing_hp_step", 0.10))) + 0.0001) * float(effect.get("missing_hp_bonus_per_step", 0.05))
 				_hit_ruler(
 					source,
@@ -682,7 +703,8 @@ func _perform_action(unit: Dictionary) -> void:
 	visual_events.append({"kind":"charge", "source_id":unit.id, "target_id":unit.id, "amount":0, "style":"magic"})
 	_cast_active_skill(unit)
 	_after_active_skill(unit)
-	if heroes[unit.hero_id].f == "qun" and int(unit.get("faction_tier", 0)) >= 3 and not _has_winner() and rng.randf() < 0.08:
+	var qun_repeat_chance := 0.08 + (0.02 * _talent_level("qun", "逐鹿中原") if unit.team == "player" else 0.0)
+	if heroes[unit.hero_id].f == "qun" and int(unit.get("faction_tier", 0)) >= 3 and not _has_winner() and rng.randf() < qun_repeat_chance:
 		_log("[color=#d59af0]" + t("【乱世争衡】触发连续施法！", "[Chaos Struggle] Double cast triggered!") + "[/color]")
 		visual_events.append({"kind":"charge", "source_id":unit.id, "target_id":unit.id, "amount":0, "style":"magic"})
 		_cast_active_skill(unit)
@@ -2451,7 +2473,8 @@ func _try_wu_equalize_and_recover(target: Dictionary) -> bool:
 	var wu_allies := _team_units(target.team).filter(func(ally): return ally.alive and heroes[ally.hero_id].f == "wu")
 	if wu_allies.size() < FACTION_BOND_TIERS[2]:
 		return false
-	state.wu_equalize_cooldown = 30.0
+	var wu_talent_level := _talent_level("wu", "同舟共济") if target.team == "player" else 0
+	state.wu_equalize_cooldown = 24.0 if wu_talent_level >= 2 else 30.0
 	faction_battle_state[target.team] = state
 	var total_hp := 0.0
 	var total_max_hp := 0.0
@@ -2461,7 +2484,8 @@ func _try_wu_equalize_and_recover(target: Dictionary) -> bool:
 	var shared_ratio := clampf(total_hp / maxf(1.0, total_max_hp), 0.0, 1.0)
 	for ally in wu_allies:
 		var before := float(ally.hp)
-		ally.hp = minf(float(ally.max_hp), float(ally.max_hp) * shared_ratio + float(ally.max_hp) * 0.05)
+		var recovery_ratio := 0.08 if wu_talent_level >= 1 else 0.05
+		ally.hp = minf(float(ally.max_hp), float(ally.max_hp) * shared_ratio + float(ally.max_hp) * recovery_ratio)
 		var restored := maxf(0.0, float(ally.hp) - before)
 		visual_events.append({"kind":"heal", "source_id":target.id, "target_id":ally.id, "amount":round(restored), "style":"heal", "nonblocking":true})
 	_log("[color=#e58f78]" + t("【江东联动】濒死触发：吴将均摊生命并恢复5%最大生命（每30秒一次）！", "[Jiangdong Relay] Lethal hit equalizes Wu health and restores 5% max HP (once per 30s)!") + "[/color]")
@@ -2488,7 +2512,7 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		value *= 1.0 + source.damage_buff + float(source.get("timed_damage_buff", 0.0)) + float(source.get("liushan_aura_damage_bonus", 0.0)) + float(source.get("kill_buff", 0.0))
 		value *= maxf(0.0, 1.0 - float(source.get("skill_debuff", 0.0)))
 		if heroes[source.hero_id].f == "wei" and int(source.get("faction_tier", 0)) >= 3 and _has_any_debuff(target):
-			value *= 1.08
+			value *= 1.08 + (0.02 * _talent_level("wei", "乘胜追击") if source.team == "player" else 0.0)
 	var freeze_remaining := float(target.get("freeze", 0.0))
 	if freeze_remaining > 0.0:
 		var shatter_damage := float(target.get("freeze_shatter_damage", 0.0))
@@ -2512,7 +2536,8 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	value *= 1.0 - clampf(total_reduction, 0.0, 0.95)
 	var faction_reduction := float(target.get("faction_damage_reduction", 0.0))
 	if heroes[target.hero_id].f == "shu" and int(target.get("faction_tier", 0)) >= 3:
-		faction_reduction += 0.03 * clampi(int(target.get("shu_damage_stacks", 0)), 0, 3)
+		var shu_stack_cap := 3 + (_talent_level("shu", "桃园同心") if target.team == "player" else 0)
+		faction_reduction += 0.03 * clampi(int(target.get("shu_damage_stacks", 0)), 0, shu_stack_cap)
 	value *= 1.0 - clampf(faction_reduction, 0.0, 0.95)
 	if damage_type == "magic" and float(target.get("strategy_mark", 0.0)) > 0.0 and source != null:
 		value *= 1.30
@@ -2531,7 +2556,8 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	_add_stat(source, "damage", actual_damage)
 	_add_stat(target, "taken", actual_damage)
 	if actual_damage > 0.0 and heroes[target.hero_id].f == "shu" and int(target.get("faction_tier", 0)) >= 3:
-		target.shu_damage_stacks = mini(3, int(target.get("shu_damage_stacks", 0)) + 1)
+		var shu_stack_cap := 3 + (_talent_level("shu", "桃园同心") if target.team == "player" else 0)
+		target.shu_damage_stacks = mini(shu_stack_cap, int(target.get("shu_damage_stacks", 0)) + 1)
 		if float(target.get("shu_damage_decay_time", 0.0)) <= 0.0:
 			target.shu_damage_decay_time = 3.0
 	if source != null: _apply_all_lifesteal(source, actual_damage)
@@ -2623,6 +2649,10 @@ func _hit_ruler(unit: Dictionary, amount: float, tile: Dictionary, label: String
 	if unit.team == "player": enemy_ruler_hp = max(0, enemy_ruler_hp - value)
 	else: player_ruler_hp = max(0, player_ruler_hp - value)
 	var after_ruler: int = enemy_ruler_hp if unit.team == "player" else player_ruler_hp
+	if after_ruler <= 0 and battle_running:
+		battle_running = false
+		tick_timer.stop()
+		call_deferred("_finish_battle")
 	_add_stat(unit, "damage", float(before_ruler - after_ruler))
 	visual_events.append({"kind":"empty", "source_id":unit.id, "team":tile.team, "row":tile.row, "col":tile.col, "amount":value, "skill":true, "style":"ranged" if int(heroes[unit.hero_id].range) > 2 else "melee", "visual_group":visual_group, "group_style":group_style})
 	_log(_hero_name(unit.hero_id) + t(" 攻击空格（", " targets an empty tile (") + label + t("），穿透命中主公 ", ") and hits the ruler for ") + str(value) + (t(" 点伤害。", ".") if language == "zh" else ""))

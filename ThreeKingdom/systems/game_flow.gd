@@ -1,9 +1,9 @@
-extends "res://ThreeKingdom/systems/game_state.gd"
+extends "res://ThreeKingdom/systems/progression_system.gd"
 
 func _new_game() -> void:
 	round_number = 1
 	phase = "draft"
-	player_ruler_hp = RULER_MAX_HP
+	player_ruler_hp = _player_ruler_max_hp()
 	enemy_ruler_hp = RULER_MAX_HP
 	ruler_regen = {"player":{"amount":0.0, "time":0.0, "clock":0.0}, "enemy":{"amount":0.0, "time":0.0, "clock":0.0}}
 	player_units = []
@@ -23,10 +23,28 @@ func _new_game() -> void:
 	if tick_timer: tick_timer.stop()
 	if is_instance_valid(log_box): log_box.clear()
 	_prepare_round()
-	_log(t("征战开始：每关进行三轮三选一，选项从左到右固定为前军、中军、后军。", "Campaign begins with three pick-one-of-three rounds; slots are fixed to Vanguard, Midguard, and Rearguard."))
+	if game_mode == "challenge":
+		_log("%s · %s：完成三轮选将后迎战守军。" % [STAGE_NAMES[selected_stage - 1], str(DIFFICULTIES[selected_difficulty].name)])
+	else:
+		_log(t("征战开始：每关进行三轮三选一，选项从左到右固定为前军、中军、后军。", "Campaign begins with three pick-one-of-three rounds; slots are fixed to Vanguard, Midguard, and Rearguard."))
 	_render()
 
+func _start_quick_game() -> void:
+	game_mode = "quick"
+	_new_game()
+
+func _start_challenge(stage: int, difficulty: int) -> bool:
+	if not _is_stage_unlocked(stage, difficulty): return false
+	game_mode = "challenge"
+	selected_stage = clampi(stage, 1, 50)
+	selected_difficulty = clampi(difficulty, 0, DIFFICULTIES.size() - 1)
+	_new_game()
+	return true
+
 func _save_game(silent := false) -> bool:
+	if game_mode == "challenge":
+		if not silent: _log(t("闯关对局不保存中途进度。", "Challenge battles cannot be saved midway."))
+		return false
 	if battle_running:
 		if not silent: _log(t("战斗过程中不能保存，请在选人或布阵阶段保存。", "Save during draft or formation, not combat."))
 		return false
@@ -96,6 +114,7 @@ func _load_game() -> bool:
 	ground_effects.clear()
 	if phase == "draft" and choices.size() != DRAFT_SIZE:
 		_generate_choices()
+	game_mode = "quick"
 	_log(t("存档已读取。", "Save loaded."))
 	_render()
 	return true
@@ -307,11 +326,12 @@ func _start_battle() -> void:
 	_apply_combo_bonds()
 	_apply_faction_bonuses()
 	_apply_opening_skills()
-	_log("[color=#f6c860]" + t("第 ", "Stage ") + str(round_number) + t(" 关战斗开始（300 秒）！", " battle begins (300 seconds)!") + "[/color]")
+	_log("[color=#f6c860]" + t("第 ", "Round ") + str(round_number) + t(" 回合战斗开始（30 秒）！", " battle begins (30 seconds)!") + "[/color]")
 	tick_timer.start()
 	_render()
 
 func _finish_battle() -> void:
+	if not battle_running and phase != "combat": return
 	tick_timer.stop()
 	battle_running = false
 	battle_paused = false
@@ -322,12 +342,27 @@ func _finish_battle() -> void:
 	elif player_ruler_hp > enemy_ruler_hp: result = t("本关战斗胜利！", "Stage won!")
 	else: result = t("本关战斗失利。", "Stage lost.")
 	_log("[color=#f6c860]" + result + "[/color]")
-	if player_ruler_hp <= 0:
+	var decisive := player_ruler_hp <= 0 or enemy_ruler_hp <= 0
+	var player_won := enemy_ruler_hp <= 0 and player_ruler_hp > 0
+	if game_mode == "challenge":
+		if decisive or round_number >= ROUND_LIMIT:
+			phase = "finished"
+			var challenge_result := _complete_challenge(player_won if decisive else player_ruler_hp > enemy_ruler_hp)
+			if has_method("_show_battle_result"):
+				call_deferred("_show_battle_result", challenge_result)
+		else:
+			round_number += 1
+			_prepare_round()
+			_log("进入闯关第 %d / 15 回合：主公生命与现有阵容继续保留。" % round_number)
+	elif decisive:
 		phase = "finished"
-		_log(t("主公阵亡，闯关失败。", "Your ruler has fallen. Campaign failed."))
+		if has_method("_show_battle_result"):
+			call_deferred("_show_battle_result", {"victory":player_won, "stage":round_number, "difficulty":-1, "stars":0, "new_stars":0, "souls":0})
 	elif final_battle:
 		phase = "finished"
 		_log(t("最终决战胜利，天下归一！", "Final victory. The realm is united!"))
+		if has_method("_show_battle_result"):
+			call_deferred("_show_battle_result", {"victory":player_ruler_hp >= enemy_ruler_hp, "stage":round_number, "difficulty":-1, "stars":0, "new_stars":0, "souls":0})
 	elif round_number >= ROUND_LIMIT:
 		_start_final_battle()
 	else:

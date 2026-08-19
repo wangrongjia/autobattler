@@ -486,7 +486,7 @@ func _roster_has_count(units: Array, ids: Array, required: int) -> bool:
 
 func _make_roster_unit(team: String, hero_id: String) -> Dictionary:
 	var hero: Dictionary = heroes[hero_id]
-	return {
+	var unit := {
 		"id":team + ":" + hero_id + ":" + str(rng.randi()), "hero_id":hero_id, "team":team, "level":1, "stat_mult":1.0,
 		"row":-1, "col":-1, "hp":float(hero.hp), "max_hp":float(hero.hp), "alive":true,
 		"action":0.0, "action_gain_mult":1.0, "shield":0.0, "burn":0.0, "burn_damage":0.0, "burn_clock":0.0, "burn_effects":[],
@@ -513,6 +513,9 @@ func _make_roster_unit(team: String, hero_id: String) -> Dictionary:
 		"charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0,
 		"skill_debuff_time":0.0, "zhangbao_revives_used":0
 	}
+	if has_method("_apply_progression_to_new_unit"):
+		call("_apply_progression_to_new_unit", unit)
+	return unit
 
 func _can_unit_use_row(unit: Dictionary, row: int) -> bool:
 	if bool(heroes[unit.hero_id].get("all_rows", false)): return row >= 0 and row < BOARD_ROWS

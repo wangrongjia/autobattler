@@ -10,6 +10,7 @@ func _initialize() -> void:
 	game._show_encyclopedia()
 	assert(game.encyclopedia_grid.columns == 2)
 	assert(game.encyclopedia_content_scroll.get_meta("touch_scroll_enabled", false))
+	assert(game.rune_inventory_scroll.get_meta("touch_scroll_enabled", false))
 	game._set_encyclopedia_mode("bonds")
 	assert(game.encyclopedia_bond_graph.get_meta("touch_pan_enabled", false))
 	game.encyclopedia_overlay.hide()
