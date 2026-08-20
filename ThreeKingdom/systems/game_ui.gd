@@ -52,7 +52,14 @@ var tianshu_owned_box: VBoxContainer
 var tianshu_overlay_title: Label
 var tianshu_overlay_close: Button
 var tianshu_header_button: Button
+var tianshu_gold_label: Label
+var tianshu_purchase_button: Button
 var tianshu_view_only := false
+var sell_layer: CanvasLayer
+var sell_zone: Control
+var sell_zone_label: Label
+var sell_drag_unit_id := ""
+var sell_zone_grace_frames := 0
 
 func _is_mobile_ui() -> bool:
 	return OS.has_feature("mobile") or OS.has_feature("android") or OS.get_environment("THREE_KINGDOM_MOBILE_UI_TEST") == "1"
@@ -501,8 +508,83 @@ func _build_ui() -> void:
 	tick_timer.timeout.connect(_battle_tick)
 	add_child(tick_timer)
 	_build_draft_layer()
+	_build_sell_zone()
 	_build_tianshu_overlay()
 	_build_unit_inspector()
+
+func _process(_delta: float) -> void:
+	if not is_instance_valid(sell_zone) or not sell_zone.visible:
+		return
+	if sell_zone_grace_frames > 0:
+		sell_zone_grace_frames -= 1
+		return
+	if not get_viewport().gui_is_dragging():
+		_hide_sell_zone()
+
+func _build_sell_zone() -> void:
+	sell_layer = CanvasLayer.new()
+	sell_layer.layer = 50
+	add_child(sell_layer)
+	sell_zone = Control.new()
+	sell_zone.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sell_zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sell_layer.add_child(sell_zone)
+	var center := CenterContainer.new()
+	center.anchor_right = 1.0
+	center.offset_bottom = 105
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sell_zone.add_child(center)
+	var target := PanelContainer.new()
+	target.custom_minimum_size = Vector2(360, 76)
+	target.mouse_filter = Control.MOUSE_FILTER_STOP
+	_style(target, Color("#33170fed"), 6, Color("#d59a45"), 3)
+	center.add_child(target)
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 1)
+	var title := _label("金　售卖武将", 18, Color("#f0c77a"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	sell_zone_label = _label("", 16, Color("#f4d69b"))
+	sell_zone_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(sell_zone_label)
+	target.add_child(box)
+	target.set_drag_forwarding(_drag_empty, _can_drop_sell, _drop_sell)
+	sell_zone.hide()
+
+func _show_sell_zone(unit_id: String) -> void:
+	var unit = _find_by_id(player_units, unit_id)
+	if unit == null:
+		return
+	sell_drag_unit_id = unit_id
+	sell_zone_label.text = "%s　+%d 金币" % [_hero_name(str(unit.hero_id)), _unit_sell_price(unit)]
+	sell_zone_grace_frames = 2
+	sell_zone.show()
+
+func _hide_sell_zone() -> void:
+	sell_drag_unit_id = ""
+	if is_instance_valid(sell_zone):
+		sell_zone.hide()
+
+func _can_drop_sell(_at_position: Vector2, data) -> bool:
+	if phase not in ["draft", "placement"] or battle_running or not (data is Dictionary) or not data.has("unit_id"):
+		return false
+	var unit = _find_by_id(player_units, str(data.unit_id))
+	return unit != null and unit.alive
+
+func _drop_sell(_at_position: Vector2, data) -> void:
+	if not _can_drop_sell(_at_position, data):
+		_hide_sell_zone()
+		return
+	var unit: Dictionary = _find_by_id(player_units, str(data.unit_id))
+	var price := _unit_sell_price(unit)
+	var hero_name := _hero_name(str(unit.hero_id))
+	player_units.erase(unit)
+	pending_unit_ids.erase(str(unit.id))
+	selected_unit = ""
+	_earn_gold(price, "出售 " + hero_name)
+	_hide_sell_zone()
+	_render()
 
 func _build_unit_inspector() -> void:
 	unit_inspector_overlay = ColorRect.new()
@@ -853,6 +935,14 @@ func _build_tianshu_overlay() -> void:
 	var subtitle := _label(t("所有天书均为彩色品质 · 同名再次选择升至Ⅱ级", "All codices share one prismatic tier · choose again to reach level II"), 14, Color("#d8b9ee"))
 	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(subtitle)
+	tianshu_gold_label = _label("", 17, Color("#e8c96e"))
+	tianshu_gold_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(tianshu_gold_label)
+	tianshu_purchase_button = _button("购买三选一 · 500")
+	tianshu_purchase_button.custom_minimum_size = Vector2(180, 46)
+	_accent_button(tianshu_purchase_button, Color("#b98a4f"), true)
+	tianshu_purchase_button.pressed.connect(_on_buy_tianshu_draw)
+	header.add_child(tianshu_purchase_button)
 	tianshu_overlay_close = _button(t("关闭", "CLOSE"))
 	_accent_button(tianshu_overlay_close, Color("#8b62a1"))
 	tianshu_overlay_close.custom_minimum_size = Vector2(120, 46)
@@ -892,18 +982,31 @@ func _build_tianshu_overlay() -> void:
 	tianshu_overlay.hide()
 
 func _show_tianshu_collection() -> void:
-	if not _tianshu_enabled(): return
+	if not _can_use_tianshu_pavilion(): return
 	tianshu_view_only = true
 	_render_tianshu_overlay()
 	tianshu_overlay.show()
+
+func _on_buy_tianshu_draw() -> void:
+	tianshu_view_only = false
+	_buy_tianshu_draw()
+
+func _on_replace_tianshu(book_id: String) -> void:
+	tianshu_view_only = false
+	_replace_tianshu(book_id)
 
 func _render_tianshu_overlay() -> void:
 	if not is_instance_valid(tianshu_overlay): return
 	_clear_dynamic_children(tianshu_choice_box)
 	_clear_dynamic_children(tianshu_owned_box)
 	var selecting := phase == "tianshu" and not tianshu_view_only
-	tianshu_overlay_title.text = t("天书三选一 · 第 %d / 15 回合" % round_number, "CHOOSE A CODEX · ROUND %d / 15" % round_number) if selecting else t("本局天书", "RUN CODEX")
+	var reason_names := {"free":"免费天书", "purchase":"天书阁购买", "replace":"替换回赠"}
+	var reason_text := str(reason_names.get(tianshu_draw_reason, "天书三选一"))
+	tianshu_overlay_title.text = ("%s · 第 %d / 15 回合" % [reason_text, round_number]) if selecting else t("天书阁", "CODEX PAVILION")
 	tianshu_overlay_close.visible = not selecting
+	tianshu_purchase_button.visible = not selecting
+	tianshu_purchase_button.disabled = gold < TIANSHU_DRAW_COST or not _can_use_tianshu_pavilion()
+	tianshu_gold_label.text = "金　%d" % gold
 	if selecting:
 		for index in tianshu_choices.size():
 			var book_id := str(tianshu_choices[index])
@@ -955,7 +1058,8 @@ func _render_tianshu_overlay() -> void:
 			option.add_child(refresh)
 			tianshu_choice_box.add_child(option)
 	else:
-		var intro := _label(t("本局共获得 %d 种天书，可在战斗中随时查看右侧详情。" % tianshu_levels.size(), "You own %d codices this run." % tianshu_levels.size()), 18, Color("#c9c0b1"))
+		var replace_remaining := maxi(0, 1 - tianshu_replacements_this_round)
+		var intro := _label("天书阁\n\n500 金币购买一次天书三选一\n300 金币替换一本天书（本回合剩余 %d / 1 次）\n替换Ⅱ级天书可连续选择两次\n\n当前利息上限：%d　下回合基础收入：%d" % [replace_remaining, _gold_interest_cap(), _round_base_gold_income()], 18, Color("#c9c0b1"))
 		intro.custom_minimum_size = Vector2(600, 120)
 		intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		tianshu_choice_box.add_child(intro)
@@ -970,12 +1074,22 @@ func _render_tianshu_overlay() -> void:
 	for book_id_variant in owned_ids:
 		var book_id := str(book_id_variant)
 		var level := _tianshu_level(book_id)
-		var item := _button("%s　%s %s\n%s" % [str(TIANSHU_BOOKS[book_id].group), _tianshu_name(book_id), "Ⅱ" if level == 2 else "Ⅰ", _tianshu_effect_text(book_id, level)])
-		item.disabled = true
+		var item_panel := PanelContainer.new()
+		_style(item_panel, Color("#17141bee"), 4, Color("#765585"), 1)
+		var item_box := VBoxContainer.new()
+		var item := _label("%s　%s %s\n%s" % [str(TIANSHU_BOOKS[book_id].group), _tianshu_name(book_id), "Ⅱ" if level == 2 else "Ⅰ", _tianshu_effect_text(book_id, level)], 14, Color("#dec8e8"))
 		item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		item.custom_minimum_size.y = 86
 		item.tooltip_text = _tianshu_effect_text(book_id, level)
-		tianshu_owned_box.add_child(item)
+		item_box.add_child(item)
+		var replace := _button("替换 · %d 金" % _tianshu_replace_cost())
+		replace.custom_minimum_size.y = 34
+		replace.add_theme_font_size_override("font_size", 13)
+		_accent_button(replace, Color("#9a6548"))
+		replace.disabled = not _can_use_tianshu_pavilion() or tianshu_replacements_this_round >= 1 or gold < _tianshu_replace_cost()
+		replace.pressed.connect(_on_replace_tianshu.bind(book_id))
+		item_box.add_child(replace)
+		item_panel.add_child(item_box)
+		tianshu_owned_box.add_child(item_panel)
 	if not tianshu_pool_effect.is_empty() and round_number <= int(tianshu_pool_effect.get("end_round", 0)):
 		var remaining := int(tianshu_pool_effect.end_round) - round_number + 1
 		tianshu_owned_box.add_child(_label(t("当前武将池限制剩余 %d 回合" % remaining, "Pool restriction: %d rounds left" % remaining), 14, Color("#f0c77a")))
@@ -1786,7 +1900,6 @@ func _render_talents(message := "") -> void:
 	var canvas_size := talent_content_box.size
 	if canvas_size.x < 500.0 or canvas_size.y < 500.0:
 		canvas_size = Vector2(850, 650)
-	var node_size := Vector2(184, 102)
 	var tree_points := {}
 	for layer in range(1, 6):
 		var layer_color: Color = layer_colors[layer - 1]
@@ -1795,6 +1908,8 @@ func _render_talents(message := "") -> void:
 		var requirement := int(layer_nodes[0][6])
 		var unlocked := _talent_points_before_layer(talent_tree_id, layer) >= requirement
 		var y := canvas_size.y - 116.0 - float(layer - 1) * 122.0
+		var node_width := minf(184.0, (canvas_size.x - 115.0) / float(layer_nodes.size()) - 8.0)
+		var layer_node_size := Vector2(node_width, 102)
 		var layer_caption := _label("第%d层 · %s" % [layer, "冠冕" if layer == 5 else ("枝干" if layer >= 3 else "根基")], 13, layer_color.lightened(0.38) if unlocked else Color("#746f66"))
 		layer_caption.position = Vector2(14, y + 35)
 		layer_caption.custom_minimum_size = Vector2(105, 26)
@@ -1805,9 +1920,9 @@ func _render_talents(message := "") -> void:
 			var x := canvas_size.x * float(node_index + 1) / float(layer_nodes.size() + 1)
 			var level := _talent_level(talent_tree_id, str(node[0]))
 			var node_panel := PanelContainer.new()
-			node_panel.position = Vector2(x - node_size.x * 0.5, y)
-			node_panel.custom_minimum_size = node_size
-			node_panel.size = node_size
+			node_panel.position = Vector2(x - layer_node_size.x * 0.5, y)
+			node_panel.custom_minimum_size = layer_node_size
+			node_panel.size = layer_node_size
 			_style(node_panel, layer_color.darkened(0.50) if unlocked else Color("#1b1b19"), 50, layer_color.lightened(0.28) if unlocked else Color("#4e4b46"), 3)
 			var node_box := VBoxContainer.new()
 			node_box.add_theme_constant_override("separation", 2)
@@ -1836,7 +1951,7 @@ func _render_talents(message := "") -> void:
 			node_box.add_child(upgrade)
 			node_panel.add_child(node_box)
 			talent_content_box.add_child(node_panel)
-			points.append(Vector2(x, y + node_size.y * 0.5))
+			points.append(Vector2(x, y + layer_node_size.y * 0.5))
 		tree_points[layer] = points
 	if is_instance_valid(talent_tree_canvas) and talent_tree_canvas.has_method("set_tree_points"):
 		talent_tree_canvas.set_tree_points(tree_points)
@@ -3220,8 +3335,9 @@ func _render() -> void:
 	load_button.text = t("读取", "LOAD")
 	menu_button.text = t("主菜单", "MENU")
 	speed_button.text = str(int(game_speed)) + "×"
-	tianshu_header_button.text = t("天书", "CODEX") + (" %d" % tianshu_levels.size() if not tianshu_levels.is_empty() else "")
+	tianshu_header_button.text = t("天书阁", "CODEX") + " · 金 " + str(gold)
 	tianshu_header_button.visible = _tianshu_enabled()
+	tianshu_header_button.disabled = battle_running or phase not in ["draft", "placement"]
 	save_button.disabled = battle_running
 	load_button.disabled = battle_running or not FileAccess.file_exists(SAVE_PATH)
 	menu_button.disabled = battle_running
@@ -3286,6 +3402,15 @@ func _render() -> void:
 	battle_pause_button.text = t("继续", "RESUME") if battle_paused else t("暂停", "PAUSE")
 	battle_pause_button.visible = phase == "combat" and battle_running
 
+func _refresh_economy_ui() -> void:
+	if is_instance_valid(tianshu_header_button):
+		tianshu_header_button.text = t("天书阁", "CODEX") + " · 金 " + str(gold)
+		tianshu_header_button.disabled = battle_running or phase not in ["draft", "placement"]
+	if is_instance_valid(tianshu_gold_label):
+		tianshu_gold_label.text = "金　%d" % gold
+	if is_instance_valid(tianshu_purchase_button):
+		tianshu_purchase_button.disabled = gold < TIANSHU_DRAW_COST or not _can_use_tianshu_pavilion()
+
 func _toggle_battle_pause() -> void:
 	if phase != "combat" or not battle_running: return
 	battle_paused = not battle_paused
@@ -3297,7 +3422,7 @@ func _toggle_battle_pause() -> void:
 
 func _hint() -> void:
 	if phase == "tianshu": hint_label.text = t("先从三本彩色天书中选择一本；每张候选卡可独立免费刷新一次。", "Choose one of three prismatic codices; each card has its own free refresh.")
-	elif phase == "draft": hint_label.text = t("选将时仍可拖拽调整阵型、从备战席上阵或将场上武将拖回备战席；点击场上武将可查看实时状态。", "During recruitment you may still drag to rearrange, deploy from reserve, return units to reserve, or tap a unit to inspect it.")
+	elif phase == "draft": hint_label.text = t("拖拽武将时顶部会出现售卖区；备战武将可上阵或互换，场上武将不能退回备战席。", "Drag generals to the top sell zone; reserves can deploy or swap, while field units cannot return to reserve.")
 	elif phase == "placement": hint_label.text = t("前军强制前排且只打前排；中军站前排可随机打全场、站中排随机打前中排、站后排只打前排；后军任意站位随机攻击全场。", "Vanguard is front-only; Midguard in front randomly reaches all rows, in middle reaches front/middle, and in back reaches front only; Rearguard randomly reaches all rows.")
 	elif phase == "combat": hint_label.text = t("最终决战没有时间限制，直到一方主公倒下。", "The final battle has no time limit and ends only when a ruler falls.") if final_battle else t("行动期间全场暂停；本关持续 30 秒。", "All gauges pause during actions. This stage lasts 30 seconds.")
 	else: hint_label.text = t("对局结束，可重新开局再次挑战。", "Match complete. Start a new game to play again.")
@@ -3711,10 +3836,9 @@ func _render_reserve() -> void:
 		if index < reserves.size():
 			var unit: Dictionary = reserves[index]
 			slot.text = ""
-			slot.tooltip_text = t("拖拽到战场上阵；场上武将拖回此处可下阵；右键备战武将可出售", "Drag to deploy; drag a field unit here to return it; right-click a reserve unit to sell")
+			slot.tooltip_text = t("拖拽到战场上阵或在备战席内换位；拖到顶部售卖区可获得 100 金币", "Drag to deploy or reorder reserves; drop on the top sell zone for 100 gold")
 			slot.modulate = Color("#f0c77a") if selected_unit == unit.id else Color.WHITE
 			slot.pressed.connect(_on_reserve_pressed.bind(unit.id))
-			slot.gui_input.connect(_on_reserve_input.bind(unit.id))
 			slot.set_drag_forwarding(_drag_unit.bind(unit.id, slot), _can_drop_reserve.bind(index), _drop_reserve.bind(index))
 			var hero: Dictionary = heroes[unit.hero_id]
 			slot.add_child(_faction_border_overlay(str(hero.f), true, 0.92))
@@ -3743,7 +3867,9 @@ func _drag_unit(_at_position: Vector2, unit_id: String, origin: Control):
 	var preview := _outlined_label(_hero_name(unit.hero_id), 16, FACTION_COLORS[heroes[unit.hero_id].f].lightened(0.3))
 	preview.custom_minimum_size = Vector2(150, 48)
 	preview.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	if origin.get_viewport().gui_is_dragging(): origin.set_drag_preview(preview)
+	if origin.get_viewport().gui_is_dragging():
+		origin.set_drag_preview(preview)
+		_show_sell_zone(unit_id)
 	else: preview.queue_free()
 	return {"unit_id":unit_id}
 
@@ -3753,7 +3879,7 @@ func _can_drop_board(_at_position: Vector2, data, _row: int, _col: int) -> bool:
 	if source == null or not _can_unit_use_row(source, _row): return false
 	var occupant = _unit_at(player_units, _row, _col)
 	if occupant == null or occupant.id == source.id: return true
-	if int(source.row) < 0: return false
+	if int(source.row) < 0: return true
 	return _can_unit_use_row(occupant, int(source.row))
 
 func _drop_board(_at_position: Vector2, data, row: int, col: int) -> void:
@@ -3763,27 +3889,27 @@ func _drop_board(_at_position: Vector2, data, row: int, col: int) -> void:
 	var old_row: int = int(source.row)
 	var old_col: int = int(source.col)
 	if occupant != null and occupant.id != source.id:
-		occupant.row = old_row  # 目标格的原武将换到源位置
-		occupant.col = old_col
+		if old_row < 0:
+			occupant.row = -1
+			occupant.col = -1
+		else:
+			occupant.row = old_row  # 两名场上武将互换位置
+			occupant.col = old_col
 	source.row = row
 	source.col = col
 	selected_unit = ""
+	_hide_sell_zone()
 	_log(_hero_name(source.hero_id) + t(" 已拖拽到指定战位。", " was dragged to the selected tile."))
 	_render()
 
 func _can_drop_reserve(_at_position: Vector2, data, _index: int) -> bool:
 	if phase not in ["draft", "placement"] or not (data is Dictionary) or not data.has("unit_id"): return false
-	return _find_by_id(player_units, str(data.unit_id)) != null
+	var source = _find_by_id(player_units, str(data.unit_id))
+	return source != null and int(source.row) < 0
 
 func _drop_reserve(_at_position: Vector2, data, index: int) -> void:
 	if not _can_drop_reserve(_at_position, data, index): return
 	var source: Dictionary = _find_by_id(player_units, str(data.unit_id))
-	if int(source.row) >= 0:
-		player_units.erase(source)
-		selected_unit = ""
-		_log(_hero_name(source.hero_id) + t(" 已从战场丢弃。", " has been dismissed from the battlefield."))
-		_render()
-		return
 	var reserves := _reserve_units()
 	var target = reserves[index] if index < reserves.size() else null
 	if target != null and target.id != source.id:
@@ -3792,6 +3918,7 @@ func _drop_reserve(_at_position: Vector2, data, index: int) -> void:
 		player_units[source_index] = target
 		player_units[target_index] = source
 	selected_unit = ""
+	_hide_sell_zone()
 	_render()
 
 func _on_reserve_input(event: InputEvent, unit_id: String) -> void:
@@ -3802,9 +3929,10 @@ func _sell_reserve_unit(unit_id: String) -> void:
 	if battle_running or phase not in ["draft", "placement"]: return
 	var unit = _find_by_id(player_units, unit_id)
 	if unit == null: return
+	var price := _unit_sell_price(unit)
 	player_units.erase(unit)
 	pending_unit_ids.erase(unit_id)
-	_log(_hero_name(unit.hero_id) + t(" 已出售。", " was sold."))
+	_earn_gold(price, "出售 " + _hero_name(str(unit.hero_id)))
 	_render()
 
 func _bond_progress_tiers(bond_id: String, member_count: int) -> Array[int]:

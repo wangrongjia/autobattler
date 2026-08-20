@@ -20,6 +20,12 @@ const TIANSHU_BOOKS := {
 	"yanxing":{"name":"雁行秘卷", "en":"Wild-Goose Scroll", "group":"通用·阵型", "effects":["后军兵略 +10，受到直接伤害降低 8%。", "兵略 +20，直接减伤 16%。"]},
 	"tonglie":{"name":"同列并进", "en":"Advance in Columns", "group":"通用·阵型", "effects":["同列至少 2 名友军时，该列生命和兵略提高 6%。", "提高至 12%，且开场行动条 +10。"]},
 	"qunce":{"name":"群策群力", "en":"United Counsel", "group":"通用·阵型", "effects":["每个不同阵营使全体兵略 +2、最大生命 +2%。", "每阵营提高至兵略 +4、最大生命 +4%。"]},
+	"taozhu_yice":{"name":"陶朱遗策", "en":"Legacy of Tao Zhu", "group":"通用·经济", "effects":["立即获得 300 金币。", "立即获得 600 金币。"]},
+	"tuntian_kaifu":{"name":"屯田开府", "en":"Agrarian Treasury", "group":"通用·经济", "effects":["每回合基础收入 +50。", "每回合基础收入 +100。"]},
+	"fujia_tianxia":{"name":"富甲天下", "en":"Wealth Under Heaven", "group":"通用·经济", "effects":["利息上限 +20。", "利息上限 +40，且每回合基础收入 +20。"]},
+	"jungong_juezhi":{"name":"军功爵制", "en":"Military Merit", "group":"通用·经济", "effects":["我方每击杀一名敌将，立即获得 40 金币。", "每次击杀获得 70 金币，且击杀者本场兵略 +5。"]},
+	"mage_guoshi":{"name":"马革裹尸", "en":"Shrouded in Horsehide", "group":"通用·经济", "effects":["我方武将每阵亡一名，立即获得 40 金币。", "每次阵亡获得 90 金币。"]},
+	"maidu_huanzhu":{"name":"买椟还珠", "en":"Keep the Casket", "group":"通用·经济", "effects":["天书替换费用降低 80（降至 220）。", "天书替换费用降低 200（降至 100）。"]},
 	"shu_jianbi":{"name":"汉室坚壁", "en":"Han Bulwark", "group":"蜀", "faction":"shu", "effects":["蜀将受到伤害降低 5%。", "减伤提高至 10%。"]},
 	"shu_rende":{"name":"仁德遗泽", "en":"Legacy of Benevolence", "group":"蜀", "faction":"shu", "effects":["蜀将治疗提高 20%；溢出治疗的 30%转化为护盾。", "治疗提高 40%，护盾转化提高至 60%。"]},
 	"shu_beifa":{"name":"北伐不息", "en":"Endless Northern March", "group":"蜀", "faction":"shu", "effects":["蜀将每次施法，本回合兵略 +1，最多 5 层。", "每次 +2，最多 8 层。"]},
@@ -58,6 +64,10 @@ var tianshu_refresh_available: Array[bool] = [true, true, true]
 var tianshu_pool_effect := {}
 var tianshu_battle_state := {}
 var tianshu_draft_refresh_used: Array[int] = [0, 0, 0]
+var tianshu_draws_remaining := 0
+var tianshu_return_phase := "draft"
+var tianshu_draw_reason := ""
+var tianshu_generate_draft_on_finish := false
 
 func _tianshu_enabled() -> bool:
 	return game_mode == "tianshu" or (game_mode == "challenge" and selected_difficulty >= 3)
@@ -69,6 +79,10 @@ func _reset_tianshu_run() -> void:
 	tianshu_battle_state.clear()
 	tianshu_refresh_available = [true, true, true]
 	tianshu_draft_refresh_used = [0, 0, 0]
+	tianshu_draws_remaining = 0
+	tianshu_return_phase = "draft"
+	tianshu_draw_reason = ""
+	tianshu_generate_draft_on_finish = false
 
 func _tianshu_level(book_id: String) -> int:
 	return int(tianshu_levels.get(book_id, 0))
@@ -99,6 +113,15 @@ func _generate_tianshu_choices() -> void:
 		tianshu_choices.append(str(pool[0]))
 	tianshu_refresh_available = [true, true, true]
 
+func _begin_tianshu_draw(count: int, reason: String, return_phase: String, generate_draft_on_finish: bool) -> void:
+	tianshu_draws_remaining = maxi(1, count)
+	tianshu_draw_reason = reason
+	tianshu_return_phase = return_phase if return_phase in ["draft", "placement"] else "draft"
+	tianshu_generate_draft_on_finish = generate_draft_on_finish
+	phase = "tianshu"
+	draft_user_hidden = true
+	_generate_tianshu_choices()
+
 func _refresh_tianshu_choice(index: int) -> void:
 	if phase != "tianshu" or index < 0 or index >= tianshu_choices.size(): return
 	if index >= tianshu_refresh_available.size() or not tianshu_refresh_available[index]: return
@@ -115,16 +138,30 @@ func _refresh_tianshu_choice(index: int) -> void:
 
 func _choose_tianshu(book_id: String) -> void:
 	if phase != "tianshu" or not tianshu_choices.has(book_id): return
+	var old_level := _tianshu_level(book_id)
 	var new_level := mini(2, _tianshu_level(book_id) + 1)
 	tianshu_levels[book_id] = new_level
 	var book: Dictionary = TIANSHU_BOOKS[book_id]
 	if book.has("pool"):
 		tianshu_pool_effect = {"book_id":book_id, "factions":Array(book.pool).duplicate(), "end_round":round_number + (2 if new_level >= 2 else 1), "level":new_level}
 	_log("[color=#e5a8ff]【天书·%s %s】%s[/color]" % [_tianshu_name(book_id), "Ⅱ" if new_level == 2 else "Ⅰ", _tianshu_effect_text(book_id, new_level)])
-	phase = "draft"
+	_apply_tianshu_acquisition_effect(book_id, old_level, new_level)
+	tianshu_draws_remaining = maxi(0, tianshu_draws_remaining - 1)
+	if tianshu_draws_remaining > 0:
+		_generate_tianshu_choices()
+		_render()
+		return
+	phase = tianshu_return_phase
 	draft_user_hidden = false
-	call("_generate_choices")
+	if phase == "draft" and (tianshu_generate_draft_on_finish or choices.size() != DRAFT_SIZE):
+		call("_generate_choices")
+	tianshu_draw_reason = ""
+	tianshu_generate_draft_on_finish = false
 	_render()
+
+func _apply_tianshu_acquisition_effect(book_id: String, old_level: int, new_level: int) -> void:
+	if book_id == "taozhu_yice" and new_level > old_level and has_method("_earn_gold"):
+		call("_earn_gold", 300 if new_level == 1 else 600, "天书·陶朱遗策")
 
 func _active_tianshu_pool_factions() -> Array:
 	if tianshu_pool_effect.is_empty() or round_number > int(tianshu_pool_effect.get("end_round", 0)):
@@ -140,7 +177,13 @@ func _tianshu_can_refresh_draft(index: int) -> bool:
 	return index >= 0 and index < tianshu_draft_refresh_used.size() and tianshu_draft_refresh_used[index] < _tianshu_draft_refresh_limit()
 
 func _tianshu_save_state() -> Dictionary:
-	return {"levels":tianshu_levels, "choices":tianshu_choices, "refresh":tianshu_refresh_available, "pool":tianshu_pool_effect, "battle":tianshu_battle_state, "draft_refresh_used":tianshu_draft_refresh_used}
+	return {
+		"levels":tianshu_levels, "choices":tianshu_choices, "refresh":tianshu_refresh_available,
+		"pool":tianshu_pool_effect, "battle":tianshu_battle_state,
+		"draft_refresh_used":tianshu_draft_refresh_used,
+		"draws_remaining":tianshu_draws_remaining, "return_phase":tianshu_return_phase,
+		"draw_reason":tianshu_draw_reason, "generate_draft_on_finish":tianshu_generate_draft_on_finish
+	}
 
 func _load_tianshu_state(value) -> void:
 	_reset_tianshu_run()
@@ -153,6 +196,11 @@ func _load_tianshu_state(value) -> void:
 	tianshu_pool_effect = Dictionary(value.get("pool", {})).duplicate(true)
 	tianshu_battle_state = Dictionary(value.get("battle", {})).duplicate(true)
 	tianshu_draft_refresh_used.assign(value.get("draft_refresh_used", [0, 0, 0]))
+	tianshu_draws_remaining = maxi(0, int(value.get("draws_remaining", 1 if not tianshu_choices.is_empty() else 0)))
+	tianshu_return_phase = str(value.get("return_phase", "draft"))
+	if tianshu_return_phase not in ["draft", "placement"]: tianshu_return_phase = "draft"
+	tianshu_draw_reason = str(value.get("draw_reason", "free"))
+	tianshu_generate_draft_on_finish = bool(value.get("generate_draft_on_finish", phase == "tianshu"))
 
 func _tianshu_has_faction(unit: Dictionary, faction: String) -> bool:
 	return unit.team == "player" and str(heroes[unit.hero_id].f) == faction
@@ -355,7 +403,17 @@ func _tianshu_on_ruler_hit(source: Dictionary, tile: Dictionary) -> void:
 		if _tianshu_level("shu_wuhu") >= 2: source.action = minf(ACTION_MAX, float(source.action) + 10.0)
 
 func _tianshu_on_kill(killer, fallen: Dictionary) -> void:
-	if killer == null or killer.team != "player" or not _tianshu_enabled() or _tianshu_level("zhanjiang") <= 0: return
+	if not _tianshu_enabled(): return
+	if fallen.team == "player" and _tianshu_level("mage_guoshi") > 0 and has_method("_earn_gold"):
+		call("_earn_gold", 40 if _tianshu_level("mage_guoshi") == 1 else 90, "天书·马革裹尸")
+	if killer == null or killer.team != "player" or fallen.team != "enemy":
+		return
+	if _tianshu_level("jungong_juezhi") > 0 and has_method("_earn_gold"):
+		var merit_level := _tianshu_level("jungong_juezhi")
+		call("_earn_gold", 40 if merit_level == 1 else 70, "天书·军功爵制")
+		if merit_level >= 2:
+			killer.tianshu_kill_strategy_bonus = float(killer.get("tianshu_kill_strategy_bonus", 0.0)) + 5.0
+	if _tianshu_level("zhanjiang") <= 0: return
 	var limit := 3 if _tianshu_level("zhanjiang") == 1 else 5
 	if int(killer.get("tianshu_kills", 0)) >= limit: return
 	killer.tianshu_kills = int(killer.get("tianshu_kills", 0)) + 1

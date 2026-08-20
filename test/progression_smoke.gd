@@ -94,11 +94,11 @@ func _init() -> void:
 	assert(game.rune_batch_synthesize_button.visible)
 	var first_rune_panel: Control = game.rune_inventory_box.get_child(0)
 	assert(first_rune_panel.mouse_filter == Control.MOUSE_FILTER_PASS)
-	var first_rune_row: Control = first_rune_panel.get_child(0)
+	var first_rune_row: Control = first_rune_panel.get_child(0).get_child(0)
 	assert(first_rune_row.mouse_filter == Control.MOUSE_FILTER_PASS)
-	assert((first_rune_row.get_child(0) as Label).text.contains("磐石"))
-	assert(((game.rune_inventory_box.get_child(1) as Control).get_child(0).get_child(0) as Label).text.contains("疾风"))
-	assert(((game.rune_inventory_box.get_child(2) as Control).get_child(0).get_child(0) as Label).text.contains("韬略"))
+	assert((first_rune_row.get_child(1) as Label).text.contains("磐石"))
+	assert(((game.rune_inventory_box.get_child(1) as Control).get_child(0).get_child(0).get_child(1) as Label).text.contains("疾风"))
+	assert(((game.rune_inventory_box.get_child(2) as Control).get_child(0).get_child(0).get_child(1) as Label).text.contains("韬略"))
 	for child in first_rune_row.get_children():
 		if child is Button: assert(child.mouse_filter == Control.MOUSE_FILTER_PASS)
 	game.rune_overlay.hide()
@@ -109,16 +109,14 @@ func _init() -> void:
 	game.menu_overlay.show()
 	game.battle_menu_overlay.show()
 	game._launch_challenge(50, 4)
-	assert(game.phase == "tianshu" and game.round_number == 1)
-	assert(game.tianshu_overlay.visible)
-	game._choose_tianshu(game.tianshu_choices[0])
-	assert(game.phase == "draft" and game.draft_overlay.visible)
+	assert(game.phase == "draft" and game.round_number == 1)
+	assert(game.draft_overlay.visible)
 	game.phase = "combat"
 	game.battle_running = true
 	game.player_ruler_hp = game._player_ruler_max_hp()
 	game.enemy_ruler_hp = game.RULER_MAX_HP
 	game._finish_battle()
-	assert(game.phase == "tianshu" and game.round_number == 2)
+	assert(game.phase == "draft" and game.round_number == 2)
 	game.round_number = 15
 	game.phase = "combat"
 	game.battle_running = true

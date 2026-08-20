@@ -50,7 +50,8 @@ const TALENT_TREES := {
 		["厚德",1,5,40.0,0.0,0.0,0], ["修文",1,5,0.0,1.0,0.0,0], ["敏行",1,5,0.0,0.0,0.05,0],
 		["强魄",2,5,60.0,0.0,0.0,8], ["韬晦",2,5,0.0,1.5,0.0,8], ["迅捷",2,5,0.0,0.0,0.075,8],
 		["金坚",3,4,80.0,0.0,0.0,20], ["睿略",3,4,0.0,2.0,0.0,20], ["疾驰",3,4,0.0,0.0,0.1,20],
-		["明君",4,2,0.0,0.0,0.0,34], ["神算",4,1,0.0,0.0,0.0,34], ["百炼",4,2,0.0,0.0,0.0,34],
+		["明君",4,2,0.0,0.0,0.0,34], ["开源",4,1,0.0,0.0,0.0,34], ["生财",4,2,0.0,0.0,0.0,34],
+		["重利",4,2,0.0,0.0,0.0,34], ["百炼",4,2,0.0,0.0,0.0,34],
 		["天命",5,1,0.0,0.0,0.0,40], ["群英",5,1,200.0,5.0,0.25,40], ["长治",5,1,0.0,0.0,0.0,40]
 	]},
 	"shu":{"name":"汉室中兴", "faction":"shu", "nodes":[
@@ -109,10 +110,16 @@ func _load_progression() -> void:
 	rune_inventory = data.get("rune_inventory", []) if data.get("rune_inventory", []) is Array else []
 	rune_loadouts = data.get("rune_loadouts", {}) if data.get("rune_loadouts", {}) is Dictionary else {}
 	talent_levels = data.get("talent_levels", {}) if data.get("talent_levels", {}) is Dictionary else {}
+	var refunded_removed_talent := int(talent_levels.get("all:神算", 0)) * 5
+	if refunded_removed_talent > 0:
+		general_stars += refunded_removed_talent
+		talent_levels.erase("all:神算")
 	home_hero_id = str(data.get("home_hero_id", "sunshangxiang"))
 	if not heroes.has(home_hero_id): home_hero_id = "sunshangxiang"
 	next_rune_id = maxi(1, int(data.get("next_rune_id", 1)))
 	_sanitize_progression()
+	if refunded_removed_talent > 0:
+		_save_progression()
 
 func _save_progression() -> bool:
 	var file := FileAccess.open(PROGRESSION_SAVE_PATH, FileAccess.WRITE)
@@ -345,7 +352,9 @@ func _talent_node(tree_id: String, node_name: String) -> Array:
 func _talent_effect_description(tree_id: String, node_name: String) -> String:
 	var specials := {
 		"all:明君":"每级使我方主公最大生命值增加 600。",
-		"all:神算":"战斗开局随机使 2 名友军行动条增加 30。",
+		"all:开源":"初始金币增加 150。",
+		"all:生财":"每级使每回合基础收入增加 20，满级每回合增加 40。",
+		"all:重利":"每级使利息上限增加 15，满级由 50 提高到 80。",
 		"all:百炼":"每级使符文转换消耗降低 5%，满级降低 10%。",
 		"all:天命":"所有阵营羁绊数值额外提高 10%。",
 		"all:群英":"所有武将生命 +200、兵略 +5、技能冷却减少 0.25 秒。",
@@ -452,7 +461,7 @@ func _talent_faction_tier_bonus(team: String, faction: String) -> float:
 	return 0.005 * float(_talent_level(faction, str(node_names[faction])))
 
 func _talent_opening_action_bonus() -> bool:
-	return _talent_level("all", "神算") > 0
+	return false
 
 func _set_home_hero(hero_id: String) -> void:
 	if not heroes.has(hero_id): return

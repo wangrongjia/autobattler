@@ -5,11 +5,15 @@ func _init() -> void:
 	var game = packed.instantiate()
 	root.add_child(game)
 	await process_frame
-	assert(game.TIANSHU_BOOKS.size() == 48)
+	assert(game.TIANSHU_BOOKS.size() == 54)
 	game._start_quick_game()
 	assert(not game._tianshu_enabled() and game.phase == "draft")
 	game._start_tianshu_game()
-	assert(game._tianshu_enabled() and game.phase == "tianshu")
+	assert(game._tianshu_enabled() and game.phase == "draft")
+	game.round_number = 3
+	game.economy_income_round = 2
+	game._prepare_round()
+	assert(game.phase == "tianshu" and game.tianshu_draw_reason == "free")
 	assert(game.tianshu_choices.size() == 3)
 	assert(game.tianshu_choices.duplicate().all(func(book_id): return game.TIANSHU_BOOKS.has(book_id)))
 	var unique := {}
@@ -54,7 +58,7 @@ func _init() -> void:
 	game._reset_tianshu_run()
 	game.limit_challenges = false
 	assert(game._start_challenge(1, 2) and game.phase == "draft")
-	assert(game._start_challenge(1, 3) and game.phase == "tianshu")
+	assert(game._start_challenge(1, 3) and game.phase == "draft")
 	assert(is_instance_valid(game.tianshu_overlay))
 	assert(is_instance_valid(game.tianshu_header_button))
 	print("TIANSHU_SMOKE_OK")

@@ -1,9 +1,10 @@
-extends "res://ThreeKingdom/systems/tianshu_system.gd"
+extends "res://ThreeKingdom/systems/economy_system.gd"
 
 func _new_game() -> void:
 	round_number = 1
 	phase = "draft"
 	_reset_tianshu_run()
+	_reset_economy_run()
 	player_ruler_hp = _player_ruler_max_hp()
 	enemy_ruler_hp = RULER_MAX_HP
 	ruler_regen = {"player":{"amount":0.0, "time":0.0, "clock":0.0}, "enemy":{"amount":0.0, "time":0.0, "clock":0.0}}
@@ -25,9 +26,9 @@ func _new_game() -> void:
 	if is_instance_valid(log_box): log_box.clear()
 	_prepare_round()
 	if game_mode == "challenge":
-		_log("%s · %s：%s完成三轮选将后迎战守军。" % [STAGE_NAMES[selected_stage - 1], str(DIFFICULTIES[selected_difficulty].name), "先选天书，再" if _tianshu_enabled() else ""])
+		_log("%s · %s：完成三轮选将后迎战守军。" % [STAGE_NAMES[selected_stage - 1], str(DIFFICULTIES[selected_difficulty].name)])
 	elif game_mode == "tianshu":
-		_log("[color=#e5a8ff]天书演武开始：每回合先三选一天书，再进行三轮选将。[/color]")
+		_log("[color=#e5a8ff]天书演武开始：第 3/6/9/12/15 回合免费选天书，其他抽取可在天书阁购买。[/color]")
 	else:
 		_log(t("征战开始：每关进行三轮三选一，选项从左到右固定为前军、中军、后军。", "Campaign begins with three pick-one-of-three rounds; slots are fixed to Vanguard, Midguard, and Rearguard."))
 	_render()
@@ -49,14 +50,12 @@ func _start_challenge(stage: int, difficulty: int) -> bool:
 	return true
 
 func _save_game(silent := false) -> bool:
-	if game_mode == "challenge":
-		if not silent: _log(t("闯关对局不保存中途进度。", "Challenge battles cannot be saved midway."))
-		return false
 	if battle_running:
 		if not silent: _log(t("战斗过程中不能保存，请在选人或布阵阶段保存。", "Save during draft or formation, not combat."))
 		return false
 	var data := {
-		"version":6, "round_number":round_number, "phase":phase, "game_mode":game_mode,
+		"version":7, "round_number":round_number, "phase":phase, "game_mode":game_mode,
+		"selected_stage":selected_stage, "selected_difficulty":selected_difficulty,
 		"player_ruler_hp":player_ruler_hp, "enemy_ruler_hp":enemy_ruler_hp,
 		"player_units":player_units, "enemy_units":enemy_units,
 		"draft_roster_baseline":draft_roster_baseline,
@@ -67,7 +66,8 @@ func _save_game(silent := false) -> bool:
 		"selected_unit":selected_unit, "final_battle":final_battle,
 		"ruler_regen":ruler_regen,
 		"last_battle_stats":last_battle_stats,
-		"tianshu":_tianshu_save_state()
+		"tianshu":_tianshu_save_state(),
+		"economy":_economy_save_state()
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null: return false
@@ -84,11 +84,13 @@ func _load_game() -> bool:
 	if file == null: return false
 	var data = JSON.parse_string(file.get_as_text())
 	file.close()
-	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) not in [3, 4, 5, 6]:
+	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) not in [3, 4, 5, 6, 7]:
 		_log(t("存档版本不兼容。", "The save version is incompatible."))
 		return false
 	tick_timer.stop()
 	game_mode = str(data.get("game_mode", "quick"))
+	selected_stage = clampi(int(data.get("selected_stage", selected_stage)), 1, STAGE_NAMES.size())
+	selected_difficulty = clampi(int(data.get("selected_difficulty", selected_difficulty)), 0, DIFFICULTIES.size() - 1)
 	round_number = int(data.round_number)
 	phase = str(data.phase)
 	player_ruler_hp = int(data.player_ruler_hp)
@@ -116,6 +118,7 @@ func _load_game() -> bool:
 	ruler_regen = data.get("ruler_regen", {"player":{"amount":0.0, "time":0.0, "clock":0.0}, "enemy":{"amount":0.0, "time":0.0, "clock":0.0}})
 	last_battle_stats = data.get("last_battle_stats", [])
 	_load_tianshu_state(data.get("tianshu", {}))
+	_load_economy_state(data.get("economy", {}))
 	if int(data.get("version", 0)) < 6:
 		for index in mini(DRAFT_SIZE, draft_refresh_available.size()):
 			tianshu_draft_refresh_used[index] = 0 if draft_refresh_available[index] else 1
@@ -149,16 +152,17 @@ func _sanitize_loaded_units(value, expected_team: String) -> Array:
 	return result
 
 func _prepare_round() -> void:
-	phase = "tianshu" if _tianshu_enabled() else "draft"
+	phase = "draft"
 	draft_user_hidden = false
 	draft_picks_remaining = PICKS_PER_ROUND
 	pending_unit_ids = []
 	chosen_this_round = []
 	draft_roster_baseline = player_units.duplicate(true)
 	selected_unit = ""
+	_settle_round_economy()
 	_add_enemy_wave()    # 每关从指定阵营（或全阵营）随机加入3名敌将
-	if _tianshu_enabled():
-		_generate_tianshu_choices()
+	if _tianshu_enabled() and _is_free_tianshu_round():
+		_begin_tianshu_draw(1, "free", "draft", true)
 	else:
 		_generate_choices()
 
@@ -305,7 +309,7 @@ func _on_player_cell(row: int, col: int) -> void:
 	elif occupant != null:
 		var selected: Variant = _find_by_id(player_units, selected_unit)
 		if selected != null and selected.row < 0:
-			_log(t("该战位已有武将；请先将原武将拖到备战区出售。", "That tile is occupied; drag its unit to the reserve to sell it first."))
+			_log(t("该战位已有武将；可将备战武将拖到此处互换。", "That tile is occupied; drag the reserve general here to swap."))
 		else:
 			selected_unit = occupant.id
 	else:
@@ -408,6 +412,8 @@ func _finish_battle() -> void:
 		_prepare_round()
 		_save_game(true)
 		_log(t("进入下一关：敌方主公保留剩余生命，再进行三轮三选一。", "Next stage: the enemy ruler keeps its remaining HP; complete three pick-one-of-three rounds."))
+	if phase == "finished":
+		_end_economy_run()
 	_render()
 
 func _start_final_battle() -> void:
