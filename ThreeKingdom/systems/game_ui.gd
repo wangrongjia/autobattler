@@ -1,26 +1,38 @@
 extends "res://ThreeKingdom/systems/combat_system.gd"
 
+const PremiumUIArt = preload("res://ThreeKingdom/ui/premium_ui_art.gd")
+
 var _encyclopedia_touch_origins := {}
 const CARD_BORDER_ROOT := "res://ThreeKingdom/animations/border/"
+const UI_GOLD := Color("#b98a4f")
+const UI_GOLD_LIGHT := Color("#f0c77a")
+const UI_INK := Color("#090a09")
+const UI_LACQUER := Color("#171411")
+const UI_JADE := Color("#315d4d")
 
 var home_portrait: TextureRect
 var home_hero_name_label: Label
 var home_resource_label: Label
+var home_faction_label: Label
+var home_motto_label: Label
 var battle_menu_overlay: Control
 var challenge_stage_grid: GridContainer
 var challenge_difficulty_options: OptionButton
 var challenge_stage_title: Label
+var challenge_difficulty_buttons: Array[Button] = []
 var rune_overlay: Control
-var rune_inventory_box: VBoxContainer
+var rune_inventory_box: Container
 var rune_inventory_scroll: ScrollContainer
 var rune_resource_label: Label
 var rune_hero_options: OptionButton
 var rune_status_label: Label
 var talent_overlay: Control
-var talent_content_box: VBoxContainer
+var talent_content_box: Control
 var talent_resource_label: Label
 var talent_tree_id := "all"
 var talent_detail_label: Label
+var talent_tree_canvas: Control
+var talent_tree_tabs := {}
 var rune_faction_options: OptionButton
 var rune_tier_filter := 0
 var rune_filter_buttons: Array[Button] = []
@@ -89,10 +101,13 @@ func _style(control: Control, color: Color, radius := 10, border := Color.TRANSP
 	box.border_width_right = width
 	box.border_width_top = width
 	box.border_width_bottom = width
-	box.content_margin_left = 10
-	box.content_margin_right = 10
-	box.content_margin_top = 8
-	box.content_margin_bottom = 8
+	box.content_margin_left = 13
+	box.content_margin_right = 13
+	box.content_margin_top = 10
+	box.content_margin_bottom = 10
+	box.shadow_color = Color(0, 0, 0, 0.48)
+	box.shadow_size = 7
+	box.shadow_offset = Vector2(0, 3)
 	control.add_theme_stylebox_override("panel", box)
 
 func _button(text_value: String) -> Button:
@@ -100,19 +115,78 @@ func _button(text_value: String) -> Button:
 	button.text = text_value
 	button.custom_minimum_size = Vector2(0, 42)
 	button.add_theme_font_size_override("font_size", 16)
+	button.add_theme_color_override("font_color", Color("#ead9b5"))
+	button.add_theme_color_override("font_hover_color", Color("#fff0c9"))
+	button.add_theme_color_override("font_pressed_color", Color("#fff4cf"))
+	button.add_theme_color_override("font_disabled_color", Color("#746b60"))
+	button.add_theme_color_override("font_focus_color", Color("#fff0c9"))
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color("#2a4762")
-	normal.corner_radius_top_left = 8
-	normal.corner_radius_top_right = 8
-	normal.corner_radius_bottom_left = 8
-	normal.corner_radius_bottom_right = 8
-	normal.content_margin_left = 12
-	normal.content_margin_right = 12
+	normal.bg_color = Color("#171716")
+	normal.border_color = Color("#755b38")
+	normal.set_border_width_all(1)
+	normal.set_corner_radius_all(5)
+	normal.content_margin_left = 15
+	normal.content_margin_right = 15
+	normal.content_margin_top = 8
+	normal.content_margin_bottom = 8
+	normal.shadow_color = Color(0, 0, 0, 0.42)
+	normal.shadow_size = 4
+	normal.shadow_offset = Vector2(0, 2)
 	var hover := normal.duplicate()
-	hover.bg_color = Color("#3d6788")
+	hover.bg_color = Color("#2b241a")
+	hover.border_color = Color("#d4a85f")
+	hover.set_border_width_all(2)
+	var pressed := normal.duplicate()
+	pressed.bg_color = Color("#3a2b18")
+	pressed.border_color = Color("#f0c77a")
+	pressed.set_border_width_all(2)
+	var disabled := normal.duplicate()
+	disabled.bg_color = Color("#111211")
+	disabled.border_color = Color("#38342e")
+	var focus := hover.duplicate()
 	button.add_theme_stylebox_override("normal", normal)
 	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("disabled", disabled)
+	button.add_theme_stylebox_override("focus", focus)
 	return button
+
+func _accent_button(button: Button, accent: Color, filled := false) -> void:
+	var normal: StyleBoxFlat = button.get_theme_stylebox("normal").duplicate()
+	normal.border_color = accent.darkened(0.15)
+	normal.bg_color = accent.darkened(0.66) if filled else Color("#171716")
+	button.add_theme_stylebox_override("normal", normal)
+	var hover: StyleBoxFlat = normal.duplicate()
+	hover.bg_color = accent.darkened(0.48)
+	hover.border_color = accent.lightened(0.25)
+	hover.set_border_width_all(2)
+	button.add_theme_stylebox_override("hover", hover)
+	var pressed: StyleBoxFlat = hover.duplicate()
+	pressed.bg_color = accent.darkened(0.35)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_color_override("font_color", accent.lightened(0.45))
+	button.add_theme_color_override("font_hover_color", Color("#fff3d1"))
+
+func _add_premium_art(parent: Control, variant: int, accent := UI_GOLD) -> Control:
+	var art := PremiumUIArt.new()
+	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	art.configure(variant, accent)
+	parent.add_child(art)
+	parent.move_child(art, 0)
+	return art
+
+func _section_title(value: String, subtitle := "") -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", -1)
+	var title := _label(value, 27, UI_GOLD_LIGHT)
+	title.add_theme_constant_override("outline_size", 4)
+	title.add_theme_color_override("font_outline_color", Color("#1b1007"))
+	box.add_child(title)
+	if not subtitle.is_empty():
+		var hint := _label(subtitle, 11, Color("#9e8769"))
+		hint.add_theme_constant_override("letter_spacing", 2)
+		box.add_child(hint)
+	return box
 
 func _label(value: String, size := 16, color := Color("#e8e2cf")) -> Label:
 	var label := Label.new()
@@ -146,6 +220,7 @@ func _build_ui() -> void:
 	glow.size = Vector2(960, 580)
 	glow.rotation = -0.14
 	add_child(glow)
+	_add_premium_art(self, PremiumUIArt.Variant.COMBAT, Color("#85663e"))
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var compact_mobile := _is_mobile_ui()
@@ -164,14 +239,16 @@ func _build_ui() -> void:
 	var brand := VBoxContainer.new()
 	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	brand.add_theme_constant_override("separation", -2)
-	var eyebrow := _label("A TACTICAL AUTOBATTLER", 10, Color("#ad8355"))
+	var eyebrow := _label("THREE KINGDOMS · TACTICAL AUTOBATTLER", 10, Color("#ad8355"))
 	eyebrow.add_theme_constant_override("outline_size", 1)
 	brand.add_child(eyebrow)
 	title_label = _label("", 27, Color("#f0c77a"))
+	title_label.add_theme_constant_override("outline_size", 4)
+	title_label.add_theme_color_override("font_outline_color", Color("#1a1008"))
 	brand.add_child(title_label)
 	header.add_child(brand)
 	var round_panel := PanelContainer.new()
-	_style(round_panel, Color("#1a1715"), 10, Color("#5f4931"), 1)
+	_style(round_panel, Color("#13120ff0"), 5, Color("#80613b"), 1)
 	var round_box := HBoxContainer.new()
 	round_box.add_theme_constant_override("separation", 12)
 	round_label = _label("", 16)
@@ -181,6 +258,7 @@ func _build_ui() -> void:
 	round_panel.add_child(round_box)
 	header.add_child(round_panel)
 	tianshu_header_button = _button(t("天书", "CODEX"))
+	_accent_button(tianshu_header_button, Color("#9e68bd"))
 	tianshu_header_button.custom_minimum_size = Vector2(86, 40)
 	tianshu_header_button.pressed.connect(_show_tianshu_collection)
 	tianshu_header_button.hide()
@@ -198,10 +276,12 @@ func _build_ui() -> void:
 	load_button.pressed.connect(_load_game)
 	header.add_child(load_button)
 	speed_button = _button("")
+	_accent_button(speed_button, Color("#9a793f"))
 	speed_button.custom_minimum_size = Vector2(72, 40)
 	speed_button.pressed.connect(_cycle_speed)
 	header.add_child(speed_button)
 	menu_button = _button("")
+	_accent_button(menu_button, Color("#866b45"))
 	menu_button.custom_minimum_size = Vector2(92, 40)
 	menu_button.pressed.connect(_show_main_menu)
 	header.add_child(menu_button)
@@ -212,7 +292,7 @@ func _build_ui() -> void:
 	var arena := PanelContainer.new()
 	battle_arena_panel = arena
 	arena.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_style(arena, Color("#1a1815ef"), 14, Color("#68513a"), 1)
+	_style(arena, Color("#11110fee"), 5, Color("#725638"), 2)
 	var arena_box := VBoxContainer.new()
 	arena_box.add_theme_constant_override("separation", 2 if compact_mobile else 6)
 	var time_row := HBoxContainer.new()
@@ -259,7 +339,7 @@ func _build_ui() -> void:
 	arena_box.add_child(enemy_roster_label)
 	var lane := PanelContainer.new()
 	lane.custom_minimum_size.y = 18 if compact_mobile else 42
-	_style(lane, Color("#241c16"), 8, Color("#8e673d"), 1)
+	_style(lane, Color("#21170e"), 3, Color("#a77a3d"), 1)
 	var lane_box := HBoxContainer.new()
 	lane_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	var lane_line_left := HSeparator.new()
@@ -294,7 +374,7 @@ func _build_ui() -> void:
 	var command := PanelContainer.new()
 	battle_info_panel = command
 	command.custom_minimum_size.x = 330 if compact_mobile else 430
-	_style(command, Color("#151719ee"), 14, Color("#594532"), 1)
+	_style(command, Color("#10110fee"), 5, Color("#725638"), 2)
 	var command_box := VBoxContainer.new()
 	command_box.add_theme_constant_override("separation", 8)
 	battle_info_host = Control.new()
@@ -398,7 +478,7 @@ func _build_ui() -> void:
 	_apply_board_side_layout()
 	var reserve_panel := PanelContainer.new()
 	reserve_panel.custom_minimum_size.y = 142 if compact_mobile else 108
-	_style(reserve_panel, Color("#151719ee"), 12, Color("#594532"), 1)
+	_style(reserve_panel, Color("#10110fee"), 5, Color("#725638"), 2)
 	var reserve_row := HBoxContainer.new()
 	reserve_row.add_theme_constant_override("separation", 10)
 	reserve_panel.add_child(reserve_row)
@@ -620,13 +700,18 @@ func _ruler_rail(is_player: bool) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(58 if _is_mobile_ui() else 76, 0)
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_style(panel, Color("#100e0de8"), 10, Color("#b68a4f" if is_player else "#9c4c48"), 2)
+	_style(panel, Color("#100e0df2"), 5, Color("#b68a4f" if is_player else "#9c4c48"), 2)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 5)
-	var seal := _label("主\n公" if is_player else "敌\n将", 17, Color("#f0c77a" if is_player else "#e89b91"))
+	var seal_panel := PanelContainer.new()
+	seal_panel.custom_minimum_size = Vector2(44, 44)
+	_style(seal_panel, Color("#173325") if is_player else Color("#451b18"), 24, Color("#d5ad58") if is_player else Color("#bf5b51"), 2)
+	var seal := _label("主" if is_player else "敌", 19, Color("#f0c77a" if is_player else "#e89b91"))
 	seal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(seal)
+	seal.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	seal_panel.add_child(seal)
+	box.add_child(seal_panel)
 	var gauge := Control.new()
 	gauge.custom_minimum_size = Vector2(42, 150)
 	gauge.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -683,10 +768,11 @@ func _build_draft_layer() -> void:
 	draft_layer.layer = 20
 	add_child(draft_layer)
 	draft_overlay = ColorRect.new()
-	draft_overlay.color = Color("#080a0df2")
+	draft_overlay.color = Color("#080907")
 	draft_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	draft_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	draft_layer.add_child(draft_overlay)
+	_add_premium_art(draft_overlay, PremiumUIArt.Variant.BACKDROP, Color("#8f6f42"))
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var mobile := _is_mobile_ui()
@@ -701,7 +787,7 @@ func _build_draft_layer() -> void:
 	margin.add_child(center)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(900, 640) if mobile else Vector2(1240, 700)
-	_style(panel, Color("#171513"), 18, Color("#8e673d"), 2)
+	_style(panel, Color("#12110fee"), 5, Color("#8e673d"), 2)
 	center.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -711,6 +797,7 @@ func _build_draft_layer() -> void:
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	var close := _button(t("暂时隐藏", "HIDE"))
+	_accent_button(close, Color("#607b95"))
 	close.custom_minimum_size = Vector2(105, 48)
 	close.pressed.connect(_hide_draft_layer)
 	header.add_child(close)
@@ -738,11 +825,12 @@ func _toggle_draft_layer() -> void:
 
 func _build_tianshu_overlay() -> void:
 	tianshu_overlay = ColorRect.new()
-	tianshu_overlay.color = Color("#090711f7")
+	tianshu_overlay.color = Color("#090711")
 	tianshu_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	tianshu_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	tianshu_overlay.z_index = 1550
 	add_child(tianshu_overlay)
+	_add_premium_art(tianshu_overlay, PremiumUIArt.Variant.CODEX, Color("#a66bcd"))
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 22)
@@ -751,19 +839,22 @@ func _build_tianshu_overlay() -> void:
 	margin.add_theme_constant_override("margin_bottom", 22)
 	tianshu_overlay.add_child(margin)
 	var panel := PanelContainer.new()
-	_style(panel, Color("#17121f"), 18, Color("#c17af4"), 3)
+	_style(panel, Color("#121018e8"), 5, Color("#b078d2"), 2)
 	margin.add_child(panel)
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 12)
 	panel.add_child(root)
 	var header := HBoxContainer.new()
-	tianshu_overlay_title = _label("", 30, Color("#f0c77a"))
+	tianshu_overlay_title = _label("", 31, Color("#f0c77a"))
+	tianshu_overlay_title.add_theme_constant_override("outline_size", 5)
+	tianshu_overlay_title.add_theme_color_override("font_outline_color", Color("#211029"))
 	tianshu_overlay_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(tianshu_overlay_title)
 	var subtitle := _label(t("所有天书均为彩色品质 · 同名再次选择升至Ⅱ级", "All codices share one prismatic tier · choose again to reach level II"), 14, Color("#d8b9ee"))
 	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(subtitle)
 	tianshu_overlay_close = _button(t("关闭", "CLOSE"))
+	_accent_button(tianshu_overlay_close, Color("#8b62a1"))
 	tianshu_overlay_close.custom_minimum_size = Vector2(120, 46)
 	tianshu_overlay_close.pressed.connect(func(): tianshu_overlay.hide())
 	header.add_child(tianshu_overlay_close)
@@ -784,11 +875,11 @@ func _build_tianshu_overlay() -> void:
 	choices_scroll.add_child(tianshu_choice_box)
 	var owned_panel := PanelContainer.new()
 	owned_panel.custom_minimum_size.x = 330
-	_style(owned_panel, Color("#14151c"), 12, Color("#765585"), 2)
+	_style(owned_panel, Color("#111117ed"), 5, Color("#765585"), 2)
 	var owned_root := VBoxContainer.new()
 	owned_root.add_theme_constant_override("separation", 8)
 	owned_panel.add_child(owned_root)
-	owned_root.add_child(_label(t("本局已获天书", "OWNED CODICES"), 20, Color("#e5a8ff")))
+	owned_root.add_child(_label(t("卷　本局已获天书", "OWNED CODICES"), 20, Color("#e5a8ff")))
 	var owned_scroll := ScrollContainer.new()
 	owned_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_enable_touch_scroll(owned_scroll, false, true)
@@ -824,7 +915,9 @@ func _render_tianshu_overlay() -> void:
 			option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			option.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			option.add_theme_constant_override("separation", 10)
-			var scope := _label(str(book.group), 16, Color("#dca6ff"))
+			var group_colors := {"通用":Color("#dca6ff"), "蜀":Color("#79b284"), "魏":Color("#6f9ac4"), "吴":Color("#d08d5c"), "群":Color("#ba6f9c"), "阵营":Color("#dca6ff")}
+			var card_accent: Color = group_colors.get(str(book.group), Color("#dca6ff"))
+			var scope := _label("◆　" + str(book.group) + "天书　◆", 16, card_accent)
 			scope.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			option.add_child(scope)
 			var card := Button.new()
@@ -833,25 +926,29 @@ func _render_tianshu_overlay() -> void:
 			card.custom_minimum_size.y = 400
 			card.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			card.add_theme_font_size_override("font_size", 20)
-			card.text = ("✦  %s  ✦\n\n%s\n\n%s\n\n%s" % [_tianshu_name(book_id), "升级至 Ⅱ 级" if current == 1 else "获得 Ⅰ 级", _tianshu_effect_text(book_id, target_level), "点击选定，本回合不可更改"])
+			card.text = ("天　书\n\n✦  %s  ✦\n\n%s\n\n%s\n\n%s" % [_tianshu_name(book_id), "升级至 Ⅱ 级" if current == 1 else "获得 Ⅰ 级", _tianshu_effect_text(book_id, target_level), "点击选定 · 本回合不可更改"])
 			var style := StyleBoxFlat.new()
-			style.bg_color = Color("#2a1838")
-			style.border_color = Color("#de8cff")
+			style.bg_color = card_accent.darkened(0.72)
+			style.border_color = card_accent
 			style.set_border_width_all(4)
-			style.set_corner_radius_all(16)
+			style.set_corner_radius_all(6)
 			style.content_margin_left = 22
 			style.content_margin_right = 22
 			style.content_margin_top = 22
 			style.content_margin_bottom = 22
+			style.shadow_color = Color(card_accent, 0.28)
+			style.shadow_size = 12
 			card.add_theme_stylebox_override("normal", style)
 			var hover: StyleBoxFlat = style.duplicate()
-			hover.bg_color = Color("#402252")
+			hover.bg_color = card_accent.darkened(0.56)
 			hover.border_color = Color("#f4d06f")
+			hover.shadow_color = Color(card_accent, 0.58)
 			card.add_theme_stylebox_override("hover", hover)
 			card.pressed.connect(_choose_tianshu.bind(book_id))
 			option.add_child(card)
 			var can_refresh := index < tianshu_refresh_available.size() and tianshu_refresh_available[index]
 			var refresh := _button(t("↻ 单独刷新此天书", "↻ REFRESH THIS CODEX") if can_refresh else t("✓ 本回合已刷新", "✓ REFRESH USED"))
+			_accent_button(refresh, card_accent)
 			refresh.disabled = not can_refresh
 			refresh.custom_minimum_size.y = 48
 			refresh.pressed.connect(_refresh_tianshu_choice.bind(index))
@@ -890,59 +987,122 @@ func _set_stats_metric(metric: String) -> void:
 func _build_main_menu() -> void:
 	var mobile := _is_mobile_ui()
 	menu_overlay = ColorRect.new()
-	menu_overlay.color = Color("#090b0ff8")
+	menu_overlay.color = Color("#080907")
 	menu_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	menu_overlay.z_index = 1000
 	add_child(menu_overlay)
+	_add_premium_art(menu_overlay, PremiumUIArt.Variant.HOME, Color("#b98a4f"))
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 28 if mobile else 70)
-	margin.add_theme_constant_override("margin_right", 28 if mobile else 70)
-	margin.add_theme_constant_override("margin_top", 20)
-	margin.add_theme_constant_override("margin_bottom", 22)
+	margin.add_theme_constant_override("margin_left", 22 if mobile else 46)
+	margin.add_theme_constant_override("margin_right", 22 if mobile else 46)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_bottom", 18)
 	menu_overlay.add_child(margin)
 	var box := VBoxContainer.new()
 	box.custom_minimum_size.x = 720.0 if mobile else 0.0
-	box.add_theme_constant_override("separation", 12)
+	box.add_theme_constant_override("separation", 10)
 	margin.add_child(box)
 	var header := HBoxContainer.new()
+	header.custom_minimum_size.y = 65
 	var title_box := VBoxContainer.new()
 	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_box.add_child(_label("A THREE KINGDOMS AUTOBATTLER", 11, Color("#ad8355")))
-	title_box.add_child(_label("三国 · 羁绊战棋", 34 if mobile else 38, Color("#f0c77a")))
+	title_box.add_theme_constant_override("separation", -3)
+	title_box.add_child(_label("THREE KINGDOMS · TACTICAL AUTOBATTLER", 10, Color("#9e7c50")))
+	var home_title := _label("三国 · 羁绊战棋", 35 if mobile else 40, Color("#edc878"))
+	home_title.add_theme_constant_override("outline_size", 6)
+	home_title.add_theme_color_override("font_outline_color", Color("#1b1007"))
+	title_box.add_child(home_title)
 	header.add_child(title_box)
+	var resource_panel := PanelContainer.new()
+	_style(resource_panel, Color("#11120ff0"), 5, Color("#82643e"), 1)
 	home_resource_label = _label("", 18, Color("#e8c96e"))
 	home_resource_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	header.add_child(home_resource_label)
+	home_resource_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	home_resource_label.custom_minimum_size.x = 390
+	resource_panel.add_child(home_resource_label)
+	header.add_child(resource_panel)
 	box.add_child(header)
 	var hero_panel := PanelContainer.new()
 	hero_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_style(hero_panel, Color("#171412"), 18, Color("#8e673d"), 2)
+	_style(hero_panel, Color("#11110ed8"), 4, Color("#8e673d"), 2)
+	var hero_frame := MarginContainer.new()
+	hero_frame.add_theme_constant_override("margin_left", 18)
+	hero_frame.add_theme_constant_override("margin_right", 18)
+	hero_frame.add_theme_constant_override("margin_top", 10)
+	hero_frame.add_theme_constant_override("margin_bottom", 8)
+	hero_panel.add_child(hero_frame)
+	var hero_row := HBoxContainer.new()
+	hero_row.add_theme_constant_override("separation", 16)
+	hero_frame.add_child(hero_row)
+	var faction_banner := PanelContainer.new()
+	faction_banner.custom_minimum_size.x = 175
+	_style(faction_banner, Color("#10261fdd"), 3, Color("#80693f"), 1)
+	var banner_box := VBoxContainer.new()
+	banner_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	banner_box.add_theme_constant_override("separation", 10)
+	var seal := _label("◆", 44, Color("#d8b96f"))
+	seal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner_box.add_child(seal)
+	home_faction_label = _label("江东\n吴", 30, Color("#d5bd7e"))
+	home_faction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner_box.add_child(home_faction_label)
+	banner_box.add_child(_label("────────", 12, Color("#6e5a37")))
+	home_motto_label = _label("弓腰姬\n英姿无双", 17, Color("#b7a17a"))
+	home_motto_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner_box.add_child(home_motto_label)
+	faction_banner.add_child(banner_box)
+	hero_row.add_child(faction_banner)
 	var hero_box := VBoxContainer.new()
+	hero_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hero_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	hero_panel.add_child(hero_box)
+	hero_row.add_child(hero_box)
 	home_portrait = TextureRect.new()
-	home_portrait.custom_minimum_size = Vector2(600 if mobile else 760, 540)
+	home_portrait.custom_minimum_size = Vector2(600 if mobile else 760, 505)
+	home_portrait.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	home_portrait.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	home_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	home_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	hero_box.add_child(home_portrait)
-	home_hero_name_label = _label("", 28, Color("#f0c77a"))
+	var name_panel := PanelContainer.new()
+	name_panel.custom_minimum_size = Vector2(430, 52)
+	_style(name_panel, Color("#15130ff2"), 3, Color("#b98a4f"), 2)
+	home_hero_name_label = _label("", 25, Color("#f0c77a"))
 	home_hero_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hero_box.add_child(home_hero_name_label)
+	name_panel.add_child(home_hero_name_label)
+	hero_box.add_child(name_panel)
+	var feature_banner := PanelContainer.new()
+	feature_banner.custom_minimum_size.x = 175
+	_style(feature_banner, Color("#131613dd"), 3, Color("#80693f"), 1)
+	var feature_box := VBoxContainer.new()
+	feature_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var feature_title := _label("主页武将", 17, Color("#9e8769"))
+	feature_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	feature_box.add_child(feature_title)
+	var feature_mark := _label("将", 48, Color("#e1c16e"))
+	feature_mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	feature_box.add_child(feature_mark)
+	var feature_help := _label("可在图鉴中\n设为主页", 16, Color("#b7a17a"))
+	feature_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	feature_box.add_child(feature_help)
+	feature_banner.add_child(feature_box)
+	hero_row.add_child(feature_banner)
 	box.add_child(hero_panel)
 	var navigation := HBoxContainer.new()
 	navigation.alignment = BoxContainer.ALIGNMENT_CENTER
-	navigation.add_theme_constant_override("separation", 12)
+	navigation.add_theme_constant_override("separation", 8)
 	var nav_entries := [
-		["图鉴", Callable(self, "_show_encyclopedia")], ["符文", Callable(self, "_show_runes")],
-		["战斗", Callable(self, "_show_battle_menu")], ["天赋", Callable(self, "_show_talents")],
-		["设置", Callable(self, "_show_settings")]
+		["图　图鉴", Callable(self, "_show_encyclopedia")], ["符　符文", Callable(self, "_show_runes")],
+		["战　战斗", Callable(self, "_show_battle_menu")], ["赋　天赋", Callable(self, "_show_talents")],
+		["设　设置", Callable(self, "_show_settings")]
 	]
-	for entry in nav_entries:
+	for index in nav_entries.size():
+		var entry: Array = nav_entries[index]
 		var nav := _button(str(entry[0]))
-		nav.custom_minimum_size = Vector2(150 if mobile else 180, 62)
+		nav.custom_minimum_size = Vector2(150 if mobile else 0, 62)
+		nav.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nav.add_theme_font_size_override("font_size", 20)
+		_accent_button(nav, Color("#d3a34f") if index == 2 else Color("#7b6a4e"), index == 2)
 		nav.pressed.connect(entry[1])
 		navigation.add_child(nav)
 	box.add_child(navigation)
@@ -959,62 +1119,80 @@ func _build_main_menu() -> void:
 func _refresh_home() -> void:
 	if not is_instance_valid(home_portrait): return
 	home_portrait.texture = _portrait_source_texture(home_hero_id)
-	home_hero_name_label.text = _hero_name(home_hero_id) + " · " + _faction_name(str(heroes[home_hero_id].f))
-	home_hero_name_label.add_theme_color_override("font_color", FACTION_COLORS[str(heroes[home_hero_id].f)].lightened(0.32))
+	var faction := str(heroes[home_hero_id].f)
+	home_hero_name_label.text = _hero_name(home_hero_id) + " · " + _faction_name(faction)
+	home_hero_name_label.add_theme_color_override("font_color", FACTION_COLORS[faction].lightened(0.32))
+	if is_instance_valid(home_faction_label):
+		var regions := {"shu":"汉室\n蜀", "wei":"中原\n魏", "wu":"江东\n吴", "qun":"群雄\n群"}
+		home_faction_label.text = str(regions.get(faction, _faction_name(faction)))
+		home_faction_label.add_theme_color_override("font_color", FACTION_COLORS[faction].lightened(0.42))
+	if is_instance_valid(home_motto_label):
+		var mottos := {"shu":"仁德昭烈\n匡扶汉室", "wei":"雄才大略\n横槊赋诗", "wu":"江东英杰\n虎踞龙盘", "qun":"逐鹿天下\n乱世争锋"}
+		home_motto_label.text = str(mottos.get(faction, "天下英豪"))
 	home_resource_label.text = "将魂  %d　　将星  %d / 750" % [general_souls, general_stars]
 
-func _full_overlay(z: int = 1150) -> ColorRect:
+func _full_overlay(z: int = 1150, art_variant: int = PremiumUIArt.Variant.BACKDROP, accent := UI_GOLD) -> ColorRect:
 	var overlay := ColorRect.new()
-	overlay.color = Color("#090b0ffc")
+	overlay.color = UI_INK
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.z_index = z
 	overlay.hide()
 	add_child(overlay)
+	_add_premium_art(overlay, art_variant, accent)
 	return overlay
 
 func _overlay_panel(overlay: Control, title_text: String, close_action: Callable) -> VBoxContainer:
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 45)
-	margin.add_theme_constant_override("margin_right", 45)
-	margin.add_theme_constant_override("margin_top", 30)
-	margin.add_theme_constant_override("margin_bottom", 30)
+	margin.add_theme_constant_override("margin_left", 30)
+	margin.add_theme_constant_override("margin_right", 30)
+	margin.add_theme_constant_override("margin_top", 22)
+	margin.add_theme_constant_override("margin_bottom", 24)
 	overlay.add_child(margin)
 	var panel := PanelContainer.new()
-	_style(panel, Color("#171513"), 18, Color("#8e673d"), 2)
+	_style(panel, Color("#12110fea"), 5, Color("#8e673d"), 2)
 	margin.add_child(panel)
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 12)
+	root.add_theme_constant_override("separation", 10)
 	panel.add_child(root)
 	var header := HBoxContainer.new()
-	var title := _label(title_text, 30, Color("#f0c77a"))
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title)
+	header.custom_minimum_size.y = 54
+	var heading := _section_title(title_text, "THREE KINGDOMS · " + title_text)
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(heading)
 	var close := _button("返回主页")
 	close.custom_minimum_size = Vector2(140, 46)
+	_accent_button(close, Color("#6f8aa5"))
 	close.pressed.connect(close_action)
 	header.add_child(close)
 	root.add_child(header)
+	var line := HSeparator.new()
+	line.add_theme_constant_override("separation", 4)
+	root.add_child(line)
 	return root
 
 func _build_battle_menu() -> void:
-	battle_menu_overlay = _full_overlay()
+	battle_menu_overlay = _full_overlay(1150, PremiumUIArt.Variant.MAP, Color("#a97c42"))
 	var root := _overlay_panel(battle_menu_overlay, "战斗", func(): battle_menu_overlay.hide())
 	var mode_row := HBoxContainer.new()
-	mode_row.add_theme_constant_override("separation", 16)
+	mode_row.add_theme_constant_override("separation", 12)
 	var quick_panel := PanelContainer.new()
-	quick_panel.custom_minimum_size = Vector2(330, 125)
-	_style(quick_panel, Color("#20201d"), 12, Color("#6c87a1"), 2)
+	quick_panel.custom_minimum_size = Vector2(390, 142)
+	quick_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style(quick_panel, Color("#151a1ce8"), 5, Color("#58758d"), 2)
 	var quick_box := VBoxContainer.new()
-	quick_box.add_child(_label("快速战斗", 24, Color("#b8d2e8")))
+	quick_box.add_theme_constant_override("separation", 6)
+	quick_box.add_child(_label("⚔　快速战斗", 24, Color("#b8d2e8")))
 	var quick_help := _label("原十五轮构筑玩法，可读取之前保存的对局。", 14, Color("#c9c0b1"))
 	quick_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	quick_box.add_child(quick_help)
 	var quick_buttons := HBoxContainer.new()
 	var quick_start := _button("开始新对局")
+	_accent_button(quick_start, Color("#557d9e"), true)
 	quick_start.pressed.connect(_start_new_from_menu)
 	quick_buttons.add_child(quick_start)
 	continue_button = _button("继续对局")
+	_accent_button(continue_button, Color("#557d9e"))
 	continue_button.disabled = not FileAccess.file_exists(SAVE_PATH)
 	continue_button.pressed.connect(_continue_from_menu)
 	quick_buttons.add_child(continue_button)
@@ -1022,42 +1200,81 @@ func _build_battle_menu() -> void:
 	quick_panel.add_child(quick_box)
 	mode_row.add_child(quick_panel)
 	var tianshu_panel := PanelContainer.new()
-	tianshu_panel.custom_minimum_size = Vector2(330, 125)
-	_style(tianshu_panel, Color("#25182d"), 12, Color("#c17af4"), 2)
+	tianshu_panel.custom_minimum_size = Vector2(390, 142)
+	tianshu_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style(tianshu_panel, Color("#211628e8"), 5, Color("#9c63c3"), 2)
 	var tianshu_box := VBoxContainer.new()
-	tianshu_box.add_child(_label("天书演武", 24, Color("#e5a8ff")))
+	tianshu_box.add_theme_constant_override("separation", 6)
+	tianshu_box.add_child(_label("卷　天书演武", 24, Color("#e5a8ff")))
 	var tianshu_help := _label("每回合先天书三选一，再进行三轮选将；天书仅本局生效。", 14, Color("#d6c3df"))
 	tianshu_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tianshu_box.add_child(tianshu_help)
 	var tianshu_start := _button("开始天书演武")
+	_accent_button(tianshu_start, Color("#955cc0"), true)
 	tianshu_start.pressed.connect(_start_tianshu_from_menu)
 	tianshu_box.add_child(tianshu_start)
 	tianshu_panel.add_child(tianshu_box)
 	mode_row.add_child(tianshu_panel)
+	var challenge_panel := PanelContainer.new()
+	challenge_panel.custom_minimum_size = Vector2(390, 142)
+	challenge_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style(challenge_panel, Color("#241b10e8"), 5, Color("#b48743"), 2)
 	var challenge_header := VBoxContainer.new()
 	challenge_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	challenge_header.add_child(_label("闯关", 24, Color("#f0c77a")))
+	challenge_header.add_theme_constant_override("separation", 6)
+	challenge_header.add_child(_label("城　闯关", 24, Color("#f0c77a")))
 	challenge_stage_title = _label("选择一个已解锁关卡与难度", 15, Color("#c9c0b1"))
+	challenge_stage_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	challenge_header.add_child(challenge_stage_title)
 	challenge_difficulty_options = OptionButton.new()
-	challenge_difficulty_options.custom_minimum_size = Vector2(280, 48)
 	for index in DIFFICULTIES.size():
 		challenge_difficulty_options.add_item(str(DIFFICULTIES[index].name), index)
 	challenge_difficulty_options.select(0)
 	challenge_difficulty_options.item_selected.connect(_on_challenge_difficulty_selected)
-	challenge_header.add_child(challenge_difficulty_options)
-	mode_row.add_child(challenge_header)
+	challenge_difficulty_options.hide()
+	var challenge_note := _label("五十城池 · 五档难度 · 每关三星", 14, Color("#ad8355"))
+	challenge_header.add_child(challenge_note)
+	challenge_panel.add_child(challenge_header)
+	mode_row.add_child(challenge_panel)
 	root.add_child(mode_row)
+	var difficulty_row := HBoxContainer.new()
+	difficulty_row.add_theme_constant_override("separation", 8)
+	var difficulty_caption := _label("难度", 16, Color("#ad8355"))
+	difficulty_caption.custom_minimum_size.x = 78
+	difficulty_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	difficulty_row.add_child(difficulty_caption)
+	var difficulty_colors := [Color("#d5a846"), Color("#4e8063"), Color("#426c91"), Color("#8250a0"), Color("#a3483d")]
+	for index in DIFFICULTIES.size():
+		var difficulty_button := _button(str(DIFFICULTIES[index].name))
+		difficulty_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		difficulty_button.custom_minimum_size.y = 45
+		_accent_button(difficulty_button, difficulty_colors[index], index == 0)
+		difficulty_button.pressed.connect(_on_challenge_difficulty_tab.bind(index))
+		challenge_difficulty_buttons.append(difficulty_button)
+		difficulty_row.add_child(difficulty_button)
+	root.add_child(difficulty_row)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_enable_touch_scroll(scroll, false, true)
 	root.add_child(scroll)
+	var stage_host := Control.new()
+	stage_host.custom_minimum_size = Vector2(1450, 390)
+	stage_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(stage_host)
+	_add_premium_art(stage_host, PremiumUIArt.Variant.MAP, Color("#8b6a3b"))
+	var stage_margin := MarginContainer.new()
+	stage_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stage_margin.add_theme_constant_override("margin_left", 5)
+	stage_margin.add_theme_constant_override("margin_right", 5)
+	stage_margin.add_theme_constant_override("margin_top", 5)
+	stage_margin.add_theme_constant_override("margin_bottom", 5)
+	stage_host.add_child(stage_margin)
 	challenge_stage_grid = GridContainer.new()
-	challenge_stage_grid.columns = 5
+	challenge_stage_grid.columns = 10
 	challenge_stage_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	challenge_stage_grid.add_theme_constant_override("h_separation", 10)
-	challenge_stage_grid.add_theme_constant_override("v_separation", 10)
-	scroll.add_child(challenge_stage_grid)
+	challenge_stage_grid.add_theme_constant_override("h_separation", 6)
+	challenge_stage_grid.add_theme_constant_override("v_separation", 7)
+	stage_margin.add_child(challenge_stage_grid)
 
 func _show_battle_menu() -> void:
 	continue_button.disabled = not FileAccess.file_exists(SAVE_PATH)
@@ -1068,6 +1285,10 @@ func _on_challenge_difficulty_selected(index: int) -> void:
 	selected_difficulty = clampi(index, 0, DIFFICULTIES.size() - 1)
 	_render_stage_grid()
 
+func _on_challenge_difficulty_tab(index: int) -> void:
+	challenge_difficulty_options.select(index)
+	_on_challenge_difficulty_selected(index)
+
 func _render_stage_grid() -> void:
 	_clear_dynamic_children(challenge_stage_grid)
 	var difficulty := challenge_difficulty_options.selected
@@ -1075,12 +1296,20 @@ func _render_stage_grid() -> void:
 	for stage in range(1, 51):
 		var unlocked := _is_stage_unlocked(stage, difficulty)
 		var best := int(stage_star_records.get(_progression_key(stage, difficulty), 0))
-		var button := _button(("第%02d关  " % stage) + STAGE_NAMES[stage - 1] + "\n" + ("★".repeat(best) + "☆".repeat(3 - best) if unlocked else "未解锁"))
-		button.custom_minimum_size = Vector2(260, 78)
+		var button := _button(("%02d" % stage) + "\n" + STAGE_NAMES[stage - 1] + "\n" + ("★".repeat(best) + "☆".repeat(3 - best) if unlocked else "锁"))
+		button.custom_minimum_size = Vector2(132, 72)
+		button.add_theme_font_size_override("font_size", 14)
 		button.disabled = not unlocked
+		var difficulty_colors := [Color("#c8953e"), Color("#48765e"), Color("#3f688e"), Color("#774694"), Color("#963f37")]
+		_accent_button(button, difficulty_colors[difficulty], stage == 1 and unlocked)
 		button.tooltip_text = "敌将兵略 +%d；初始生命 ×%.1f%s" % [stage * 5, float(DIFFICULTIES[difficulty].hp), "；每回合启用天书三选一" if difficulty >= 3 else ""]
 		button.pressed.connect(_launch_challenge.bind(stage, difficulty))
 		challenge_stage_grid.add_child(button)
+	var tab_colors := [Color("#d5a846"), Color("#4e8063"), Color("#426c91"), Color("#8250a0"), Color("#a3483d")]
+	for index in challenge_difficulty_buttons.size():
+		var tab := challenge_difficulty_buttons[index]
+		_accent_button(tab, tab_colors[index], index == difficulty)
+		tab.modulate = Color.WHITE if index == difficulty else Color(0.72, 0.72, 0.72, 0.82)
 
 func _launch_challenge(stage: int, difficulty: int) -> void:
 	battle_menu_overlay.hide()
@@ -1098,13 +1327,13 @@ func _start_tianshu_from_menu() -> void:
 	_render()
 
 func _build_result_overlay() -> void:
-	result_overlay = _full_overlay(1600)
+	result_overlay = _full_overlay(1600, PremiumUIArt.Variant.HOME, Color("#b88a50"))
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	result_overlay.add_child(center)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(620, 420)
-	_style(panel, Color("#171513"), 20, Color("#b88a50"), 3)
+	_style(panel, Color("#15120df2"), 6, Color("#b88a50"), 3)
 	center.add_child(panel)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1117,6 +1346,7 @@ func _build_result_overlay() -> void:
 	result_detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(result_detail_label)
 	var back := _button("点击返回主页")
+	_accent_button(back, Color("#b98a4f"), true)
 	back.custom_minimum_size = Vector2(320, 64)
 	back.add_theme_font_size_override("font_size", 20)
 	back.pressed.connect(_return_home_from_result)
@@ -1139,7 +1369,7 @@ func _return_home_from_result() -> void:
 	_show_main_menu()
 
 func _build_rune_overlay() -> void:
-	rune_overlay = _full_overlay()
+	rune_overlay = _full_overlay(1150, PremiumUIArt.Variant.BACKDROP, Color("#557b61"))
 	var root := _overlay_panel(rune_overlay, "符文", func(): rune_overlay.hide(); _refresh_home())
 	var toolbar := HBoxContainer.new()
 	toolbar.add_theme_constant_override("separation", 10)
@@ -1147,9 +1377,11 @@ func _build_rune_overlay() -> void:
 	rune_resource_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(rune_resource_label)
 	var draw := _button("抽取一次（500）")
+	_accent_button(draw, Color("#52755e"))
 	draw.pressed.connect(_on_draw_runes.bind(1))
 	toolbar.add_child(draw)
 	var draw_ten := _button("十连抽（5000）")
+	_accent_button(draw_ten, Color("#b98a4f"), true)
 	draw_ten.pressed.connect(_on_draw_runes.bind(10))
 	toolbar.add_child(draw_ten)
 	root.add_child(toolbar)
@@ -1160,6 +1392,8 @@ func _build_rune_overlay() -> void:
 		var text_value := "全部" if tier == 0 else str(RUNE_TIERS[tier - 1].name)
 		var filter_button := _button(text_value)
 		filter_button.custom_minimum_size = Vector2(105, 42)
+		if tier > 0:
+			_accent_button(filter_button, Color(str(RUNE_TIERS[tier - 1].hex)))
 		filter_button.pressed.connect(_set_rune_tier_filter.bind(tier))
 		rune_filter_buttons.append(filter_button)
 		filters.add_child(filter_button)
@@ -1170,6 +1404,7 @@ func _build_rune_overlay() -> void:
 	for rune_class in ["", "正", "均", "极"]:
 		var class_button := _button("全部" if rune_class.is_empty() else rune_class + "符文")
 		class_button.custom_minimum_size = Vector2(125, 40)
+		_accent_button(class_button, Color("#71806f"))
 		class_button.pressed.connect(_set_rune_class_filter.bind(rune_class))
 		rune_class_filter_buttons.append(class_button)
 		class_filters.add_child(class_button)
@@ -1183,8 +1418,8 @@ func _build_rune_overlay() -> void:
 	columns.add_theme_constant_override("separation", 16)
 	root.add_child(columns)
 	var hero_panel := PanelContainer.new()
-	hero_panel.custom_minimum_size = Vector2(390, 0)
-	_style(hero_panel, Color("#1c1916"), 14, Color("#7c603f"), 2)
+	hero_panel.custom_minimum_size = Vector2(420, 0)
+	_style(hero_panel, Color("#121c17ed"), 5, Color("#617c5d"), 2)
 	var hero_box := VBoxContainer.new()
 	hero_box.add_theme_constant_override("separation", 10)
 	hero_panel.add_child(hero_box)
@@ -1202,7 +1437,7 @@ func _build_rune_overlay() -> void:
 	rune_hero_options.item_selected.connect(func(_index): _render_runes())
 	hero_box.add_child(rune_hero_options)
 	rune_hero_portrait = TextureRect.new()
-	rune_hero_portrait.custom_minimum_size = Vector2(320, 255)
+	rune_hero_portrait.custom_minimum_size = Vector2(320, 150)
 	rune_hero_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	rune_hero_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	hero_box.add_child(rune_hero_portrait)
@@ -1236,10 +1471,12 @@ func _build_rune_overlay() -> void:
 	_enable_touch_scroll(rune_inventory_scroll, false, true)
 	if _is_mobile_ui(): inventory_column.gui_input.connect(_on_touch_scroll_input.bind(rune_inventory_scroll, false, true))
 	inventory_column.add_child(rune_inventory_scroll)
-	rune_inventory_box = VBoxContainer.new()
+	rune_inventory_box = GridContainer.new()
+	(rune_inventory_box as GridContainer).columns = 2
 	rune_inventory_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rune_inventory_box.mouse_filter = Control.MOUSE_FILTER_PASS
-	rune_inventory_box.add_theme_constant_override("separation", 8)
+	rune_inventory_box.add_theme_constant_override("h_separation", 8)
+	rune_inventory_box.add_theme_constant_override("v_separation", 8)
 	rune_inventory_scroll.add_child(rune_inventory_box)
 	var home_faction := str(heroes[home_hero_id].f)
 	for index in rune_faction_options.item_count:
@@ -1315,14 +1552,22 @@ func _render_runes(message := "") -> void:
 		if rune == null: continue
 		var tier_data: Dictionary = RUNE_TIERS[int(rune.tier) - 1]
 		var equipped_panel := PanelContainer.new()
-		_style(equipped_panel, Color("#20201d"), 9, Color(str(tier_data.hex)), 2)
+		equipped_panel.custom_minimum_size.y = 66
+		_style(equipped_panel, Color("#141815"), 5, Color(str(tier_data.hex)), 2)
 		var equipped_row := HBoxContainer.new()
-		var equipped_text := _label(_rune_display_name(rune) + "\n" + _rune_description(rune), 14, Color(str(tier_data.hex)).lightened(0.22))
+		equipped_row.add_theme_constant_override("separation", 10)
+		var equipped_gem := _label("◆\n" + str(tier_data.name), 14, Color(str(tier_data.hex)).lightened(0.18))
+		equipped_gem.custom_minimum_size.x = 54
+		equipped_gem.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		equipped_gem.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		equipped_row.add_child(equipped_gem)
+		var equipped_text := _label(_rune_display_name(rune) + "\n" + _rune_description(rune), 12, Color(str(tier_data.hex)).lightened(0.22))
 		equipped_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		equipped_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		equipped_row.add_child(equipped_text)
 		var remove := _button("卸下")
-		remove.custom_minimum_size = Vector2(72, 48)
+		remove.custom_minimum_size = Vector2(64, 38)
+		remove.add_theme_font_size_override("font_size", 13)
 		remove.pressed.connect(_on_unequip_rune.bind(hero_id, int(uid)))
 		equipped_row.add_child(remove)
 		equipped_panel.add_child(equipped_row)
@@ -1350,34 +1595,62 @@ func _render_runes(message := "") -> void:
 	for rune in sorted_runes:
 		var tier_data: Dictionary = RUNE_TIERS[int(rune.tier) - 1]
 		var panel := PanelContainer.new()
+		panel.custom_minimum_size = Vector2(0, 112)
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		panel.mouse_filter = Control.MOUSE_FILTER_PASS
-		_style(panel, Color("#1c1d1c"), 9, Color(str(tier_data.hex)), 2)
+		_style(panel, Color("#131713ee"), 5, Color(str(tier_data.hex)).darkened(0.12), 2)
+		var card_box := VBoxContainer.new()
+		card_box.mouse_filter = Control.MOUSE_FILTER_PASS
+		card_box.add_theme_constant_override("separation", 5)
 		var row := HBoxContainer.new()
 		row.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_theme_constant_override("separation", 10)
-		var info := _label(_rune_display_name(rune) + "　" + _rune_description(rune), 16, Color(str(tier_data.hex)).lightened(0.2))
+		var rune_class := str(_rune_kind(str(rune.kind)).get("class", ""))
+		var gem := _label("◆", 30, Color(str(tier_data.hex)))
+		gem.custom_minimum_size.x = 38
+		gem.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		gem.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		gem.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(gem)
+		var info := _label(_rune_display_name(rune) + "　[" + rune_class + "]\n" + _rune_description(rune), 15, Color(str(tier_data.hex)).lightened(0.22))
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(info)
 		var owner := _rune_equipped_hero(int(rune.uid))
+		card_box.add_child(row)
+		var actions := HBoxContainer.new()
+		actions.add_theme_constant_override("separation", 6)
 		if not owner.is_empty():
-			var owner_label := _label("装备：" + _hero_name(owner), 13, Color("#b7ae9f"))
+			var owner_label := _label("已装备 · " + _hero_name(owner), 12, Color("#b7ae9f"))
+			owner_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			owner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			owner_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			row.add_child(owner_label)
+			actions.add_child(owner_label)
+		else:
+			var spacer := Control.new()
+			spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			actions.add_child(spacer)
 		var convert_cost := int(RUNE_TIERS[int(rune.tier) - 1].convert)
 		convert_cost = ceili(convert_cost * (1.0 - 0.05 * _talent_level("all", "百炼")))
 		var convert := _button("转换 %d" % convert_cost)
+		convert.custom_minimum_size.y = 34
+		convert.add_theme_font_size_override("font_size", 13)
 		convert.mouse_filter = Control.MOUSE_FILTER_PASS
 		convert.disabled = general_souls < convert_cost
 		convert.pressed.connect(_on_convert_rune.bind(int(rune.uid)))
-		row.add_child(convert)
+		actions.add_child(convert)
 		var equip := _button("卸下" if owner == hero_id else "装备")
+		equip.custom_minimum_size.y = 34
+		equip.add_theme_font_size_override("font_size", 13)
+		_accent_button(equip, Color(str(tier_data.hex)))
 		equip.mouse_filter = Control.MOUSE_FILTER_PASS
 		equip.disabled = not owner.is_empty() and owner != hero_id or (owner.is_empty() and equipped.size() >= 3)
 		if owner == hero_id: equip.pressed.connect(_on_unequip_rune.bind(hero_id, int(rune.uid)))
 		else: equip.pressed.connect(_on_equip_rune.bind(hero_id, int(rune.uid)))
-		row.add_child(equip)
-		panel.add_child(row)
+		actions.add_child(equip)
+		card_box.add_child(actions)
+		panel.add_child(card_box)
 		rune_inventory_box.add_child(panel)
 	if sorted_runes.is_empty():
 		var empty := _label("当前分类暂无符文。", 20, Color("#887e70"))
@@ -1421,36 +1694,78 @@ func _on_unequip_rune(hero_id: String, uid: int) -> void:
 	_render_runes()
 
 func _build_talent_overlay() -> void:
-	talent_overlay = _full_overlay()
+	talent_overlay = _full_overlay(1150, PremiumUIArt.Variant.TALENT, Color("#987030"))
 	var root := _overlay_panel(talent_overlay, "天赋", func(): talent_overlay.hide(); _refresh_home())
-	var tree_tabs := HBoxContainer.new()
-	tree_tabs.add_theme_constant_override("separation", 8)
-	talent_resource_label = _label("", 18, Color("#e8c96e"))
-	talent_resource_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tree_tabs.add_child(talent_resource_label)
+	var content := HBoxContainer.new()
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 12)
+	root.add_child(content)
+	var navigation_panel := PanelContainer.new()
+	navigation_panel.custom_minimum_size.x = 220
+	_style(navigation_panel, Color("#111511ed"), 5, Color("#665535"), 2)
+	var navigation := VBoxContainer.new()
+	navigation.add_theme_constant_override("separation", 9)
+	navigation_panel.add_child(navigation)
+	var resource_caption := _label("天赋资源", 14, Color("#9e8769"))
+	resource_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	navigation.add_child(resource_caption)
+	talent_resource_label = _label("", 17, Color("#e8c96e"))
+	talent_resource_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	talent_resource_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	talent_resource_label.custom_minimum_size.y = 64
+	navigation.add_child(talent_resource_label)
+	navigation.add_child(HSeparator.new())
 	for tree_id in ["all", "shu", "wei", "wu", "qun"]:
-		var tab := _button(str(TALENT_TREES[tree_id].name))
+		var tab := _button(("◆　" if tree_id == "all" else "◇　") + str(TALENT_TREES[tree_id].name))
+		tab.custom_minimum_size.y = 58
+		tab.add_theme_font_size_override("font_size", 18)
+		var faction := str(TALENT_TREES[tree_id].faction)
+		var tab_color: Color = Color("#b98a4f") if faction.is_empty() else FACTION_COLORS[faction]
+		_accent_button(tab, tab_color, tree_id == "all")
 		tab.pressed.connect(_select_talent_tree.bind(tree_id))
-		tree_tabs.add_child(tab)
-	var reset := _button("重置本树")
+		talent_tree_tabs[tree_id] = tab
+		navigation.add_child(tab)
+	var nav_spacer := Control.new()
+	nav_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	navigation.add_child(nav_spacer)
+	var reset := _button("↻　重置本树")
+	_accent_button(reset, Color("#886449"))
 	reset.pressed.connect(_on_reset_talent_tree)
-	tree_tabs.add_child(reset)
-	root.add_child(tree_tabs)
+	navigation.add_child(reset)
+	content.add_child(navigation_panel)
+	var tree_panel := PanelContainer.new()
+	tree_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tree_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_style(tree_panel, Color("#11130fe3"), 5, Color("#796137"), 2)
+	var tree_host := Control.new()
+	tree_host.custom_minimum_size = Vector2(850, 650)
+	tree_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tree_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tree_panel.add_child(tree_host)
+	talent_tree_canvas = PremiumUIArt.new()
+	talent_tree_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	talent_tree_canvas.configure(PremiumUIArt.Variant.TALENT, Color("#c0903e"))
+	tree_host.add_child(talent_tree_canvas)
+	talent_content_box = Control.new()
+	talent_content_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	tree_host.add_child(talent_content_box)
+	content.add_child(tree_panel)
 	var detail_panel := PanelContainer.new()
-	_style(detail_panel, Color("#211d18"), 10, Color("#a37a48"), 1)
+	detail_panel.custom_minimum_size.x = 330
+	_style(detail_panel, Color("#211b12f2"), 5, Color("#a37a48"), 2)
+	var detail_box := VBoxContainer.new()
+	detail_box.add_theme_constant_override("separation", 10)
+	detail_box.add_child(_label("天赋详情", 24, Color("#d8b96f")))
 	talent_detail_label = _label("点击任一天赋节点查看完整效果。", 16, Color("#ead9b5"))
 	talent_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	talent_detail_label.custom_minimum_size.y = 50
-	detail_panel.add_child(talent_detail_label)
-	root.add_child(detail_panel)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_enable_touch_scroll(scroll, false, true)
-	root.add_child(scroll)
-	talent_content_box = VBoxContainer.new()
-	talent_content_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	talent_content_box.add_theme_constant_override("separation", 12)
-	scroll.add_child(talent_content_box)
+	talent_detail_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	talent_detail_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	detail_box.add_child(talent_detail_label)
+	var detail_hint := _label("选择节点查看完整效果\n满足前置后可消耗 5 将星升级", 13, Color("#8f816e"))
+	detail_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail_box.add_child(detail_hint)
+	detail_panel.add_child(detail_box)
+	content.add_child(detail_panel)
 
 func _show_talents() -> void:
 	talent_overlay.show()
@@ -1465,64 +1780,69 @@ func _render_talents(message := "") -> void:
 	_clear_dynamic_children(talent_content_box)
 	var invested := 0
 	for node in TALENT_TREES[talent_tree_id].nodes: invested += _talent_level(talent_tree_id, str(node[0]))
-	talent_resource_label.text = "将星 %d　（5 将星 = 1 天赋点）　%s：%d 点" % [general_stars, str(TALENT_TREES[talent_tree_id].name), invested]
+	talent_resource_label.text = "★ 将星 %d / 750\n%s · %d 点" % [general_stars, str(TALENT_TREES[talent_tree_id].name), invested]
 	if not message.is_empty(): talent_detail_label.text = message
 	var layer_colors := [Color("#365d43"), Color("#3d6b5c"), Color("#41627a"), Color("#765585"), Color("#9a6b32")]
-	for layer in range(5, 0, -1):
-		var layer_panel := PanelContainer.new()
+	var canvas_size := talent_content_box.size
+	if canvas_size.x < 500.0 or canvas_size.y < 500.0:
+		canvas_size = Vector2(850, 650)
+	var node_size := Vector2(184, 102)
+	var tree_points := {}
+	for layer in range(1, 6):
 		var layer_color: Color = layer_colors[layer - 1]
-		_style(layer_panel, layer_color.darkened(0.48), 16, layer_color.lightened(0.18), 2)
-		var layer_box := VBoxContainer.new()
-		layer_box.add_theme_constant_override("separation", 8)
 		var layer_nodes: Array = TALENT_TREES[talent_tree_id].nodes.filter(func(node): return int(node[1]) == layer)
 		if layer_nodes.is_empty(): continue
 		var requirement := int(layer_nodes[0][6])
 		var unlocked := _talent_points_before_layer(talent_tree_id, layer) >= requirement
-		var layer_title := _label("第 %d 层 · %s%s" % [layer, "冠冕" if layer == 5 else ("枝干" if layer >= 3 else "根基"), "" if unlocked else "　🔒 前置累计 %d 点" % requirement], 20, layer_color.lightened(0.38) if unlocked else Color("#887e70"))
-		layer_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		layer_box.add_child(layer_title)
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 10)
-		for node in layer_nodes:
+		var y := canvas_size.y - 116.0 - float(layer - 1) * 122.0
+		var layer_caption := _label("第%d层 · %s" % [layer, "冠冕" if layer == 5 else ("枝干" if layer >= 3 else "根基")], 13, layer_color.lightened(0.38) if unlocked else Color("#746f66"))
+		layer_caption.position = Vector2(14, y + 35)
+		layer_caption.custom_minimum_size = Vector2(105, 26)
+		talent_content_box.add_child(layer_caption)
+		var points: Array = []
+		for node_index in layer_nodes.size():
+			var node: Array = layer_nodes[node_index]
+			var x := canvas_size.x * float(node_index + 1) / float(layer_nodes.size() + 1)
 			var level := _talent_level(talent_tree_id, str(node[0]))
 			var node_panel := PanelContainer.new()
-			node_panel.custom_minimum_size = Vector2(310, 150)
-			node_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			_style(node_panel, layer_color.darkened(0.28) if unlocked else Color("#252525"), 12, layer_color.lightened(0.3) if unlocked else Color("#555555"), 2)
+			node_panel.position = Vector2(x - node_size.x * 0.5, y)
+			node_panel.custom_minimum_size = node_size
+			node_panel.size = node_size
+			_style(node_panel, layer_color.darkened(0.50) if unlocked else Color("#1b1b19"), 50, layer_color.lightened(0.28) if unlocked else Color("#4e4b46"), 3)
 			var node_box := VBoxContainer.new()
-			node_box.add_theme_constant_override("separation", 5)
-			var node_title := _label("%s　%d / %d" % [str(node[0]), level, int(node[2])], 19, Color("#fff0c9") if unlocked else Color("#8b8b8b"))
-			node_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			node_box.add_child(node_title)
-			var effect_text := _label(_talent_effect_description(talent_tree_id, str(node[0])), 13, Color("#e0d8c8") if unlocked else Color("#777777"))
-			effect_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			effect_text.custom_minimum_size.y = 52
-			node_box.add_child(effect_text)
-			var actions := HBoxContainer.new()
-			var detail := _button("查看详情")
-			detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			node_box.add_theme_constant_override("separation", 2)
+			var detail := Button.new()
+			detail.flat = true
+			detail.text = ("%s　%d / %d" % [str(node[0]), level, int(node[2])]) if unlocked else ("🔒 " + str(node[0]))
+			detail.custom_minimum_size.y = 28
+			detail.add_theme_font_size_override("font_size", 16)
+			detail.add_theme_color_override("font_color", Color("#fff0c9") if unlocked else Color("#7b7770"))
+			detail.tooltip_text = _talent_effect_description(talent_tree_id, str(node[0]))
 			detail.pressed.connect(_show_talent_detail.bind(talent_tree_id, str(node[0])))
-			actions.add_child(detail)
+			node_box.add_child(detail)
+			var effect_text := _label(_talent_effect_description(talent_tree_id, str(node[0])), 11, Color("#d9d0bf") if unlocked else Color("#6c6963"))
+			effect_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			effect_text.max_lines_visible = 2
+			effect_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			effect_text.custom_minimum_size.y = 31
+			effect_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			node_box.add_child(effect_text)
 			var upgrade := _button("升级 · 5 将星")
-			upgrade.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			upgrade.custom_minimum_size.y = 28
+			upgrade.add_theme_font_size_override("font_size", 12)
+			_accent_button(upgrade, layer_color)
 			upgrade.disabled = not _can_upgrade_talent(talent_tree_id, str(node[0]))
 			upgrade.pressed.connect(_on_upgrade_talent.bind(talent_tree_id, str(node[0])))
-			actions.add_child(upgrade)
-			node_box.add_child(actions)
+			node_box.add_child(upgrade)
 			node_panel.add_child(node_box)
-			row.add_child(node_panel)
-		layer_box.add_child(row)
-		layer_panel.add_child(layer_box)
-		talent_content_box.add_child(layer_panel)
-		if layer > 1:
-			var connector := _label("▲\n│", 22, layer_colors[layer - 2].lightened(0.2))
-			connector.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			connector.custom_minimum_size.y = 42
-			talent_content_box.add_child(connector)
-	var roots := _label("╱　天下根基　╲", 18, Color("#7fa789"))
-	roots.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	talent_content_box.add_child(roots)
+			talent_content_box.add_child(node_panel)
+			points.append(Vector2(x, y + node_size.y * 0.5))
+		tree_points[layer] = points
+	if is_instance_valid(talent_tree_canvas) and talent_tree_canvas.has_method("set_tree_points"):
+		talent_tree_canvas.set_tree_points(tree_points)
+	for tree_id in talent_tree_tabs:
+		var tab: Button = talent_tree_tabs[tree_id]
+		tab.modulate = Color.WHITE if tree_id == talent_tree_id else Color(0.68, 0.68, 0.68, 0.82)
 
 func _show_talent_detail(tree_id: String, node_name: String) -> void:
 	var node := _talent_node(tree_id, node_name)
@@ -1539,23 +1859,26 @@ func _on_reset_talent_tree() -> void:
 
 func _build_settings_overlay() -> void:
 	settings_overlay = ColorRect.new()
-	settings_overlay.color = Color("#090b0ffa")
+	settings_overlay.color = UI_INK
 	settings_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	settings_overlay.z_index = 1200
 	settings_overlay.hide()
 	add_child(settings_overlay)
+	_add_premium_art(settings_overlay, PremiumUIArt.Variant.BACKDROP, Color("#846d4a"))
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	settings_overlay.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(620, 820)
-	_style(panel, Color("#171513"), 18, Color("#8e673d"), 2)
+	panel.custom_minimum_size = Vector2(700, 820)
+	_style(panel, Color("#12120ff0"), 5, Color("#8e673d"), 2)
 	center.add_child(panel)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
 	var title := _label(t("游戏设置", "SETTINGS"), 30, Color("#f0c77a"))
+	title.add_theme_constant_override("outline_size", 5)
+	title.add_theme_color_override("font_outline_color", Color("#1a1008"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var pause_help := _label(t("行动演出期间是否冻结其他武将的行动条和状态计时", "Freeze all gauges and status timers during action animations"), 14, Color("#c9c0b1"))
@@ -1616,17 +1939,21 @@ func _build_settings_overlay() -> void:
 	resource_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	resource_row.add_theme_constant_override("separation", 10)
 	var add_souls := _button("增加将魂 +10000")
+	_accent_button(add_souls, Color("#4c8b66"))
 	add_souls.pressed.connect(_on_add_debug_souls)
 	resource_row.add_child(add_souls)
 	var add_stars := _button("增加将星 +100")
+	_accent_button(add_stars, Color("#b78a43"))
 	add_stars.pressed.connect(_on_add_debug_stars)
 	resource_row.add_child(add_stars)
 	box.add_child(resource_row)
 	var lab_button := _button("平衡实验室")
+	_accent_button(lab_button, Color("#705f8f"))
 	lab_button.custom_minimum_size = Vector2(360, 46)
 	lab_button.pressed.connect(func(): settings_overlay.hide(); _show_balance_lab())
 	box.add_child(lab_button)
 	var close := _button(t("保存并返回", "SAVE & BACK"))
+	_accent_button(close, Color("#b98a4f"), true)
 	close.custom_minimum_size = Vector2(240, 48)
 	close.pressed.connect(_close_settings)
 	box.add_child(close)
@@ -1758,20 +2085,21 @@ func _save_settings() -> void:
 func _build_encyclopedia() -> void:
 	var mobile := _is_mobile_ui()
 	encyclopedia_overlay = ColorRect.new()
-	encyclopedia_overlay.color = Color("#090b0ffa")
+	encyclopedia_overlay.color = UI_INK
 	encyclopedia_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	encyclopedia_overlay.z_index = 1100
 	encyclopedia_overlay.hide()
 	add_child(encyclopedia_overlay)
+	_add_premium_art(encyclopedia_overlay, PremiumUIArt.Variant.BACKDROP, Color("#8f6f42"))
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 12 if mobile else 90)
-	margin.add_theme_constant_override("margin_right", 12 if mobile else 90)
-	margin.add_theme_constant_override("margin_top", 12 if mobile else 50)
-	margin.add_theme_constant_override("margin_bottom", 24 if mobile else 50)
+	margin.add_theme_constant_override("margin_left", 12 if mobile else 34)
+	margin.add_theme_constant_override("margin_right", 12 if mobile else 34)
+	margin.add_theme_constant_override("margin_top", 12 if mobile else 24)
+	margin.add_theme_constant_override("margin_bottom", 24)
 	encyclopedia_overlay.add_child(margin)
 	var panel := PanelContainer.new()
-	_style(panel, Color("#171513"), 18, Color("#8e673d"), 2)
+	_style(panel, Color("#12110fed"), 5, Color("#8e673d"), 2)
 	margin.add_child(panel)
 	var root_box := VBoxContainer.new()
 	root_box.add_theme_constant_override("separation", 12)
@@ -1781,18 +2109,22 @@ func _build_encyclopedia() -> void:
 	encyclopedia_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(encyclopedia_title_label)
 	encyclopedia_hero_tab_button = _button(t("武将图鉴", "HERO CODEX"))
+	_accent_button(encyclopedia_hero_tab_button, Color("#b98a4f"), true)
 	encyclopedia_hero_tab_button.custom_minimum_size = Vector2(150, 42)
 	encyclopedia_hero_tab_button.pressed.connect(_set_encyclopedia_mode.bind("heroes"))
 	header.add_child(encyclopedia_hero_tab_button)
 	encyclopedia_weapon_tab_button = _button(t("武器图鉴", "WEAPON CODEX"))
+	_accent_button(encyclopedia_weapon_tab_button, Color("#8d744d"))
 	encyclopedia_weapon_tab_button.custom_minimum_size = Vector2(150, 42)
 	encyclopedia_weapon_tab_button.pressed.connect(_set_encyclopedia_mode.bind("weapons"))
 	header.add_child(encyclopedia_weapon_tab_button)
 	encyclopedia_bond_tab_button = _button(t("羁绊图", "BOND GRAPH"))
+	_accent_button(encyclopedia_bond_tab_button, Color("#705f8f"))
 	encyclopedia_bond_tab_button.custom_minimum_size = Vector2(135, 42)
 	encyclopedia_bond_tab_button.pressed.connect(_set_encyclopedia_mode.bind("bonds"))
 	header.add_child(encyclopedia_bond_tab_button)
 	var close_button := _button(t("返回主菜单", "BACK"))
+	_accent_button(close_button, Color("#607b95"))
 	close_button.custom_minimum_size = Vector2(130, 42)
 	close_button.pressed.connect(func(): encyclopedia_overlay.hide())
 	header.add_child(close_button)
@@ -1810,6 +2142,7 @@ func _build_encyclopedia() -> void:
 	encyclopedia_hero_filters.add_child(encyclopedia_bond_reset_button)
 	for faction in ["shu", "wei", "wu", "qun"]:
 		var faction_button := _button(_faction_name(faction))
+		_accent_button(faction_button, FACTION_COLORS[faction])
 		faction_button.custom_minimum_size = Vector2(90, 42)
 		faction_button.pressed.connect(_set_encyclopedia_faction.bind(faction))
 		encyclopedia_hero_filters.add_child(faction_button)
@@ -2997,16 +3330,16 @@ func _render_board(board: GridContainer, units: Array, is_player: bool) -> void:
 			cell.tooltip_text = _hero_name(unit.hero_id) + "\n" + (hero.zh_skill if language == "zh" else hero.skill) + "\n" + _skill_detail(str(unit.hero_id))
 			if is_player and selected_unit == unit.id: border = Color("#f0c77a")
 		var normal := StyleBoxFlat.new()
-		normal.bg_color = Color("#101417")
-		normal.border_color = Color("#393733")
+		normal.bg_color = Color("#101311")
+		normal.border_color = Color("#453d31")
 		normal.border_width_left = 1
 		normal.border_width_right = 1
 		normal.border_width_top = 1
 		normal.border_width_bottom = 1
-		normal.corner_radius_top_left = 7
-		normal.corner_radius_top_right = 7
-		normal.corner_radius_bottom_left = 7
-		normal.corner_radius_bottom_right = 7
+		normal.corner_radius_top_left = 3
+		normal.corner_radius_top_right = 3
+		normal.corner_radius_bottom_left = 3
+		normal.corner_radius_bottom_right = 3
 		cell.add_theme_stylebox_override("normal", normal)
 		cell.add_theme_stylebox_override("disabled", normal)
 		var hover: StyleBoxFlat = normal.duplicate()
@@ -3133,7 +3466,8 @@ func _render_board(board: GridContainer, units: Array, is_player: bool) -> void:
 			card_layer.add_child(skill_bar)
 			action_bar_refs[unit.id] = skill_bar
 		else:
-			var empty := _cell_text("＋\n" + t("空位", "EMPTY"), 13, Color("#55534e"))
+			var row_marks := ["前", "中", "后"]
+			var empty := _cell_text(row_marks[row] + "\n" + t("空位", "EMPTY"), 15, Color("#5f594e"))
 			empty.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -3300,7 +3634,7 @@ func _render_draft() -> void:
 		option.add_child(reroll)
 		draft_box.add_child(option)
 
-func _clear_dynamic_children(container: Container) -> void:
+func _clear_dynamic_children(container: Node) -> void:
 	for child in container.get_children():
 		child.hide()
 		child.queue_free()
