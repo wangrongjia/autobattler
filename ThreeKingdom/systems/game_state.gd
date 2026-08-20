@@ -42,7 +42,7 @@ const SHU_WEAPON_CODEX := [
 
 var language := "zh"               # 当前语言:"zh"中文 / "en"英文
 var round_number := 1              # 当前关卡数(1~15)
-var phase := "draft"               # 当前阶段:draft选将 / placement布阵 / combat战斗 / finished结算
+var phase := "draft"               # 当前阶段:tianshu天书 / draft选将 / placement布阵 / combat战斗 / finished结算
 var player_ruler_hp := RULER_MAX_HP  # 我方主公当前血量
 var enemy_ruler_hp := RULER_MAX_HP   # 敌方主公当前血量
 var player_units: Array = []       # 我方所有武将单位列表(包括棋盘上和备战区的)
@@ -460,7 +460,7 @@ func _hero_army_name(hero_id: String) -> String:
 	return _army_name(int(heroes[hero_id].range))
 
 func _phase_name() -> String:
-	var map := {"draft":["选将", "DRAFT"], "placement":["布阵", "FORMATION"], "combat":["战斗", "COMBAT"], "finished":["结算", "RESULT"]}
+	var map := {"tianshu":["天书", "CODEX"], "draft":["选将", "DRAFT"], "placement":["布阵", "FORMATION"], "combat":["战斗", "COMBAT"], "finished":["结算", "RESULT"]}
 	return map[phase][0 if language == "zh" else 1]
 
 func _action_odds(hero_id: String) -> String:

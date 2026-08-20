@@ -1,8 +1,9 @@
-extends "res://ThreeKingdom/systems/progression_system.gd"
+extends "res://ThreeKingdom/systems/tianshu_system.gd"
 
 func _new_game() -> void:
 	round_number = 1
 	phase = "draft"
+	_reset_tianshu_run()
 	player_ruler_hp = _player_ruler_max_hp()
 	enemy_ruler_hp = RULER_MAX_HP
 	ruler_regen = {"player":{"amount":0.0, "time":0.0, "clock":0.0}, "enemy":{"amount":0.0, "time":0.0, "clock":0.0}}
@@ -24,13 +25,19 @@ func _new_game() -> void:
 	if is_instance_valid(log_box): log_box.clear()
 	_prepare_round()
 	if game_mode == "challenge":
-		_log("%s · %s：完成三轮选将后迎战守军。" % [STAGE_NAMES[selected_stage - 1], str(DIFFICULTIES[selected_difficulty].name)])
+		_log("%s · %s：%s完成三轮选将后迎战守军。" % [STAGE_NAMES[selected_stage - 1], str(DIFFICULTIES[selected_difficulty].name), "先选天书，再" if _tianshu_enabled() else ""])
+	elif game_mode == "tianshu":
+		_log("[color=#e5a8ff]天书演武开始：每回合先三选一天书，再进行三轮选将。[/color]")
 	else:
 		_log(t("征战开始：每关进行三轮三选一，选项从左到右固定为前军、中军、后军。", "Campaign begins with three pick-one-of-three rounds; slots are fixed to Vanguard, Midguard, and Rearguard."))
 	_render()
 
 func _start_quick_game() -> void:
 	game_mode = "quick"
+	_new_game()
+
+func _start_tianshu_game() -> void:
+	game_mode = "tianshu"
 	_new_game()
 
 func _start_challenge(stage: int, difficulty: int) -> bool:
@@ -49,7 +56,7 @@ func _save_game(silent := false) -> bool:
 		if not silent: _log(t("战斗过程中不能保存，请在选人或布阵阶段保存。", "Save during draft or formation, not combat."))
 		return false
 	var data := {
-		"version":5, "round_number":round_number, "phase":phase,
+		"version":6, "round_number":round_number, "phase":phase, "game_mode":game_mode,
 		"player_ruler_hp":player_ruler_hp, "enemy_ruler_hp":enemy_ruler_hp,
 		"player_units":player_units, "enemy_units":enemy_units,
 		"draft_roster_baseline":draft_roster_baseline,
@@ -59,7 +66,8 @@ func _save_game(silent := false) -> bool:
 		"refresh_charges":refresh_charges,
 		"selected_unit":selected_unit, "final_battle":final_battle,
 		"ruler_regen":ruler_regen,
-		"last_battle_stats":last_battle_stats
+		"last_battle_stats":last_battle_stats,
+		"tianshu":_tianshu_save_state()
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null: return false
@@ -76,10 +84,11 @@ func _load_game() -> bool:
 	if file == null: return false
 	var data = JSON.parse_string(file.get_as_text())
 	file.close()
-	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) not in [3, 4, 5]:
+	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) not in [3, 4, 5, 6]:
 		_log(t("存档版本不兼容。", "The save version is incompatible."))
 		return false
 	tick_timer.stop()
+	game_mode = str(data.get("game_mode", "quick"))
 	round_number = int(data.round_number)
 	phase = str(data.phase)
 	player_ruler_hp = int(data.player_ruler_hp)
@@ -106,15 +115,20 @@ func _load_game() -> bool:
 	final_battle = bool(data.get("final_battle", false))
 	ruler_regen = data.get("ruler_regen", {"player":{"amount":0.0, "time":0.0, "clock":0.0}, "enemy":{"amount":0.0, "time":0.0, "clock":0.0}})
 	last_battle_stats = data.get("last_battle_stats", [])
+	_load_tianshu_state(data.get("tianshu", {}))
+	if int(data.get("version", 0)) < 6:
+		for index in mini(DRAFT_SIZE, draft_refresh_available.size()):
+			tianshu_draft_refresh_used[index] = 0 if draft_refresh_available[index] else 1
 	battle_running = false
 	battle_paused = false
 	action_in_progress = false
 	combat_units = []
 	visual_events.clear()
 	ground_effects.clear()
-	if phase == "draft" and choices.size() != DRAFT_SIZE:
+	if phase == "tianshu" and tianshu_choices.size() != 3:
+		_generate_tianshu_choices()
+	elif phase == "draft" and choices.size() != DRAFT_SIZE:
 		_generate_choices()
-	game_mode = "quick"
 	_log(t("存档已读取。", "Save loaded."))
 	_render()
 	return true
@@ -135,7 +149,7 @@ func _sanitize_loaded_units(value, expected_team: String) -> Array:
 	return result
 
 func _prepare_round() -> void:
-	phase = "draft"
+	phase = "tianshu" if _tianshu_enabled() else "draft"
 	draft_user_hidden = false
 	draft_picks_remaining = PICKS_PER_ROUND
 	pending_unit_ids = []
@@ -143,25 +157,36 @@ func _prepare_round() -> void:
 	draft_roster_baseline = player_units.duplicate(true)
 	selected_unit = ""
 	_add_enemy_wave()    # 每关从指定阵营（或全阵营）随机加入3名敌将
-	_generate_choices()
+	if _tianshu_enabled():
+		_generate_tianshu_choices()
+	else:
+		_generate_choices()
 
 func _generate_choices() -> void:
 	choices = []
+	var pool_factions := _active_tianshu_pool_factions()
 	for range_tier in [1, 2, 3]:
 		var pool := _draft_pool_for_range(range_tier, draft_faction_filter)
+		if pool_factions.size() == 2 and int(tianshu_pool_effect.get("level", 0)) >= 2:
+			var preferred_faction := str(pool_factions[(range_tier - 1 + round_number) % 2])
+			var preferred: Array = pool.filter(func(hero_id): return str(heroes[hero_id].f) == preferred_faction)
+			if not preferred.is_empty(): pool = preferred
 		pool.shuffle()
 		if not pool.is_empty(): choices.append(pool[0])
 	draft_refresh_available = [true, true, true]
+	tianshu_draft_refresh_used = [0, 0, 0]
 
 func _draft_pool_for_range(range_tier: int, faction_filter: String) -> Array:
+	var pool_factions := _active_tianshu_pool_factions()
 	return heroes.keys().filter(func(hero_id):
-		return int(heroes[hero_id].range) == range_tier and (faction_filter.is_empty() or str(heroes[hero_id].f) == faction_filter)
+		var faction := str(heroes[hero_id].f)
+		return int(heroes[hero_id].range) == range_tier and (pool_factions.has(faction) if not pool_factions.is_empty() else (faction_filter.is_empty() or faction == faction_filter))
 	)
 
 func _refresh_draft_choice(choice_index: int) -> void:
 	if phase != "draft" or battle_running or choice_index < 0 or choice_index >= choices.size():
 		return
-	if choice_index >= draft_refresh_available.size() or not draft_refresh_available[choice_index]:
+	if not _tianshu_can_refresh_draft(choice_index):
 		return
 	var old_id := str(choices[choice_index])
 	var required_range := choice_index + 1
@@ -171,7 +196,8 @@ func _refresh_draft_choice(choice_index: int) -> void:
 		return
 	pool.shuffle()
 	choices[choice_index] = pool[0]
-	draft_refresh_available[choice_index] = false
+	tianshu_draft_refresh_used[choice_index] += 1
+	draft_refresh_available[choice_index] = _tianshu_can_refresh_draft(choice_index)
 	_log(t("已单独刷新 ", "Refreshed ") + _hero_name(old_id) + t(" 的候选位。", " candidate slot."))
 	_render()
 
@@ -324,6 +350,7 @@ func _start_battle() -> void:
 	for unit in combat_units:
 		battle_stats[unit.id] = {"unit_id":unit.id, "hero_id":unit.hero_id, "team":unit.team, "level":int(unit.get("level", 1)), "damage":0.0, "healing":0.0, "taken":0.0, "control":0.0}
 	_apply_combo_bonds()
+	_apply_tianshu_battle_start()
 	_apply_faction_bonuses()
 	_apply_opening_skills()
 	_log("[color=#f6c860]" + t("第 ", "Round ") + str(round_number) + t(" 回合战斗开始（30 秒）！", " battle begins (30 seconds)!") + "[/color]")
@@ -337,6 +364,7 @@ func _finish_battle() -> void:
 	battle_paused = false
 	action_in_progress = false
 	_capture_battle_stats()
+	_tianshu_on_round_end()
 	var result: String
 	if player_ruler_hp == enemy_ruler_hp: result = t("本关战斗结束，平局。", "Stage complete — draw.")
 	elif player_ruler_hp > enemy_ruler_hp: result = t("本关战斗胜利！", "Stage won!")
@@ -350,10 +378,20 @@ func _finish_battle() -> void:
 			var challenge_result := _complete_challenge(player_won if decisive else player_ruler_hp > enemy_ruler_hp)
 			if has_method("_show_battle_result"):
 				call_deferred("_show_battle_result", challenge_result)
-		else:
+		if not decisive and round_number < ROUND_LIMIT:
 			round_number += 1
 			_prepare_round()
 			_log("进入闯关第 %d / 15 回合：主公生命与现有阵容继续保留。" % round_number)
+	elif game_mode == "tianshu":
+		if decisive or round_number >= ROUND_LIMIT:
+			phase = "finished"
+			if has_method("_show_battle_result"):
+				call_deferred("_show_battle_result", {"victory":player_won if decisive else player_ruler_hp >= enemy_ruler_hp, "stage":round_number, "difficulty":-1, "stars":0, "new_stars":0, "souls":0})
+		if not decisive and round_number < ROUND_LIMIT:
+			round_number += 1
+			_prepare_round()
+			_save_game(true)
+			_log("进入天书演武第 %d / 15 回合。" % round_number)
 	elif decisive:
 		phase = "finished"
 		if has_method("_show_battle_result"):

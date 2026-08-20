@@ -60,6 +60,7 @@ func _init() -> void:
 	assert(game.rune_inventory.filter(func(rune): return int(rune.tier) == 1).size() == 1)
 	assert(game.rune_loadouts.sunshangxiang == [105])
 	game.stage_star_records = {}
+	game.limit_challenges = true
 	assert(game._is_stage_unlocked(1, 0))
 	assert(not game._is_stage_unlocked(2, 0))
 	assert(not game._is_stage_unlocked(1, 1))
@@ -108,14 +109,16 @@ func _init() -> void:
 	game.menu_overlay.show()
 	game.battle_menu_overlay.show()
 	game._launch_challenge(50, 4)
-	assert(game.phase == "draft" and game.round_number == 1)
-	assert(game.draft_overlay.visible)
+	assert(game.phase == "tianshu" and game.round_number == 1)
+	assert(game.tianshu_overlay.visible)
+	game._choose_tianshu(game.tianshu_choices[0])
+	assert(game.phase == "draft" and game.draft_overlay.visible)
 	game.phase = "combat"
 	game.battle_running = true
 	game.player_ruler_hp = game._player_ruler_max_hp()
 	game.enemy_ruler_hp = game.RULER_MAX_HP
 	game._finish_battle()
-	assert(game.phase == "draft" and game.round_number == 2)
+	assert(game.phase == "tianshu" and game.round_number == 2)
 	game.round_number = 15
 	game.phase = "combat"
 	game.battle_running = true

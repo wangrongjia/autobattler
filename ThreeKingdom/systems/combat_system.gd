@@ -50,6 +50,8 @@ func _migrate_legacy_dots(unit: Dictionary) -> void:
 
 func _add_burn_effect(source: Variant, target: Dictionary, duration: float, damage_per_second: float, missing_hp_scale := false, visual_group := "", missing_hp_step := 0.10, missing_hp_bonus_per_step := 0.05) -> void:
 	if target == null or not target.alive or duration <= 0.0 or damage_per_second <= 0.0: return
+	duration *= _tianshu_dot_duration_multiplier(source)
+	damage_per_second *= _tianshu_dot_damage_multiplier(source)
 	_migrate_legacy_dots(target)
 	var effects: Array = target.get("burn_effects", [])
 	effects.append({"source_id":str(source.get("id", "")) if source != null else "", "time":duration, "clock":0.0, "damage":damage_per_second, "missing_hp_scale":missing_hp_scale, "visual_group":visual_group, "missing_hp_step":missing_hp_step, "missing_hp_bonus_per_step":missing_hp_bonus_per_step})
@@ -58,6 +60,8 @@ func _add_burn_effect(source: Variant, target: Dictionary, duration: float, dama
 
 func _add_decay_poison_effect(source: Variant, target: Dictionary, stacks: int, retention := 0.5) -> void:
 	if target == null or not target.alive or stacks <= 0: return
+	stacks = roundi(float(stacks) * _tianshu_dot_damage_multiplier(source))
+	retention = clampf(retention + (1.0 - retention) * (_tianshu_dot_duration_multiplier(source) - 1.0), 0.0, 0.95)
 	_migrate_legacy_dots(target)
 	var effects: Array = target.get("poison_effects", [])
 	var merged := false
@@ -397,7 +401,7 @@ func _unit_skill_cooldown(unit: Dictionary) -> float:
 	var talent_reduction := float(unit.get("talent_cooldown_reduction", 0.0))
 	# 符文带来的冷却缩减最多达到武将原始冷却的一半，超出部分舍弃。
 	var rune_reduction := minf(float(unit.get("rune_cooldown_reduction", 0.0)), original * 0.5)
-	return maxf(1.0, base - talent_reduction - rune_reduction)
+	return maxf(1.0, base - talent_reduction - rune_reduction - _tianshu_cooldown_reduction(unit))
 
 func _unit_has_active_skill(unit: Dictionary) -> bool:
 	return str(heroes[unit.hero_id].get("ability", "")) != "passive"
@@ -406,7 +410,8 @@ func _unit_skill_power_multiplier(unit: Dictionary) -> float:
 	return maxf(0.0, _unit_skill_stat_value(unit) / 100.0)
 
 func _unit_skill_stat_value(unit: Dictionary) -> float:
-	return float(heroes[unit.hero_id].skill_value) + float(unit.get("skill_value_bonus", 0.0)) + float(unit.get("timed_skill_value_bonus", 0.0)) + float(unit.get("sunshangxiang_skill_bonus", 0.0))
+	var value := float(heroes[unit.hero_id].skill_value) + float(unit.get("skill_value_bonus", 0.0)) + float(unit.get("timed_skill_value_bonus", 0.0)) + float(unit.get("sunshangxiang_skill_bonus", 0.0)) + _tianshu_strategy_bonus(unit)
+	return value * _tianshu_strategy_multiplier(unit)
 
 func _unit_scaled_skill_value(unit: Dictionary) -> float:
 	return _unit_skill_stat_value(unit) * maxf(0.0, 1.0 - float(unit.get("skill_debuff", 0.0)))
@@ -415,7 +420,7 @@ func _unit_skill_effect_multiplier(unit: Dictionary) -> float:
 	return _unit_skill_power_multiplier(unit) * maxf(0.0, 1.0 - float(unit.get("skill_debuff", 0.0)))
 
 func _control_duration_multiplier(unit: Dictionary) -> float:
-	return float(unit.get("control_multiplier", 1.0)) * (1.0 + float(unit.get("faction_control_bonus", 0.0)))
+	return float(unit.get("control_multiplier", 1.0)) * (1.0 + float(unit.get("faction_control_bonus", 0.0))) * _tianshu_control_source_multiplier(unit)
 
 func _scaled_control_duration(unit: Dictionary, duration: float, include_effect_multiplier := false) -> float:
 	var multiplier := CONTROL_DURATION_MULTIPLIER * _control_duration_multiplier(unit)
@@ -513,6 +518,7 @@ func _process_statuses(delta: float = TICK) -> void:
 	for unit in combat_units:
 		if not unit.alive: continue
 		_ensure_unit_fields(unit)
+		var control_decay := _tianshu_control_decay_multiplier(unit)
 		# Compatibility for a battle loaded from an older save that only has the legacy single DOT fields.
 		_migrate_legacy_dots(unit)
 		var active_burns: Array = []
@@ -537,7 +543,7 @@ func _process_statuses(delta: float = TICK) -> void:
 			if unit.fear_clock >= 1.0:
 				unit.fear_clock -= 1.0
 				_damage(null, unit, float(unit.max_hp) * float(unit.get("fear_damage_ratio", 0.05)), "magic", t("恐惧", "Fear"), "status_fear:" + status_tick_id, "fear_tick", false)
-			unit.fear = maxf(0.0, float(unit.fear) - delta)
+			unit.fear = maxf(0.0, float(unit.fear) - delta * control_decay)
 			if unit.fear <= 0.0:
 				unit.fear_damage_ratio = 0.0
 				unit.fear_clock = 0.0
@@ -553,8 +559,8 @@ func _process_statuses(delta: float = TICK) -> void:
 			if int(effect.get("stacks", 0)) > 0: active_poisons.append(effect)
 		unit.poison_effects = active_poisons
 		_sync_dot_summaries(unit)
-		unit.freeze = maxf(0.0, float(unit.get("freeze", 0.0)) - delta)
-		unit.stun = max(0.0, unit.stun - delta)
+		unit.freeze = maxf(0.0, float(unit.get("freeze", 0.0)) - delta * control_decay)
+		unit.stun = max(0.0, unit.stun - delta * control_decay)
 		if float(unit.get("charm", 0.0)) > 0.0 and bool(unit.get("charm_forced_attack", false)):
 			unit.charm_attack_clock = float(unit.get("charm_attack_clock", 0.0)) + delta
 			var interval := float(heroes.diaochan.ability_params.get("forced_attack_interval", 1.0))
@@ -567,7 +573,7 @@ func _process_statuses(delta: float = TICK) -> void:
 				var victim: Dictionary = adjacent[rng.randi_range(0, adjacent.size() - 1)]
 				var forced_amount := _unit_skill_stat_value(unit) * float(heroes.diaochan.ability_params.get("forced_attack_mult", 1.0))
 				_damage(unit, victim, forced_amount, "physical", t("魅惑倒戈", "Charmed betrayal"), "charm_attack:" + str(unit.id), "multi_target")
-		unit.charm = max(0.0, unit.charm - delta)
+		unit.charm = max(0.0, unit.charm - delta * control_decay)
 		if unit.charm <= 0.0:
 			unit.charm_forced_attack = false
 			unit.charm_attack_clock = 0.0
@@ -575,7 +581,7 @@ func _process_statuses(delta: float = TICK) -> void:
 		unit.skill_debuff_time = maxf(0.0, float(unit.get("skill_debuff_time", 0.0)) - delta)
 		if unit.skill_debuff_time <= 0.0: unit.skill_debuff = 0.0
 		unit.stealth = max(0.0, float(unit.get("stealth", 0.0)) - delta)
-		unit.slow_time = max(0.0, float(unit.get("slow_time", 0.0)) - delta)
+		unit.slow_time = max(0.0, float(unit.get("slow_time", 0.0)) - delta * control_decay)
 		if unit.slow_time <= 0.0: unit.slow = 0.0
 		unit.vulnerable_time = max(0.0, float(unit.get("vulnerable_time", 0.0)) - delta)
 		if unit.vulnerable_time <= 0.0: unit.vulnerable = 0.0
@@ -697,6 +703,7 @@ func _process_statuses(delta: float = TICK) -> void:
 			regen.amount = 0.0
 			regen.magic_reduction = 0.0
 		ruler_regen[team] = regen
+	_tianshu_process_tick(delta)
 
 func _perform_action(unit: Dictionary) -> void:
 	_play_random_skill_voice(unit)
@@ -1283,6 +1290,7 @@ func _cast_weiyan_cleave(unit: Dictionary) -> void:
 				_heal_unit_only(unit, ally, damage_dealt * float(params.get("fated_ally_heal", 0.06)) * _unit_skill_effect_multiplier(unit))
 
 func _after_active_skill(unit: Dictionary) -> void:
+	_tianshu_on_cast(unit)
 	if heroes[unit.hero_id].f == "shu" and int(unit.get("faction_tier", 0)) >= 3:
 		unit.shu_damage_stacks = 0
 		unit.shu_damage_decay_time = 0.0
@@ -2367,6 +2375,7 @@ func _heal_weakest_fixed(unit: Dictionary, heal_amount: float, reduction: float,
 	target.damage_reduction = max(target.damage_reduction, reduction)
 func _heal_with_overflow(source: Dictionary, target, amount: float, visual_kind := "heal", nonblocking := false) -> void:
 	if source == null or amount <= 0.0: return
+	amount *= _tianshu_heal_multiplier(source)
 	if target != null and target.alive:
 		amount *= 1.0 - clampf(float(target.get("grievous", 0.0)), 0.0, 0.95)
 	var overflow := amount
@@ -2377,6 +2386,7 @@ func _heal_with_overflow(source: Dictionary, target, amount: float, visual_kind 
 		overflow -= restored
 		if restored > 0.0:
 			visual_events.append({"kind":visual_kind, "source_id":source.id, "target_id":target.id, "amount":round(restored), "style":"heal", "nonblocking":nonblocking})
+	_tianshu_on_overflow(source, target, overflow)
 	var ruler_restored := 0.0
 	if overflow > 0.0:
 		var ruler_hp: int = player_ruler_hp if source.team == "player" else enemy_ruler_hp
@@ -2389,6 +2399,7 @@ func _heal_with_overflow(source: Dictionary, target, amount: float, visual_kind 
 
 func _heal_unit_only(source: Dictionary, target: Dictionary, amount: float, visual_group := "", group_style := "") -> float:
 	if source == null or target == null or not target.alive or amount <= 0.0: return 0.0
+	amount *= _tianshu_heal_multiplier(source)
 	amount *= 1.0 - clampf(float(target.get("grievous", 0.0)), 0.0, 0.95)
 	var missing := maxf(0.0, float(target.max_hp) - float(target.hp))
 	var restored := minf(missing, amount)
@@ -2459,6 +2470,8 @@ func _combat_name(unit: Dictionary) -> String:
 
 func _apply_all_lifesteal(unit: Dictionary, damage_dealt: float) -> void:
 	var ratio := maxf(float(unit.get("all_lifesteal", 0.0)), float(unit.get("liushan_aura_lifesteal", 0.0)))
+	if unit.team == "player" and _tianshu_enabled() and _tianshu_level("canyang") >= 2 and float(unit.hp) < float(unit.max_hp) * 0.5:
+		ratio = maxf(ratio, 0.10)
 	if ratio <= 0.0 or damage_dealt <= 0.0 or not unit.alive: return
 	_heal_with_overflow(unit, unit, damage_dealt * ratio)
 
@@ -2505,6 +2518,7 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		_log(_hero_name(target.hero_id) + t(" 反弹了指向性技能。", " reflects the targeted skill."))
 		return 0.0
 	var value: float = amount
+	var direct_tianshu_damage := source != null and group_style not in ["burn_tick", "poison_tick", "fear_tick"] and not str(visual_group).begins_with("status_")
 	value *= 1.0 + float(target.get("vulnerable", 0.0))
 	if source != null:
 		value *= float(source.get("stat_mult", 1.0))
@@ -2513,6 +2527,7 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		value *= maxf(0.0, 1.0 - float(source.get("skill_debuff", 0.0)))
 		if heroes[source.hero_id].f == "wei" and int(source.get("faction_tier", 0)) >= 3 and _has_any_debuff(target):
 			value *= 1.08 + (0.02 * _talent_level("wei", "乘胜追击") if source.team == "player" else 0.0)
+		value *= _tianshu_damage_multiplier(source, target, direct_tianshu_damage)
 	var freeze_remaining := float(target.get("freeze", 0.0))
 	if freeze_remaining > 0.0:
 		var shatter_damage := float(target.get("freeze_shatter_damage", 0.0))
@@ -2533,6 +2548,7 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		var params: Dictionary = heroes.sunce.ability_params
 		var missing_hp_reduction := _missing_hp_damage_multiplier(target, float(params.get("missing_hp_step", 0.10)), float(params.get("missing_hp_reduction_per_step", 0.03))) - 1.0
 		total_reduction += missing_hp_reduction
+	total_reduction += _tianshu_damage_reduction(target, source, direct_tianshu_damage)
 	value *= 1.0 - clampf(total_reduction, 0.0, 0.95)
 	var faction_reduction := float(target.get("faction_damage_reduction", 0.0))
 	if heroes[target.hero_id].f == "shu" and int(target.get("faction_tier", 0)) >= 3:
@@ -2561,12 +2577,15 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		if float(target.get("shu_damage_decay_time", 0.0)) <= 0.0:
 			target.shu_damage_decay_time = 3.0
 	if source != null: _apply_all_lifesteal(source, actual_damage)
+	_tianshu_on_damage(source, target, actual_damage, direct_tianshu_damage)
 	if propagate_links and actual_damage > 0.0: _propagate_pangtong_link(target, actual_damage, visual_group)
 	var effect_style := "effect" if source == null else ("magic" if damage_type == "magic" else ("ranged" if int(heroes[source.hero_id].range) > 2 else "melee"))
 	visual_events.append({"kind":"damage", "source_id":"" if source == null else source.id, "target_id":target.id, "team":target.team, "row":target.row, "col":target.col, "amount":round(value), "skill":true, "style":effect_style, "visual_group":visual_group, "group_style":group_style})
 	var source_name := t("环境", "Effect") if source == null else _hero_name(source.hero_id)
 	_log(source_name + t(" 对 ", " hits ") + _hero_name(target.hero_id) + t(" 造成 ", " for ") + str(round(value)) + t(" 伤害（", " damage (") + label + "）")
 	if target.hp <= 0:
+		if _tianshu_try_prevent_death(target):
+			return actual_damage
 		if float(target.get("death_prevention", 0.0)) > 0.0:
 			target.hp = max(1.0, target.max_hp * 0.08)
 			target.death_prevention = 0.0
@@ -2627,6 +2646,7 @@ func _resolve_zhangbao_death(unit: Dictionary, killer, visual_group: String, gro
 	return true
 
 func _on_unit_fallen(fallen: Dictionary, killer) -> void:
+	_tianshu_on_kill(killer, fallen)
 	var allies := _team_units(fallen.team).filter(func(ally): return ally.alive)
 	if fallen.hero_id == "sunjian" and bool(fallen.get("sun_legacy", false)):
 		var legacy_bonus := float(heroes.sunjian.ability_params.get("death_wu_damage_bonus", 0.12))
@@ -2641,6 +2661,7 @@ func _hit_ruler(unit: Dictionary, amount: float, tile: Dictionary, label: String
 	var value_float: float = amount * float(unit.get("stat_mult", 1.0)) * (1.0 + float(unit.damage_buff) + float(unit.get("timed_damage_buff", 0.0)) + float(unit.get("liushan_aura_damage_bonus", 0.0)) + float(unit.get("kill_buff", 0.0)))
 	if scales_with_skill: value_float *= _unit_skill_power_multiplier(unit)
 	value_float *= maxf(0.0, 1.0 - float(unit.get("skill_debuff", 0.0)))
+	value_float *= _tianshu_ruler_damage_multiplier(unit)
 	var target_team := _enemy_team_id(unit.team)
 	var ability := str(heroes[unit.hero_id].get("ability", ""))
 	if ability in ["strike_magic", "row_magic", "multi_magic", "control"]: value_float *= 1.0 - float(ruler_regen[target_team].get("magic_reduction", 0.0))
@@ -2654,6 +2675,7 @@ func _hit_ruler(unit: Dictionary, amount: float, tile: Dictionary, label: String
 		tick_timer.stop()
 		call_deferred("_finish_battle")
 	_add_stat(unit, "damage", float(before_ruler - after_ruler))
+	_tianshu_on_ruler_hit(unit, tile)
 	visual_events.append({"kind":"empty", "source_id":unit.id, "team":tile.team, "row":tile.row, "col":tile.col, "amount":value, "skill":true, "style":"ranged" if int(heroes[unit.hero_id].range) > 2 else "melee", "visual_group":visual_group, "group_style":group_style})
 	_log(_hero_name(unit.hero_id) + t(" 攻击空格（", " targets an empty tile (") + label + t("），穿透命中主公 ", ") and hits the ruler for ") + str(value) + (t(" 点伤害。", ".") if language == "zh" else ""))
 	return float(before_ruler - after_ruler)

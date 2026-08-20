@@ -34,6 +34,13 @@ var challenge_limit_setting_button: Button
 var result_overlay: Control
 var result_title_label: Label
 var result_detail_label: Label
+var tianshu_overlay: Control
+var tianshu_choice_box: HBoxContainer
+var tianshu_owned_box: VBoxContainer
+var tianshu_overlay_title: Label
+var tianshu_overlay_close: Button
+var tianshu_header_button: Button
+var tianshu_view_only := false
 
 func _is_mobile_ui() -> bool:
 	return OS.has_feature("mobile") or OS.has_feature("android") or OS.get_environment("THREE_KINGDOM_MOBILE_UI_TEST") == "1"
@@ -173,6 +180,11 @@ func _build_ui() -> void:
 	round_box.add_child(phase_label)
 	round_panel.add_child(round_box)
 	header.add_child(round_panel)
+	tianshu_header_button = _button(t("天书", "CODEX"))
+	tianshu_header_button.custom_minimum_size = Vector2(86, 40)
+	tianshu_header_button.pressed.connect(_show_tianshu_collection)
+	tianshu_header_button.hide()
+	header.add_child(tianshu_header_button)
 	language_button = _button("")
 	language_button.custom_minimum_size = Vector2(100, 40)
 	language_button.pressed.connect(_toggle_language)
@@ -409,6 +421,7 @@ func _build_ui() -> void:
 	tick_timer.timeout.connect(_battle_tick)
 	add_child(tick_timer)
 	_build_draft_layer()
+	_build_tianshu_overlay()
 	_build_unit_inspector()
 
 func _build_unit_inspector() -> void:
@@ -723,6 +736,153 @@ func _toggle_draft_layer() -> void:
 	draft_user_hidden = not draft_user_hidden
 	draft_overlay.visible = not draft_user_hidden
 
+func _build_tianshu_overlay() -> void:
+	tianshu_overlay = ColorRect.new()
+	tianshu_overlay.color = Color("#090711f7")
+	tianshu_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	tianshu_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	tianshu_overlay.z_index = 1550
+	add_child(tianshu_overlay)
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 22)
+	margin.add_theme_constant_override("margin_right", 22)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_bottom", 22)
+	tianshu_overlay.add_child(margin)
+	var panel := PanelContainer.new()
+	_style(panel, Color("#17121f"), 18, Color("#c17af4"), 3)
+	margin.add_child(panel)
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 12)
+	panel.add_child(root)
+	var header := HBoxContainer.new()
+	tianshu_overlay_title = _label("", 30, Color("#f0c77a"))
+	tianshu_overlay_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(tianshu_overlay_title)
+	var subtitle := _label(t("所有天书均为彩色品质 · 同名再次选择升至Ⅱ级", "All codices share one prismatic tier · choose again to reach level II"), 14, Color("#d8b9ee"))
+	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(subtitle)
+	tianshu_overlay_close = _button(t("关闭", "CLOSE"))
+	tianshu_overlay_close.custom_minimum_size = Vector2(120, 46)
+	tianshu_overlay_close.pressed.connect(func(): tianshu_overlay.hide())
+	header.add_child(tianshu_overlay_close)
+	root.add_child(header)
+	var content := HBoxContainer.new()
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 14)
+	root.add_child(content)
+	var choices_scroll := ScrollContainer.new()
+	choices_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	choices_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	choices_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_enable_touch_scroll(choices_scroll, true, true)
+	content.add_child(choices_scroll)
+	tianshu_choice_box = HBoxContainer.new()
+	tianshu_choice_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tianshu_choice_box.add_theme_constant_override("separation", 14)
+	choices_scroll.add_child(tianshu_choice_box)
+	var owned_panel := PanelContainer.new()
+	owned_panel.custom_minimum_size.x = 330
+	_style(owned_panel, Color("#14151c"), 12, Color("#765585"), 2)
+	var owned_root := VBoxContainer.new()
+	owned_root.add_theme_constant_override("separation", 8)
+	owned_panel.add_child(owned_root)
+	owned_root.add_child(_label(t("本局已获天书", "OWNED CODICES"), 20, Color("#e5a8ff")))
+	var owned_scroll := ScrollContainer.new()
+	owned_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_enable_touch_scroll(owned_scroll, false, true)
+	owned_root.add_child(owned_scroll)
+	tianshu_owned_box = VBoxContainer.new()
+	tianshu_owned_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tianshu_owned_box.add_theme_constant_override("separation", 7)
+	owned_scroll.add_child(tianshu_owned_box)
+	content.add_child(owned_panel)
+	tianshu_overlay.hide()
+
+func _show_tianshu_collection() -> void:
+	if not _tianshu_enabled(): return
+	tianshu_view_only = true
+	_render_tianshu_overlay()
+	tianshu_overlay.show()
+
+func _render_tianshu_overlay() -> void:
+	if not is_instance_valid(tianshu_overlay): return
+	_clear_dynamic_children(tianshu_choice_box)
+	_clear_dynamic_children(tianshu_owned_box)
+	var selecting := phase == "tianshu" and not tianshu_view_only
+	tianshu_overlay_title.text = t("天书三选一 · 第 %d / 15 回合" % round_number, "CHOOSE A CODEX · ROUND %d / 15" % round_number) if selecting else t("本局天书", "RUN CODEX")
+	tianshu_overlay_close.visible = not selecting
+	if selecting:
+		for index in tianshu_choices.size():
+			var book_id := str(tianshu_choices[index])
+			var book: Dictionary = TIANSHU_BOOKS[book_id]
+			var current := _tianshu_level(book_id)
+			var target_level := mini(2, current + 1)
+			var option := VBoxContainer.new()
+			option.custom_minimum_size = Vector2(300 if _is_mobile_ui() else 355, 500)
+			option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			option.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			option.add_theme_constant_override("separation", 10)
+			var scope := _label(str(book.group), 16, Color("#dca6ff"))
+			scope.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			option.add_child(scope)
+			var card := Button.new()
+			card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			card.custom_minimum_size.y = 400
+			card.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			card.add_theme_font_size_override("font_size", 20)
+			card.text = ("✦  %s  ✦\n\n%s\n\n%s\n\n%s" % [_tianshu_name(book_id), "升级至 Ⅱ 级" if current == 1 else "获得 Ⅰ 级", _tianshu_effect_text(book_id, target_level), "点击选定，本回合不可更改"])
+			var style := StyleBoxFlat.new()
+			style.bg_color = Color("#2a1838")
+			style.border_color = Color("#de8cff")
+			style.set_border_width_all(4)
+			style.set_corner_radius_all(16)
+			style.content_margin_left = 22
+			style.content_margin_right = 22
+			style.content_margin_top = 22
+			style.content_margin_bottom = 22
+			card.add_theme_stylebox_override("normal", style)
+			var hover: StyleBoxFlat = style.duplicate()
+			hover.bg_color = Color("#402252")
+			hover.border_color = Color("#f4d06f")
+			card.add_theme_stylebox_override("hover", hover)
+			card.pressed.connect(_choose_tianshu.bind(book_id))
+			option.add_child(card)
+			var can_refresh := index < tianshu_refresh_available.size() and tianshu_refresh_available[index]
+			var refresh := _button(t("↻ 单独刷新此天书", "↻ REFRESH THIS CODEX") if can_refresh else t("✓ 本回合已刷新", "✓ REFRESH USED"))
+			refresh.disabled = not can_refresh
+			refresh.custom_minimum_size.y = 48
+			refresh.pressed.connect(_refresh_tianshu_choice.bind(index))
+			option.add_child(refresh)
+			tianshu_choice_box.add_child(option)
+	else:
+		var intro := _label(t("本局共获得 %d 种天书，可在战斗中随时查看右侧详情。" % tianshu_levels.size(), "You own %d codices this run." % tianshu_levels.size()), 18, Color("#c9c0b1"))
+		intro.custom_minimum_size = Vector2(600, 120)
+		intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		tianshu_choice_box.add_child(intro)
+	var owned_ids: Array = tianshu_levels.keys()
+	owned_ids.sort_custom(func(a, b):
+		var group_a := str(TIANSHU_BOOKS[a].group)
+		var group_b := str(TIANSHU_BOOKS[b].group)
+		return group_a + str(TIANSHU_BOOKS[a].name) < group_b + str(TIANSHU_BOOKS[b].name)
+	)
+	if owned_ids.is_empty():
+		tianshu_owned_box.add_child(_label(t("尚未选择天书", "No codex selected"), 16, Color("#82788a")))
+	for book_id_variant in owned_ids:
+		var book_id := str(book_id_variant)
+		var level := _tianshu_level(book_id)
+		var item := _button("%s　%s %s\n%s" % [str(TIANSHU_BOOKS[book_id].group), _tianshu_name(book_id), "Ⅱ" if level == 2 else "Ⅰ", _tianshu_effect_text(book_id, level)])
+		item.disabled = true
+		item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		item.custom_minimum_size.y = 86
+		item.tooltip_text = _tianshu_effect_text(book_id, level)
+		tianshu_owned_box.add_child(item)
+	if not tianshu_pool_effect.is_empty() and round_number <= int(tianshu_pool_effect.get("end_round", 0)):
+		var remaining := int(tianshu_pool_effect.end_round) - round_number + 1
+		tianshu_owned_box.add_child(_label(t("当前武将池限制剩余 %d 回合" % remaining, "Pool restriction: %d rounds left" % remaining), 14, Color("#f0c77a")))
+
 func _set_stats_metric(metric: String) -> void:
 	stats_metric = metric
 	_render_battle_stats()
@@ -861,6 +1021,19 @@ func _build_battle_menu() -> void:
 	quick_box.add_child(quick_buttons)
 	quick_panel.add_child(quick_box)
 	mode_row.add_child(quick_panel)
+	var tianshu_panel := PanelContainer.new()
+	tianshu_panel.custom_minimum_size = Vector2(330, 125)
+	_style(tianshu_panel, Color("#25182d"), 12, Color("#c17af4"), 2)
+	var tianshu_box := VBoxContainer.new()
+	tianshu_box.add_child(_label("天书演武", 24, Color("#e5a8ff")))
+	var tianshu_help := _label("每回合先天书三选一，再进行三轮选将；天书仅本局生效。", 14, Color("#d6c3df"))
+	tianshu_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tianshu_box.add_child(tianshu_help)
+	var tianshu_start := _button("开始天书演武")
+	tianshu_start.pressed.connect(_start_tianshu_from_menu)
+	tianshu_box.add_child(tianshu_start)
+	tianshu_panel.add_child(tianshu_box)
+	mode_row.add_child(tianshu_panel)
 	var challenge_header := VBoxContainer.new()
 	challenge_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	challenge_header.add_child(_label("闯关", 24, Color("#f0c77a")))
@@ -898,14 +1071,14 @@ func _on_challenge_difficulty_selected(index: int) -> void:
 func _render_stage_grid() -> void:
 	_clear_dynamic_children(challenge_stage_grid)
 	var difficulty := challenge_difficulty_options.selected
-	challenge_stage_title.text = "每个闯关包含 15 回合，每回合 30 秒。解锁限制：%s" % ("开启" if limit_challenges else "关闭，全部关卡开放")
+	challenge_stage_title.text = "每个闯关包含 15 回合，每回合 30 秒；王者、地狱启用天书。解锁限制：%s" % ("开启" if limit_challenges else "关闭，全部关卡开放")
 	for stage in range(1, 51):
 		var unlocked := _is_stage_unlocked(stage, difficulty)
 		var best := int(stage_star_records.get(_progression_key(stage, difficulty), 0))
 		var button := _button(("第%02d关  " % stage) + STAGE_NAMES[stage - 1] + "\n" + ("★".repeat(best) + "☆".repeat(3 - best) if unlocked else "未解锁"))
 		button.custom_minimum_size = Vector2(260, 78)
 		button.disabled = not unlocked
-		button.tooltip_text = "敌将兵略 +%d；初始生命 ×%.1f" % [stage * 5, float(DIFFICULTIES[difficulty].hp)]
+		button.tooltip_text = "敌将兵略 +%d；初始生命 ×%.1f%s" % [stage * 5, float(DIFFICULTIES[difficulty].hp), "；每回合启用天书三选一" if difficulty >= 3 else ""]
 		button.pressed.connect(_launch_challenge.bind(stage, difficulty))
 		challenge_stage_grid.add_child(button)
 
@@ -916,6 +1089,12 @@ func _launch_challenge(stage: int, difficulty: int) -> void:
 		menu_overlay.show()
 		battle_menu_overlay.show()
 		return
+	_render()
+
+func _start_tianshu_from_menu() -> void:
+	battle_menu_overlay.hide()
+	menu_overlay.hide()
+	_start_tianshu_game()
 	_render()
 
 func _build_result_overlay() -> void:
@@ -2450,7 +2629,7 @@ func _show_main_menu() -> void:
 	if battle_running: return
 	continue_button.disabled = not FileAccess.file_exists(SAVE_PATH)
 	draft_overlay.hide()
-	for overlay in [battle_menu_overlay, rune_overlay, talent_overlay, settings_overlay, encyclopedia_overlay]:
+	for overlay in [battle_menu_overlay, rune_overlay, talent_overlay, settings_overlay, encyclopedia_overlay, tianshu_overlay]:
 		if is_instance_valid(overlay): overlay.hide()
 	_refresh_home()
 	menu_overlay.show()
@@ -2696,14 +2875,20 @@ func _render() -> void:
 		battle_info_tabs.set_tab_title(0, t("羁绊组成", "BONDS"))
 		battle_info_tabs.set_tab_title(1, t("实时战报", "BATTLE LOG"))
 		battle_info_tabs.set_tab_title(2, t("统计图表", "STATISTICS"))
-	title_label.text = (STAGE_NAMES[selected_stage - 1] + " · " + str(DIFFICULTIES[selected_difficulty].name)) if game_mode == "challenge" else t("三国 · 羁绊战棋 · 快速战斗", "THREE KINGDOMS · QUICK BATTLE")
-	round_label.text = ("闯关 %d / 50 · 回合 %d / 15" % [selected_stage, round_number]) if game_mode == "challenge" else (t("最终决战", "FINAL BATTLE") if final_battle else t("关卡 ", "STAGE ") + str(round_number) + " / " + str(ROUND_LIMIT))
+	if game_mode == "challenge": title_label.text = STAGE_NAMES[selected_stage - 1] + " · " + str(DIFFICULTIES[selected_difficulty].name)
+	elif game_mode == "tianshu": title_label.text = t("三国 · 羁绊战棋 · 天书演武", "THREE KINGDOMS · CODEX TRIAL")
+	else: title_label.text = t("三国 · 羁绊战棋 · 快速战斗", "THREE KINGDOMS · QUICK BATTLE")
+	if game_mode == "challenge": round_label.text = "闯关 %d / 50 · 回合 %d / 15" % [selected_stage, round_number]
+	elif game_mode == "tianshu": round_label.text = t("天书演武 ", "CODEX TRIAL ") + str(round_number) + " / " + str(ROUND_LIMIT)
+	else: round_label.text = t("最终决战", "FINAL BATTLE") if final_battle else t("关卡 ", "STAGE ") + str(round_number) + " / " + str(ROUND_LIMIT)
 	phase_label.text = "◆ " + _phase_name()
 	language_button.text = "English" if language == "zh" else "简体中文"
 	save_button.text = t("保存", "SAVE")
 	load_button.text = t("读取", "LOAD")
 	menu_button.text = t("主菜单", "MENU")
 	speed_button.text = str(int(game_speed)) + "×"
+	tianshu_header_button.text = t("天书", "CODEX") + (" %d" % tianshu_levels.size() if not tianshu_levels.is_empty() else "")
+	tianshu_header_button.visible = _tianshu_enabled()
 	save_button.disabled = battle_running
 	load_button.disabled = battle_running or not FileAccess.file_exists(SAVE_PATH)
 	menu_button.disabled = battle_running
@@ -2721,7 +2906,8 @@ func _render() -> void:
 		_refresh_unit_inspector()
 	enemy_title_label.text = t("敌方阵地  ·  后排在上 / 前排在下", "ENEMY FORMATION  ·  BACK TO FRONT")
 	player_title_label.text = t("我方阵地  ·  前排在上 / 后排在下", "YOUR FORMATION  ·  FRONT TO BACK")
-	if phase == "draft": draft_title_label.text = t("三选一 · 第%d/3轮" % (PICKS_PER_ROUND - draft_picks_remaining + 1), "PICK 1 OF 3 · ROUND %d/3" % (PICKS_PER_ROUND - draft_picks_remaining + 1))
+	if phase == "tianshu": draft_title_label.text = t("天书三选一", "CHOOSE A CODEX")
+	elif phase == "draft": draft_title_label.text = t("三选一 · 第%d/3轮" % (PICKS_PER_ROUND - draft_picks_remaining + 1), "PICK 1 OF 3 · ROUND %d/3" % (PICKS_PER_ROUND - draft_picks_remaining + 1))
 	elif phase == "placement": draft_title_label.text = t("布置新武将 · 待放 ", "DEPLOY RECRUITS · LEFT ") + str(pending_unit_ids.size())
 	elif phase == "combat": draft_title_label.text = t("最终无限战斗", "FINAL UNLIMITED BATTLE") if final_battle else t("本关战斗中 · 30 秒", "STAGE BATTLE · 30 SEC")
 	else: draft_title_label.text = t("征战结果", "CAMPAIGN RESULT")
@@ -2743,6 +2929,14 @@ func _render() -> void:
 	_render_board(enemy_board, enemy_units, false)
 	_render_board(player_board, player_units, true)
 	_render_draft()
+	if phase == "tianshu":
+		tianshu_view_only = false
+		_render_tianshu_overlay()
+		tianshu_overlay.visible = not is_instance_valid(menu_overlay) or not menu_overlay.visible
+	elif is_instance_valid(tianshu_overlay) and tianshu_overlay.visible and tianshu_view_only:
+		_render_tianshu_overlay()
+	elif is_instance_valid(tianshu_overlay) and tianshu_overlay.visible and not tianshu_view_only:
+		tianshu_overlay.hide()
 	_render_rosters()
 	_render_reserve()
 	draft_toggle_button.text = t("隐藏选将", "HIDE DRAFT") if not draft_user_hidden else t("显示选将", "SHOW DRAFT")
@@ -2769,7 +2963,8 @@ func _toggle_battle_pause() -> void:
 	_render()
 
 func _hint() -> void:
-	if phase == "draft": hint_label.text = t("选将时仍可拖拽调整阵型、从备战席上阵或将场上武将拖回备战席；点击场上武将可查看实时状态。", "During recruitment you may still drag to rearrange, deploy from reserve, return units to reserve, or tap a unit to inspect it.")
+	if phase == "tianshu": hint_label.text = t("先从三本彩色天书中选择一本；每张候选卡可独立免费刷新一次。", "Choose one of three prismatic codices; each card has its own free refresh.")
+	elif phase == "draft": hint_label.text = t("选将时仍可拖拽调整阵型、从备战席上阵或将场上武将拖回备战席；点击场上武将可查看实时状态。", "During recruitment you may still drag to rearrange, deploy from reserve, return units to reserve, or tap a unit to inspect it.")
 	elif phase == "placement": hint_label.text = t("前军强制前排且只打前排；中军站前排可随机打全场、站中排随机打前中排、站后排只打前排；后军任意站位随机攻击全场。", "Vanguard is front-only; Midguard in front randomly reaches all rows, in middle reaches front/middle, and in back reaches front only; Rearguard randomly reaches all rows.")
 	elif phase == "combat": hint_label.text = t("最终决战没有时间限制，直到一方主公倒下。", "The final battle has no time limit and ends only when a ruler falls.") if final_battle else t("行动期间全场暂停；本关持续 30 秒。", "All gauges pause during actions. This stage lasts 30 seconds.")
 	else: hint_label.text = t("对局结束，可重新开局再次挑战。", "Match complete. Start a new game to play again.")
@@ -3096,8 +3291,9 @@ func _render_draft() -> void:
 		card.disabled = battle_running or phase != "draft" or not _can_accept_hero(id)
 		card.pressed.connect(_choose_hero.bind(id))
 		option.add_child(card)
-		var can_refresh := choice_index < draft_refresh_available.size() and draft_refresh_available[choice_index]
-		var reroll := _button(t("↻ 仅刷新此选项（本轮1次）", "↻ REFRESH THIS OPTION (ONCE)")) if can_refresh else _button(t("✓ 本轮已刷新", "✓ REFRESH USED"))
+		var can_refresh := _tianshu_can_refresh_draft(choice_index)
+		var remaining := maxi(0, _tianshu_draft_refresh_limit() - tianshu_draft_refresh_used[choice_index])
+		var reroll := _button(t("↻ 仅刷新此选项（剩余%d次）" % remaining, "↻ REFRESH THIS OPTION (%d LEFT)" % remaining)) if can_refresh else _button(t("✓ 本轮已刷新", "✓ REFRESH USED"))
 		reroll.custom_minimum_size = Vector2(0, 44)
 		reroll.disabled = battle_running or phase != "draft" or not can_refresh
 		reroll.pressed.connect(_refresh_draft_choice.bind(choice_index))
