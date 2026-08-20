@@ -1123,7 +1123,7 @@ func _build_main_menu() -> void:
 	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_box.add_theme_constant_override("separation", -3)
 	title_box.add_child(_label("THREE KINGDOMS · TACTICAL AUTOBATTLER", 10, Color("#9e7c50")))
-	var home_title := _label("三国 · 羁绊战棋", 35 if mobile else 40, Color("#edc878"))
+	var home_title := _label("战三国 · 弈定九州", 35 if mobile else 40, Color("#edc878"))
 	home_title.add_theme_constant_override("outline_size", 6)
 	home_title.add_theme_color_override("font_outline_color", Color("#1b1007"))
 	title_box.add_child(home_title)
@@ -3324,8 +3324,8 @@ func _render() -> void:
 		battle_info_tabs.set_tab_title(1, t("实时战报", "BATTLE LOG"))
 		battle_info_tabs.set_tab_title(2, t("统计图表", "STATISTICS"))
 	if game_mode == "challenge": title_label.text = STAGE_NAMES[selected_stage - 1] + " · " + str(DIFFICULTIES[selected_difficulty].name)
-	elif game_mode == "tianshu": title_label.text = t("三国 · 羁绊战棋 · 天书演武", "THREE KINGDOMS · CODEX TRIAL")
-	else: title_label.text = t("三国 · 羁绊战棋 · 快速战斗", "THREE KINGDOMS · QUICK BATTLE")
+	elif game_mode == "tianshu": title_label.text = t("战三国 · 弈定九州 · 天书演武", "THREE KINGDOMS · CODEX TRIAL")
+	else: title_label.text = t("战三国 · 弈定九州 · 快速战斗", "THREE KINGDOMS · QUICK BATTLE")
 	if game_mode == "challenge": round_label.text = "闯关 %d / 50 · 回合 %d / 15" % [selected_stage, round_number]
 	elif game_mode == "tianshu": round_label.text = t("天书演武 ", "CODEX TRIAL ") + str(round_number) + " / " + str(ROUND_LIMIT)
 	else: round_label.text = t("最终决战", "FINAL BATTLE") if final_battle else t("关卡 ", "STAGE ") + str(round_number) + " / " + str(ROUND_LIMIT)
