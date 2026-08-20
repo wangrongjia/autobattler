@@ -1,6 +1,6 @@
 extends "res://ThreeKingdom/systems/progression_system.gd"
 
-# 天书只在本局有效。独立的天书演武，以及王者/地狱闯关会启用本系统。
+# 天书只在本局有效。独立的天书演武，以及所有难度的闯关均会启用本系统。
 const TIANSHU_BOOKS := {
 	"pojun":{"name":"破军天章", "en":"Army-Breaking Canon", "group":"通用·进攻", "effects":["所有我方武将兵略值 +8。", "所有我方武将兵略值 +16。"]},
 	"fengchi":{"name":"风驰电掣", "en":"Lightning March", "group":"通用·进攻", "effects":["所有我方武将技能冷却减少 0.25 秒。", "所有我方武将技能冷却减少 0.5 秒。"]},
@@ -70,7 +70,7 @@ var tianshu_draw_reason := ""
 var tianshu_generate_draft_on_finish := false
 
 func _tianshu_enabled() -> bool:
-	return game_mode == "tianshu" or (game_mode == "challenge" and selected_difficulty >= 3)
+	return game_mode == "tianshu" or game_mode == "challenge"
 
 func _reset_tianshu_run() -> void:
 	tianshu_levels.clear()

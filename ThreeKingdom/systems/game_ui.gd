@@ -1406,7 +1406,7 @@ func _on_challenge_difficulty_tab(index: int) -> void:
 func _render_stage_grid() -> void:
 	_clear_dynamic_children(challenge_stage_grid)
 	var difficulty := challenge_difficulty_options.selected
-	challenge_stage_title.text = "每个闯关包含 15 回合，每回合 30 秒；王者、地狱启用天书。解锁限制：%s" % ("开启" if limit_challenges else "关闭，全部关卡开放")
+	challenge_stage_title.text = "每个闯关包含 15 回合，每回合 30 秒；所有难度启用天书。解锁限制：%s" % ("开启" if limit_challenges else "关闭，全部关卡开放")
 	for stage in range(1, 51):
 		var unlocked := _is_stage_unlocked(stage, difficulty)
 		var best := int(stage_star_records.get(_progression_key(stage, difficulty), 0))
@@ -1490,11 +1490,11 @@ func _build_rune_overlay() -> void:
 	rune_resource_label = _label("", 18, Color("#e8c96e"))
 	rune_resource_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(rune_resource_label)
-	var draw := _button("抽取一次（500）")
+	var draw := _button("抽取一次（%d）" % RUNE_DRAW_COST)
 	_accent_button(draw, Color("#52755e"))
 	draw.pressed.connect(_on_draw_runes.bind(1))
 	toolbar.add_child(draw)
-	var draw_ten := _button("十连抽（5000）")
+	var draw_ten := _button("十连抽（%d）" % (RUNE_DRAW_COST * 10))
 	_accent_button(draw_ten, Color("#b98a4f"), true)
 	draw_ten.pressed.connect(_on_draw_runes.bind(10))
 	toolbar.add_child(draw_ten)
@@ -1775,7 +1775,7 @@ func _render_runes(message := "") -> void:
 func _on_draw_runes(count: int) -> void:
 	var results := _draw_runes(count)
 	if results.is_empty():
-		_render_runes("将魂不足，%d 连抽需要 %d 将魂。" % [count, count * 500])
+		_render_runes("将魂不足，%d 连抽需要 %d 将魂。" % [count, count * RUNE_DRAW_COST])
 		return
 	if count == 1:
 		_render_runes("抽取完成：" + _rune_display_name(results[0]) + "　" + _rune_description(results[0]))
@@ -1830,7 +1830,7 @@ func _build_talent_overlay() -> void:
 	navigation.add_child(talent_resource_label)
 	navigation.add_child(HSeparator.new())
 	for tree_id in ["all", "shu", "wei", "wu", "qun"]:
-		var tab := _button(("◆　" if tree_id == "all" else "◇　") + str(TALENT_TREES[tree_id].name))
+		var tab := _button(str(TALENT_TREES[tree_id].name))
 		tab.custom_minimum_size.y = 58
 		tab.add_theme_font_size_override("font_size", 18)
 		var faction := str(TALENT_TREES[tree_id].faction)
@@ -2238,6 +2238,11 @@ func _build_encyclopedia() -> void:
 	encyclopedia_bond_tab_button.custom_minimum_size = Vector2(135, 42)
 	encyclopedia_bond_tab_button.pressed.connect(_set_encyclopedia_mode.bind("bonds"))
 	header.add_child(encyclopedia_bond_tab_button)
+	encyclopedia_tianshu_tab_button = _button(t("天书图鉴", "TIANSHU CODEX"))
+	_accent_button(encyclopedia_tianshu_tab_button, Color("#4f8f9f"))
+	encyclopedia_tianshu_tab_button.custom_minimum_size = Vector2(135, 42)
+	encyclopedia_tianshu_tab_button.pressed.connect(_set_encyclopedia_mode.bind("tianshu"))
+	header.add_child(encyclopedia_tianshu_tab_button)
 	var close_button := _button(t("返回主菜单", "BACK"))
 	_accent_button(close_button, Color("#607b95"))
 	close_button.custom_minimum_size = Vector2(130, 42)
@@ -2298,7 +2303,7 @@ func _show_encyclopedia() -> void:
 	_render_encyclopedia()
 
 func _set_encyclopedia_mode(mode: String) -> void:
-	if mode not in ["heroes", "weapons", "bonds"]: return
+	if mode not in ["heroes", "weapons", "bonds", "tianshu"]: return
 	_hide_encyclopedia_preview()
 	encyclopedia_mode = mode
 	_render_encyclopedia()
@@ -2525,16 +2530,20 @@ func _render_encyclopedia() -> void:
 	encyclopedia_preview_hero_ids.clear()
 	var showing_weapons := encyclopedia_mode == "weapons"
 	var showing_bonds := encyclopedia_mode == "bonds"
+	var showing_tianshu := encyclopedia_mode == "tianshu"
 	if showing_weapons:
 		encyclopedia_title_label.text = t("蜀国武器图鉴", "SHU WEAPON CODEX")
 	elif showing_bonds:
 		encyclopedia_title_label.text = _faction_name(encyclopedia_faction) + t("国武将羁绊图", " BOND GRAPH")
+	elif showing_tianshu:
+		encyclopedia_title_label.text = t("天书图鉴", "TIANSHU CODEX")
 	else:
 		encyclopedia_title_label.text = t("武将图鉴", "HERO CODEX")
 	encyclopedia_hero_tab_button.modulate = Color("#f0c77a") if encyclopedia_mode == "heroes" else Color.WHITE
 	encyclopedia_weapon_tab_button.modulate = Color("#f0c77a") if showing_weapons else Color.WHITE
 	encyclopedia_bond_tab_button.modulate = Color("#f0c77a") if showing_bonds else Color.WHITE
-	encyclopedia_hero_filters.visible = not showing_weapons
+	encyclopedia_tianshu_tab_button.modulate = Color("#f0c77a") if showing_tianshu else Color.WHITE
+	encyclopedia_hero_filters.visible = not (showing_weapons or showing_tianshu)
 	for star_button in encyclopedia_star_filter_buttons:
 		star_button.visible = not showing_bonds
 	encyclopedia_bond_reset_button.visible = showing_bonds
@@ -2547,6 +2556,10 @@ func _render_encyclopedia() -> void:
 	if showing_bonds:
 		encyclopedia_bond_label.text = _bond_graph_help_text()
 		_render_encyclopedia_bond_graph()
+		return
+	if showing_tianshu:
+		encyclopedia_bond_label.text = t("天书演武与所有难度的闯关均启用；首次选择获得一级，再次选到同名天书升级为二级。当前收录 %d 本。" % TIANSHU_BOOKS.size(), "Tianshu powers the Codex Trial and all challenge difficulties; first pick grants level I, picking the same book again upgrades it to level II. %d entries in total." % TIANSHU_BOOKS.size())
+		_render_tianshu_encyclopedia()
 		return
 	encyclopedia_bond_label.text = _bond_detail(encyclopedia_faction)
 	for hero_id in heroes:
@@ -3026,6 +3039,47 @@ func _arrange_encyclopedia_bond_graph() -> void:
 	if encyclopedia_mode != "bonds" or not is_instance_valid(encyclopedia_bond_graph):
 		return
 	encyclopedia_bond_graph.scroll_offset = Vector2.ZERO
+
+func _tianshu_group_color(book: Dictionary) -> Color:
+	# 分类边框色：通用=金、阵营=阵营色、武将池=紫。
+	if book.has("faction"):
+		return FACTION_COLORS[str(book.faction)]
+	if book.has("pool"):
+		return Color("#705f8f")
+	return Color("#b98a4f")
+
+func _render_tianshu_encyclopedia() -> void:
+	var book_ids := TIANSHU_BOOKS.keys()
+	book_ids.sort_custom(func(a, b):
+		var group_a := str(TIANSHU_BOOKS[a].group)
+		var group_b := str(TIANSHU_BOOKS[b].group)
+		return group_a + str(TIANSHU_BOOKS[a].name) < group_b + str(TIANSHU_BOOKS[b].name)
+	)
+	for book_id in book_ids:
+		var book: Dictionary = TIANSHU_BOOKS[str(book_id)]
+		var accent := _tianshu_group_color(book)
+		var card := PanelContainer.new()
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_style(card, Color("#1a1d1f"), 12, accent, 2)
+		encyclopedia_grid.add_child(card)
+		var card_box := VBoxContainer.new()
+		card_box.add_theme_constant_override("separation", 8)
+		card.add_child(card_box)
+		var group_label := _label(str(book.group), 13, accent.lightened(0.25))
+		group_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card_box.add_child(group_label)
+		var book_name := _label(_tianshu_name(str(book_id)), 22, accent.lightened(0.34))
+		book_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card_box.add_child(book_name)
+		var effects: Array = book.get("effects", [])
+		var level_one := _label(t("一级：", "Level I: ") + (str(effects[0]) if effects.size() > 0 else ""), 14, Color("#e8e2cf"))
+		level_one.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		level_one.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card_box.add_child(level_one)
+		var level_two := _label(t("二级：", "Level II: ") + (str(effects[1]) if effects.size() > 1 else ""), 14, Color("#c9c0b1"))
+		level_two.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		level_two.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card_box.add_child(level_two)
 
 func _render_weapon_encyclopedia() -> void:
 	for weapon in SHU_WEAPON_CODEX:

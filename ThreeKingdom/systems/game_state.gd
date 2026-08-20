@@ -131,12 +131,13 @@ var draft_toggle_button: Button    # 显示/隐藏选将弹层的按钮
 
 var encyclopedia_overlay: Control  # 图鉴覆盖层
 var encyclopedia_grid: GridContainer  # 图鉴卡片网格(3 列)
-var encyclopedia_mode := "heroes"  # heroes 武将图鉴 / weapons 武器图鉴 / bonds 羁绊图
+var encyclopedia_mode := "heroes"  # heroes 武将图鉴 / weapons 武器图鉴 / bonds 羁绊图 / tianshu 天书图鉴
 var encyclopedia_title_label: Label
 var encyclopedia_hero_filters: Control
 var encyclopedia_hero_tab_button: Button
 var encyclopedia_weapon_tab_button: Button
 var encyclopedia_bond_tab_button: Button
+var encyclopedia_tianshu_tab_button: Button
 var encyclopedia_bond_reset_button: Button
 var encyclopedia_star_filter_buttons: Array[Button] = []
 var encyclopedia_content_scroll: ScrollContainer
@@ -308,7 +309,7 @@ func _add_extended_roster() -> void:
 func _register_hero(id: String, zh: String, en: String, faction: String, hp: int, skill_value: int, cooldown: float, range_tier: int, skill: String, zh_skill: String, ability: String, params: Dictionary, detail_zh: String, detail_en: String) -> void:
 	heroes[id] = {"zh":zh, "en":en, "f":faction, "hp":hp, "skill_value":skill_value, "cooldown":maxf(COOLDOWN_INPUT_MIN, cooldown), "range":range_tier, "skill":skill, "zh_skill":zh_skill, "summary":detail_zh, "en_summary":detail_en, "ability":ability, "ability_params":params, "detail_zh":detail_zh, "detail_en":detail_en}
 
-const FACTION_COLORS := {"shu": Color("#4ca968"), "wei": Color("#4f79c5"), "wu": Color("#d2644f"), "qun": Color("#a66dc4")}
+const FACTION_COLORS := {"shu": Color("#d2644f"), "wei": Color("#4f79c5"), "wu": Color("#4ca968"), "qun": Color("#a66dc4")}
 
 func _apply_registered_balance_baseline() -> void:
 	for hero_id in REGISTERED_HERO_BALANCE.BASE_STATS:
