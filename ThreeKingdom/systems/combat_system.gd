@@ -794,7 +794,7 @@ func _highest_action_enemy(unit: Dictionary):
 func _cast_sunjian_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.sunjian.ability_params
 	var hp_before := float(unit.hp)
-	var requested_cost := hp_before * float(params.get("sun_legacy_current_hp_cost", 0.80)) if bool(unit.get("sun_legacy", false)) else float(unit.max_hp) * float(params.get("max_hp_cost", 0.40))
+	var requested_cost := hp_before * (float(params.get("sun_legacy_current_hp_cost", 0.80)) if bool(unit.get("sun_legacy", false)) else float(params.get("current_hp_cost", 0.40)))
 	unit.hp = maxf(0.0, hp_before - minf(hp_before, requested_cost))
 	var hp_spent := hp_before - float(unit.hp)
 	var amount := hp_spent * float(params.get("damage_cost_ratio", 1.0))
@@ -933,6 +933,8 @@ func _cast_ganning_skill(unit: Dictionary) -> void:
 
 func _finish_sacrifice_death(unit: Dictionary) -> void:
 	if not unit.alive or float(unit.hp) > 0.0:
+		return
+	if _try_wu_equalize_and_recover(unit):
 		return
 	unit.alive = false
 	_on_unit_fallen(unit, null)
