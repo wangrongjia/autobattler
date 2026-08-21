@@ -349,6 +349,7 @@ func _start_battle() -> void:
 			unit.action_gain_mult = 1.0
 			unit.heal_multiplier = 1.0
 			unit.charm_multiplier = 1.0
+			unit.kill_buff = 0.0
 			unit.current_hp_ratio = 0.06
 			combat_units.append(unit)
 	battle_stats = {}
@@ -364,6 +365,8 @@ func _start_battle() -> void:
 
 func _finish_battle() -> void:
 	if not battle_running and phase != "combat": return
+	if has_method("_hide_unit_inspector"):
+		call("_hide_unit_inspector")
 	tick_timer.stop()
 	battle_running = false
 	battle_paused = false

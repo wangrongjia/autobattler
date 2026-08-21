@@ -57,8 +57,8 @@ func _initialize() -> void:
 	gaoshun.col = 0
 	game.combat_units = [chengong, lvbu, gaoshun]
 	game._apply_combo_bonds(false, false)
-	assert(is_equal_approx(float(lvbu.bond_cooldown), 9.6))
-	assert(is_equal_approx(float(gaoshun.bond_cooldown), 9.6))
+	assert(is_equal_approx(float(lvbu.bond_cooldown), 10.2))
+	assert(is_equal_approx(float(gaoshun.bond_cooldown), 10.2))
 	print("qun_rework:chengong_ok")
 
 	var diaochan := _unit(game, "player", "diaochan", 2, 4)
@@ -69,16 +69,18 @@ func _initialize() -> void:
 	game._cast_diaochan(diaochan)
 	var charmed := charmed_a if float(charmed_a.charm) > 0.0 else charmed_b
 	assert(is_equal_approx(float(charmed.charm), 10.8))
-	assert(is_equal_approx(float(diaochan.hp), 300.0))
+	assert(is_equal_approx(float(diaochan.hp), 400.0))
 	print("qun_rework:diaochan_ok")
 
 	var fragile_targets: Array = []
-	for index in 3:
-		fragile_targets.append(_durable_enemy(game, index, index))
+	for index in game.BOARD_COLUMNS:
+		fragile_targets.append(_durable_enemy(game, 0, index))
 	game.combat_units = [gaoshun, lvbu, chengong] + fragile_targets
 	game._cast_gaoshun_skill(gaoshun)
-	assert(fragile_targets.all(func(target): return is_equal_approx(float(target.vulnerable), 0.40)))
-	assert(fragile_targets.all(func(target): return is_equal_approx(float(target.vulnerable_time), 12.6)))
+	var fragile_hits: Array = fragile_targets.filter(func(target): return float(target.vulnerable) > 0.0)
+	assert(fragile_hits.size() == 3)
+	assert(fragile_hits.all(func(target): return is_equal_approx(float(target.vulnerable), 0.40)))
+	assert(fragile_hits.all(func(target): return is_equal_approx(float(target.vulnerable_time), 12.6)))
 	print("qun_rework:gaoshun_ok")
 
 	var yanliang := _unit(game, "player", "yanliang", 0, 0)
@@ -89,27 +91,28 @@ func _initialize() -> void:
 	var aura_col := _unit(game, "player", "lvbu", 0, 2)
 	game.combat_units = [yanliang, wenchou, qunzhanghe, gaolan, aura_row, aura_col]
 	game._apply_combo_bonds(false, false)
-	assert(is_equal_approx(float(aura_row.skill_value_bonus), 25.0))
-	assert(is_equal_approx(float(aura_col.skill_value_bonus), 25.0))
+	assert(is_equal_approx(float(aura_row.gaolan_skill_value_bonus), 25.0))
+	assert(is_equal_approx(float(aura_col.gaolan_skill_value_bonus), 25.0))
+	assert(game._inspector_buffs(aura_row).contains("高览·列阵扬威"))
 	for ally in game.combat_units:
 		ally.hp = float(100 + int(ally.col) * 10 + int(ally.row))
 	game._cast_qun_zhanghe_skill(qunzhanghe)
 	var shielded: Array = game.combat_units.filter(func(unit): return float(unit.shield) > 0.0)
-	assert(shielded.size() == 3)
+	assert(shielded.size() == 4)
 	assert(shielded.all(func(unit): return is_equal_approx(float(unit.shield), 450.0)))
 	print("qun_rework:hebei_aura_shield_ok")
 
 	var enemy_targets: Array = []
-	for index in 4:
-		var enemy := _durable_enemy(game, 1 if index < 2 else 2, index)
-		enemy_targets.append(enemy)
+	for row in game.BOARD_ROWS:
+		for col in game.BOARD_COLUMNS:
+			enemy_targets.append(_durable_enemy(game, row, col))
 	game.combat_units = [yanliang, wenchou, qunzhanghe, gaolan] + enemy_targets
 	game._apply_combo_bonds(false, false)
 	game.visual_events.clear()
 	game._cast_yanliang_skill(yanliang)
 	hits = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
 	assert(hits.size() == 4 and hits.all(func(event): return int(event.amount) == 290))
-	for enemy in enemy_targets: enemy.hp = enemy.max_hp; enemy.row = 0 if int(enemy.col) < 2 else 1
+	for enemy in enemy_targets: enemy.hp = enemy.max_hp
 	game.visual_events.clear()
 	game._cast_wenchou_skill(wenchou)
 	hits = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")

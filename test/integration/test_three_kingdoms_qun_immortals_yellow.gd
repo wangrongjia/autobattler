@@ -27,22 +27,23 @@ func _initialize() -> void:
 	print("qun_immortals:huatuo_ok")
 
 	var enemies: Array = []
-	for index in 4:
-		var enemy := _unit(game, "enemy", "caocao", index % 3, index)
-		enemy.max_hp = 10000.0
-		enemy.hp = enemy.max_hp
-		enemies.append(enemy)
+	for row in game.BOARD_ROWS:
+		for col in game.BOARD_COLUMNS:
+			var enemy := _unit(game, "enemy", "caocao", row, col)
+			enemy.max_hp = 10000.0
+			enemy.hp = enemy.max_hp
+			enemies.append(enemy)
 	game.combat_units = [yuji, huatuo, zuoci] + enemies
 	game._cast_yuji_skill(yuji)
 	var poisoned: Array = enemies.filter(func(enemy): return not (enemy.poison_effects as Array).is_empty())
 	assert(poisoned.size() == 3)
-	assert(poisoned.all(func(enemy): return int(enemy.poison_effects[0].stacks) == 180))
+	assert(poisoned.all(func(enemy): return int(enemy.poison_effects[0].stacks) == 140))
 	var poison_hp := float(poisoned[0].hp)
 	game._process_statuses(1.0)
-	assert(is_equal_approx(poison_hp - float(poisoned[0].hp), 180.0))
-	assert(int(poisoned[0].poison_effects[0].stacks) == 90)
+	assert(is_equal_approx(poison_hp - float(poisoned[0].hp), 140.0))
+	assert(int(poisoned[0].poison_effects[0].stacks) == 70)
 	game._process_statuses(1.0)
-	assert(int(poisoned[0].poison_effects[0].stacks) == 45)
+	assert(int(poisoned[0].poison_effects[0].stacks) == 35)
 	print("qun_immortals:yuji_decay_ok")
 
 	huatuo.hp = 100.0
@@ -53,9 +54,9 @@ func _initialize() -> void:
 	game.visual_events.clear()
 	before = float(huatuo.hp)
 	game._cast_zuoci_skill(zuoci)
-	assert(is_equal_approx(float(huatuo.hp) - before, 220.0))
+	assert(is_equal_approx(float(huatuo.hp) - before, 270.0))
 	var thunder: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
-	assert(thunder.size() == 2 and thunder.all(func(event): return int(event.amount) == 100))
+	assert(thunder.size() == 2 and thunder.all(func(event): return int(event.amount) == 200))
 	print("qun_immortals:zuoci_ok")
 
 	var zhangjiao := _unit(game, "player", "zhangjiao", 2, 0)
@@ -67,7 +68,7 @@ func _initialize() -> void:
 	game.rng.seed = 17
 	game._cast_zhangjiao_skill(zhangjiao)
 	var lightning: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage")
-	assert(lightning.size() == 3 and lightning.all(func(event): return int(event.amount) == 420))
+	assert(lightning.size() == 2 and lightning.all(func(event): return int(event.amount) == 420))
 	print("qun_yellow:zhangjiao_ok")
 
 	for enemy in enemies: enemy.skill_debuff = 0.0; enemy.skill_debuff_time = 0.0
@@ -92,6 +93,8 @@ func _initialize() -> void:
 	assert(zhangbao.alive and int(zhangbao.zhangbao_revives_used) == 2)
 	game._damage(killer, zhangbao, 100000.0, "physical", "revive test")
 	assert(not zhangbao.alive)
+	var death_thunder: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "damage" and str(event.get("source_id", "")) == str(zhangjiao.id) and int(event.get("amount", 0)) == 600)
+	assert(death_thunder.size() == 2)
 	print("qun_yellow:zhangbao_ok")
 
 	game.tick_timer.stop()
