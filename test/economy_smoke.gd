@@ -17,9 +17,9 @@ func _initialize() -> void:
 	assert(settlement.interest == 50 and settlement.income == 150)
 	assert(game.gold == 700)
 
-	game.talent_levels = {"all:开源":1, "all:生财":2, "all:重利":2}
-	assert(game._gold_interest_cap() == 80)
-	assert(game._round_base_gold_income() == 190)
+	game.talent_levels = {"all:神算":1, "all:百炼":2}
+	assert(game._gold_interest_cap() == 50)
+	assert(game._round_base_gold_income() == 150)
 
 	game.talent_levels = {}
 	game.round_number = 3
@@ -74,10 +74,10 @@ func _initialize() -> void:
 	var killer = game._make_roster_unit("player", "zhaoyun")
 	var enemy = game._make_roster_unit("enemy", "caocao")
 	game._tianshu_on_kill(killer, enemy)
-	assert(game.gold == 70 and float(killer.get("tianshu_kill_strategy_bonus", 0.0)) == 5.0)
+	assert(game.gold == 80 and float(killer.get("tianshu_kill_strategy_bonus", 0.0)) == 20.0)
 	var ally = game._make_roster_unit("player", "zhangfei")
 	game._tianshu_on_kill(enemy, ally)
-	assert(game.gold == 160)
+	assert(game.gold == 170)
 
 	game.gold = 987
 	game.economy_income_round = 7

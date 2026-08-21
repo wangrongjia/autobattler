@@ -15,11 +15,11 @@ const STAGE_NAMES := [
 	"上方谷之战", "剑阁之战", "成都之战", "建业之战", "洛阳终章之战"
 ]
 const DIFFICULTIES := [
-	{"name":"简单", "en":"EASY", "hp":0.8},
-	{"name":"一般", "en":"NORMAL", "hp":1.0},
-	{"name":"困难", "en":"HARD", "hp":1.2},
-	{"name":"王者", "en":"KING", "hp":1.5},
-	{"name":"地狱", "en":"HELL", "hp":2.0}
+	{"name":"简单", "en":"EASY", "hp":1.0, "strategy":0},
+	{"name":"一般", "en":"NORMAL", "hp":1.2, "strategy":10},
+	{"name":"困难", "en":"HARD", "hp":1.5, "strategy":20},
+	{"name":"王者", "en":"KING", "hp":1.7, "strategy":30},
+	{"name":"地狱", "en":"HELL", "hp":2.2, "strategy":50}
 ]
 const RUNE_TIERS := [
 	{"name":"一阶", "color":"白", "hex":"#dedede", "chance":0.50, "power":4.0, "balanced":2.5, "extreme":5.0, "penalty":1.0, "convert":100},
@@ -51,9 +51,8 @@ const TALENT_TREES := {
 		["厚德",1,5,40.0,0.0,0.0,0], ["修文",1,5,0.0,1.0,0.0,0], ["敏行",1,5,0.0,0.0,0.05,0],
 		["强魄",2,5,60.0,0.0,0.0,8], ["韬晦",2,5,0.0,1.5,0.0,8], ["迅捷",2,5,0.0,0.0,0.075,8],
 		["金坚",3,4,80.0,0.0,0.0,20], ["睿略",3,4,0.0,2.0,0.0,20], ["疾驰",3,4,0.0,0.0,0.1,20],
-		["明君",4,2,0.0,0.0,0.0,34], ["开源",4,1,0.0,0.0,0.0,34], ["生财",4,2,0.0,0.0,0.0,34],
-		["重利",4,2,0.0,0.0,0.0,34], ["百炼",4,2,0.0,0.0,0.0,34],
-		["天命",5,1,0.0,0.0,0.0,40], ["群英",5,1,200.0,5.0,0.25,40], ["长治",5,1,0.0,0.0,0.0,40]
+		["明君",4,2,0.0,0.0,0.0,34], ["神算",4,1,0.0,0.0,0.0,34], ["百炼",4,2,0.0,0.0,0.0,34],
+		["天命",5,1,0.0,0.0,0.0,40], ["群英",5,1,400.0,10.0,0.5,40], ["长治",5,1,0.0,0.0,0.0,40]
 	]},
 	"shu":{"name":"蜀·汉室中兴", "faction":"shu", "nodes":[
 		["仁厚",1,2,60.0,0.0,0.0,0], ["睿思",1,2,0.0,1.0,0.0,0], ["笃行",1,2,0.0,0.0,0.05,0],
@@ -111,10 +110,12 @@ func _load_progression() -> void:
 	rune_inventory = data.get("rune_inventory", []) if data.get("rune_inventory", []) is Array else []
 	rune_loadouts = data.get("rune_loadouts", {}) if data.get("rune_loadouts", {}) is Dictionary else {}
 	talent_levels = data.get("talent_levels", {}) if data.get("talent_levels", {}) is Dictionary else {}
-	var refunded_removed_talent := int(talent_levels.get("all:神算", 0)) * 5
+	var refunded_removed_talent := 0
+	for removed_name in ["开源", "生财", "重利"]:
+		refunded_removed_talent += int(talent_levels.get("all:" + removed_name, 0)) * 5
+		talent_levels.erase("all:" + removed_name)
 	if refunded_removed_talent > 0:
 		general_stars += refunded_removed_talent
-		talent_levels.erase("all:神算")
 	home_hero_id = str(data.get("home_hero_id", "sunshangxiang"))
 	if not heroes.has(home_hero_id): home_hero_id = "sunshangxiang"
 	next_rune_id = maxi(1, int(data.get("next_rune_id", 1)))
@@ -163,15 +164,20 @@ func _is_stage_unlocked(stage: int, difficulty: int) -> bool:
 	return _is_stage_unlocked(stage, 0) and int(stage_star_records.get(_progression_key(stage, difficulty - 1), 0)) > 0
 
 func _challenge_strategy_bonus() -> float:
-	return float(selected_stage * 5) if game_mode == "challenge" else float(enemy_strategy_bonus)
+	if game_mode != "challenge": return float(enemy_strategy_bonus)
+	return float(selected_stage * 5 + int(DIFFICULTIES[selected_difficulty].strategy))
+
+func _challenge_stage_strategy_bonus(stage := selected_stage) -> int:
+	return clampi(int(stage), 1, STAGE_NAMES.size()) * 5
+
+func _challenge_difficulty_strategy_bonus(difficulty := selected_difficulty) -> int:
+	return int(DIFFICULTIES[clampi(int(difficulty), 0, DIFFICULTIES.size() - 1)].strategy)
 
 func _challenge_enemy_hp_multiplier() -> float:
 	return float(DIFFICULTIES[selected_difficulty].hp) if game_mode == "challenge" else 1.0
 
 func _challenge_stars_for_hp() -> int:
-	var max_hp := float(_player_ruler_max_hp())
-	var ratio := float(player_ruler_hp) / maxf(1.0, max_hp)
-	return 3 if ratio >= 0.8 else (2 if ratio >= 0.5 else 1)
+	return 3 if player_ruler_hp > 40000 else (2 if player_ruler_hp > 25000 else 1)
 
 func _challenge_soul_reward(stars: int) -> int:
 	return 300 + 50 * (selected_stage - 1) + 50 * selected_difficulty + 100 * (stars - 1)
@@ -280,7 +286,7 @@ func _convert_rune(uid: int):
 	var old = _rune_by_uid(uid)
 	if old == null: return null
 	var tier := int(old.tier)
-	var discount := 1.0 - 0.05 * float(_talent_level("all", "百炼"))
+	var discount := 1.0 - 0.10 * float(_talent_level("all", "百炼"))
 	var cost := ceili(float(RUNE_TIERS[tier - 1].convert) * discount)
 	if general_souls < cost: return null
 	general_souls -= cost
@@ -352,22 +358,20 @@ func _talent_node(tree_id: String, node_name: String) -> Array:
 
 func _talent_effect_description(tree_id: String, node_name: String) -> String:
 	var specials := {
-		"all:明君":"每级使我方主公最大生命值增加 600。",
-		"all:开源":"初始金币增加 150。",
-		"all:生财":"每级使每回合基础收入增加 20，满级每回合增加 40。",
-		"all:重利":"每级使利息上限增加 15，满级由 50 提高到 80。",
-		"all:百炼":"每级使符文转换消耗降低 5%，满级降低 10%。",
-		"all:天命":"所有阵营羁绊数值额外提高 10%。",
-		"all:群英":"所有武将生命 +200、兵略 +5、技能冷却减少 0.25 秒。",
-		"all:长治":"我方主公最大生命值增加 1500。",
-		"shu:汉室坚壁":"每级使蜀阵营 2/5/8 人羁绊减伤各增加 0.5%，满级变为 3%/6%/9%。",
-		"shu:桃园同心":"每级使蜀阵营 8 人羁绊的减伤叠层上限 +1，满级由 3 层提高到 5 层。",
-		"wei:中枢令典":"每级使魏阵营 2/5/8 人羁绊控制强化各增加 0.5%，满级变为 3%/6%/9%。",
-		"wei:乘胜追击":"每级使魏阵营 8 人羁绊对减益目标伤害提高 2%，满级由 8%提高到 12%。",
-		"wu:三世基业":"每级使吴阵营 2/5/8 人羁绊生命加成各增加 0.5%，满级变为 3%/6%/9%。",
-		"wu:同舟共济":"1级：8 人羁绊均摊后回复由 5%提高到 8%；2级：触发冷却由 30 秒缩短到 24 秒。",
-		"qun:烽火燎原":"每级使群阵营 2/5/8 人羁绊冷却强化各增加 0.5%，满级变为 3%/6%/9%。",
-		"qun:逐鹿中原":"每级使群阵营 8 人羁绊的技能连发概率提高 2%，满级由 8%提高到 12%。"
+		"all:明君":"每级使我方主公最大生命值增加 2000，满级增加 4000。",
+		"all:神算":"每场战斗开局随机 3 名友军行动条 +30。",
+		"all:百炼":"每级使符文转换消耗降低 10%，满级降低 20%。",
+		"all:天命":"所有阵营羁绊数值额外提高 20%。",
+		"all:群英":"所有武将生命 +400、兵略 +10、技能冷却减少 0.5 秒。",
+		"all:长治":"我方主公最大生命值增加 5000。",
+		"shu:汉室坚壁":"每级使蜀阵营 2/5/8 人羁绊减伤各增加 1%，满级变为 4%/7%/10%。",
+		"shu:桃园同心":"每级使蜀阵营 8 人羁绊叠层上限 +1、每层减伤 +1%、持续时间 +1 秒。",
+		"wei:中枢令典":"每级使魏阵营 2/5/8 人羁绊控制强化各增加 1%，满级变为 4%/7%/10%。",
+		"wei:乘胜追击":"每级使魏阵营 8 人羁绊对减益目标伤害提高 4%，满级由 8%提高到 16%。",
+		"wu:三世基业":"每级使吴阵营 2/5/8 人羁绊生命加成各增加 1%，满级变为 4%/7%/10%。",
+		"wu:同舟共济":"1级：8 人羁绊均摊后回复由 5%提高到 7%；2级提高到 9%。",
+		"qun:烽火燎原":"每级使群阵营 2/5/8 人羁绊冷却强化各增加 1%，满级变为 4%/7%/10%。",
+		"qun:逐鹿中原":"每级使群阵营 8 人羁绊的技能连发概率提高 4%，满级由 8%提高到 16%。"
 	}
 	var key := _talent_key(tree_id, node_name)
 	if specials.has(key): return str(specials[key])
@@ -451,18 +455,18 @@ func _apply_progression_to_new_unit(unit: Dictionary) -> void:
 	unit.rune_cooldown_reduction = float(runes.cooldown)
 
 func _player_ruler_max_hp() -> int:
-	return RULER_MAX_HP + 600 * _talent_level("all", "明君") + 1500 * _talent_level("all", "长治")
+	return RULER_MAX_HP + 2000 * _talent_level("all", "明君") + 5000 * _talent_level("all", "长治")
 
 func _talent_bond_multiplier(team: String) -> float:
-	return 1.1 if team == "player" and _talent_level("all", "天命") > 0 else 1.0
+	return 1.2 if team == "player" and _talent_level("all", "天命") > 0 else 1.0
 
 func _talent_faction_tier_bonus(team: String, faction: String) -> float:
 	if team != "player": return 0.0
 	var node_names := {"shu":"汉室坚壁", "wei":"中枢令典", "wu":"三世基业", "qun":"烽火燎原"}
-	return 0.005 * float(_talent_level(faction, str(node_names[faction])))
+	return 0.01 * float(_talent_level(faction, str(node_names[faction])))
 
 func _talent_opening_action_bonus() -> bool:
-	return false
+	return _talent_level("all", "神算") > 0
 
 func _set_home_hero(hero_id: String) -> void:
 	if not heroes.has(hero_id): return

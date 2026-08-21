@@ -143,6 +143,9 @@ var encyclopedia_star_filter_buttons: Array[Button] = []
 var encyclopedia_content_scroll: ScrollContainer
 var encyclopedia_bond_graph: GraphEdit
 var encyclopedia_faction := "shu"  # 图鉴当前查看的阵营
+var encyclopedia_tianshu_faction := "all" # 天书图鉴：通用 / 蜀 / 魏 / 吴 / 群
+var encyclopedia_tianshu_filters: Control
+var encyclopedia_tianshu_filter_buttons := {}
 var encyclopedia_star_level := 1   # 兼容旧界面数据；现版本只有一星
 var encyclopedia_bond_label: Label # 图鉴顶部的阵营羁绊说明
 var encyclopedia_preview_overlay: Control # 图鉴武将放大预览层

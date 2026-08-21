@@ -16,7 +16,7 @@ var economy_income_round := 0
 var tianshu_replacements_this_round := 0
 
 func _reset_economy_run() -> void:
-	gold = INITIAL_GOLD + 150 * _talent_level("all", "开源")
+	gold = INITIAL_GOLD
 	economy_income_round = 0
 	tianshu_replacements_this_round = 0
 
@@ -27,14 +27,13 @@ func _end_economy_run() -> void:
 
 func _round_base_gold_income() -> int:
 	var result := ROUND_BASE_INCOME + maxi(0, round_number - 1) * ROUND_INCOME_GROWTH
-	result += 20 * _talent_level("all", "生财")
 	result += 50 * _tianshu_level("tuntian_kaifu")
 	if _tianshu_level("fujia_tianxia") >= 2:
 		result += 20
 	return result
 
 func _gold_interest_cap() -> int:
-	var result := BASE_INTEREST_CAP + 15 * _talent_level("all", "重利")
+	var result := BASE_INTEREST_CAP
 	var rich_level := _tianshu_level("fujia_tianxia")
 	if rich_level == 1:
 		result += 20

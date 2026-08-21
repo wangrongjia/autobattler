@@ -6,10 +6,52 @@ func _initialize() -> void:
 	root.add_child(game)
 	await process_frame
 	assert(game._is_mobile_ui())
-	assert(game.menu_overlay.get_child(0).get_child(0).custom_minimum_size.x >= 700.0)
+	assert(game.menu_overlay.visible)
+	game.limit_challenges = false
+	game._show_battle_menu()
+	await process_frame
+	assert(game.challenge_stage_grid.get_child_count() == 50)
+	assert(game.challenge_stage_scroll.get_meta("touch_scroll_enabled", false))
+	assert(game.challenge_detail_scroll.get_meta("touch_scroll_enabled", false))
+	var stage_bar: VScrollBar = game.challenge_stage_scroll.get_v_scroll_bar()
+	assert(stage_bar.max_value > stage_bar.page)
+	var stage_swipe := InputEventScreenDrag.new()
+	stage_swipe.relative = Vector2(0, -180)
+	game.challenge_stage_grid.get_child(0).emit_signal("gui_input", stage_swipe)
+	assert(game.challenge_stage_scroll.scroll_vertical > 0)
+	game.challenge_stage_scroll.scroll_vertical = 100000
+	await process_frame
+	assert(game.challenge_stage_scroll.scroll_vertical >= int(stage_bar.max_value - stage_bar.page) - 2)
+	var stage_view_rect: Rect2 = game.challenge_stage_scroll.get_global_rect()
+	var last_stage_rect: Rect2 = game.challenge_stage_grid.get_child(49).get_global_rect()
+	assert(last_stage_rect.position.y >= stage_view_rect.position.y - 2.0)
+	assert(last_stage_rect.end.y <= stage_view_rect.end.y + 2.0)
+	var detail_bar: VScrollBar = game.challenge_detail_scroll.get_v_scroll_bar()
+	if detail_bar.max_value > detail_bar.page:
+		var detail_swipe := InputEventScreenDrag.new()
+		detail_swipe.relative = Vector2(0, -120)
+		game.challenge_detail_scroll.emit_signal("gui_input", detail_swipe)
+		assert(game.challenge_detail_scroll.scroll_vertical > 0)
+	var viewport_height: float = game.get_viewport_rect().size.y
+	assert(game.challenge_start_button.visible)
+	assert(game.challenge_start_button.get_global_rect().end.y <= viewport_height + 1.0)
+	game.battle_menu_overlay.hide()
 	game._show_encyclopedia()
 	assert(game.encyclopedia_grid.columns == 2)
 	assert(game.encyclopedia_content_scroll.get_meta("touch_scroll_enabled", false))
+	assert(game.encyclopedia_grid.get_meta("touch_scroll_enabled", false))
+	game._set_encyclopedia_mode("tianshu")
+	assert(game.encyclopedia_tianshu_filters.visible)
+	for faction in ["all", "shu", "wei", "wu", "qun"]:
+		game._set_encyclopedia_tianshu_faction(faction)
+		assert(game.encyclopedia_grid.get_child_count() > 0)
+	game._set_encyclopedia_tianshu_faction("all")
+	await process_frame
+	assert(game.encyclopedia_grid.get_child_count() == 24)
+	var swipe := InputEventScreenDrag.new()
+	swipe.relative = Vector2(0, -80)
+	game.encyclopedia_grid.emit_signal("gui_input", swipe)
+	assert(game.encyclopedia_content_scroll.scroll_vertical > 0)
 	assert(game.rune_inventory_scroll.get_meta("touch_scroll_enabled", false))
 	game._set_encyclopedia_mode("bonds")
 	assert(game.encyclopedia_bond_graph.get_meta("touch_pan_enabled", false))

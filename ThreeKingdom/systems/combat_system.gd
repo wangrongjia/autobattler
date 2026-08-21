@@ -162,7 +162,7 @@ func _apply_opening_skills() -> void:
 	if _talent_opening_action_bonus():
 		var allies := combat_units.filter(func(unit): return unit.team == "player" and unit.alive)
 		allies.shuffle()
-		for index in mini(2, allies.size()): allies[index].action = minf(ACTION_MAX, float(allies[index].action) + 30.0)
+		for index in mini(3, allies.size()): allies[index].action = minf(ACTION_MAX, float(allies[index].action) + 30.0)
 
 func _apply_combo_bonds(opening := true, announce := true) -> void:
 	for unit in combat_units:
@@ -605,7 +605,8 @@ func _process_statuses(delta: float = TICK) -> void:
 			var decay := float(unit.get("shu_damage_decay_time", 0.0)) - delta
 			if decay <= 0.0:
 				unit.shu_damage_stacks = int(unit.get("shu_damage_stacks", 0)) - 1
-				unit.shu_damage_decay_time = 3.0 if int(unit.shu_damage_stacks) > 0 else 0.0
+				var shu_talent_duration := _talent_level("shu", "桃园同心") if unit.team == "player" else 0
+				unit.shu_damage_decay_time = 3.0 + shu_talent_duration if int(unit.shu_damage_stacks) > 0 else 0.0
 			else:
 				unit.shu_damage_decay_time = decay
 		if float(unit.get("regen_time", 0.0)) > 0.0:
@@ -710,7 +711,7 @@ func _perform_action(unit: Dictionary) -> void:
 	visual_events.append({"kind":"charge", "source_id":unit.id, "target_id":unit.id, "amount":0, "style":"magic"})
 	_cast_active_skill(unit)
 	_after_active_skill(unit)
-	var qun_repeat_chance := 0.08 + (0.02 * _talent_level("qun", "逐鹿中原") if unit.team == "player" else 0.0)
+	var qun_repeat_chance := 0.08 + (0.04 * _talent_level("qun", "逐鹿中原") if unit.team == "player" else 0.0)
 	if heroes[unit.hero_id].f == "qun" and int(unit.get("faction_tier", 0)) >= 3 and not _has_winner() and rng.randf() < qun_repeat_chance:
 		_log("[color=#d59af0]" + t("【乱世争衡】触发连续施法！", "[Chaos Struggle] Double cast triggered!") + "[/color]")
 		visual_events.append({"kind":"charge", "source_id":unit.id, "target_id":unit.id, "amount":0, "style":"magic"})
@@ -2386,16 +2387,8 @@ func _heal_with_overflow(source: Dictionary, target, amount: float, visual_kind 
 		overflow -= restored
 		if restored > 0.0:
 			visual_events.append({"kind":visual_kind, "source_id":source.id, "target_id":target.id, "amount":round(restored), "style":"heal", "nonblocking":nonblocking})
-	_tianshu_on_overflow(source, target, overflow)
-	var ruler_restored := 0.0
-	if overflow > 0.0:
-		var ruler_hp: int = player_ruler_hp if source.team == "player" else enemy_ruler_hp
-		ruler_restored = minf(overflow, float(RULER_MAX_HP - ruler_hp))
-		if source.team == "player": player_ruler_hp += int(round(ruler_restored))
-		else: enemy_ruler_hp += int(round(ruler_restored))
-		if ruler_restored > 0.0:
-			visual_events.append({"kind":visual_kind, "source_id":source.id, "target_id":"", "team":source.team, "row":-1, "col":-1, "amount":round(ruler_restored), "ruler":true, "style":"heal", "nonblocking":nonblocking})
-	_add_stat(source, "healing", amount)
+	var ruler_restored := _tianshu_on_overflow(source, target, overflow, visual_kind, nonblocking)
+	_add_stat(source, "healing", amount - overflow + ruler_restored)
 
 func _heal_unit_only(source: Dictionary, target: Dictionary, amount: float, visual_group := "", group_style := "") -> float:
 	if source == null or target == null or not target.alive or amount <= 0.0: return 0.0
@@ -2403,10 +2396,11 @@ func _heal_unit_only(source: Dictionary, target: Dictionary, amount: float, visu
 	amount *= 1.0 - clampf(float(target.get("grievous", 0.0)), 0.0, 0.95)
 	var missing := maxf(0.0, float(target.max_hp) - float(target.hp))
 	var restored := minf(missing, amount)
-	if restored <= 0.0: return 0.0
-	target.hp += restored
-	visual_events.append({"kind":"heal", "source_id":source.id, "target_id":target.id, "amount":round(restored), "style":"heal", "nonblocking":true, "visual_group":visual_group, "group_style":group_style})
-	_add_stat(source, "healing", restored)
+	if restored > 0.0:
+		target.hp += restored
+		visual_events.append({"kind":"heal", "source_id":source.id, "target_id":target.id, "amount":round(restored), "style":"heal", "nonblocking":true, "visual_group":visual_group, "group_style":group_style})
+	var ruler_restored := _tianshu_on_overflow(source, target, amount - restored, "heal", true)
+	_add_stat(source, "healing", restored + ruler_restored)
 	return restored
 
 func _ability_enemy_tile(unit: Dictionary, _params: Dictionary) -> Dictionary:
@@ -2487,7 +2481,7 @@ func _try_wu_equalize_and_recover(target: Dictionary) -> bool:
 	if wu_allies.size() < FACTION_BOND_TIERS[2]:
 		return false
 	var wu_talent_level := _talent_level("wu", "同舟共济") if target.team == "player" else 0
-	state.wu_equalize_cooldown = 24.0 if wu_talent_level >= 2 else 30.0
+	state.wu_equalize_cooldown = 30.0
 	faction_battle_state[target.team] = state
 	var total_hp := 0.0
 	var total_max_hp := 0.0
@@ -2496,12 +2490,12 @@ func _try_wu_equalize_and_recover(target: Dictionary) -> bool:
 		total_max_hp += maxf(1.0, float(ally.max_hp))
 	var shared_ratio := clampf(total_hp / maxf(1.0, total_max_hp), 0.0, 1.0)
 	for ally in wu_allies:
-		var before := float(ally.hp)
-		var recovery_ratio := 0.08 if wu_talent_level >= 1 else 0.05
-		ally.hp = minf(float(ally.max_hp), float(ally.max_hp) * shared_ratio + float(ally.max_hp) * recovery_ratio)
-		var restored := maxf(0.0, float(ally.hp) - before)
-		visual_events.append({"kind":"heal", "source_id":target.id, "target_id":ally.id, "amount":round(restored), "style":"heal", "nonblocking":true})
-	_log("[color=#e58f78]" + t("【江东联动】濒死触发：吴将均摊生命并恢复5%最大生命（每30秒一次）！", "[Jiangdong Relay] Lethal hit equalizes Wu health and restores 5% max HP (once per 30s)!") + "[/color]")
+		var recovery_ratio := 0.05 + 0.02 * wu_talent_level
+		ally.hp = float(ally.max_hp) * shared_ratio
+		_heal_with_overflow(target, ally, float(ally.max_hp) * recovery_ratio, "heal", true)
+	var recovery_percent := roundi((0.05 + 0.02 * wu_talent_level) * 100.0)
+	var trigger_text := "生命低于 %d%%" % roundi(_tianshu_wu_equalize_threshold(target) * 100.0) if _tianshu_wu_equalize_threshold(target) > 0.0 else "濒死"
+	_log("[color=#e58f78]【江东联动】%s触发：吴将均摊生命并恢复 %d%% 最大生命（每30秒一次）！[/color]" % [trigger_text, recovery_percent])
 	return target.hp > 0.0
 
 func _damage(source, target: Dictionary, amount: float, damage_type: String, label: String, visual_group := "", group_style := "", scales_with_skill := false, propagate_links := true, ignore_shield := false) -> float:
@@ -2526,7 +2520,7 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		value *= 1.0 + source.damage_buff + float(source.get("timed_damage_buff", 0.0)) + float(source.get("liushan_aura_damage_bonus", 0.0)) + float(source.get("kill_buff", 0.0))
 		value *= maxf(0.0, 1.0 - float(source.get("skill_debuff", 0.0)))
 		if heroes[source.hero_id].f == "wei" and int(source.get("faction_tier", 0)) >= 3 and _has_any_debuff(target):
-			value *= 1.08 + (0.02 * _talent_level("wei", "乘胜追击") if source.team == "player" else 0.0)
+			value *= 1.08 + (0.04 * _talent_level("wei", "乘胜追击") if source.team == "player" else 0.0)
 		value *= _tianshu_damage_multiplier(source, target, direct_tianshu_damage)
 	var freeze_remaining := float(target.get("freeze", 0.0))
 	if freeze_remaining > 0.0:
@@ -2553,7 +2547,8 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	var faction_reduction := float(target.get("faction_damage_reduction", 0.0))
 	if heroes[target.hero_id].f == "shu" and int(target.get("faction_tier", 0)) >= 3:
 		var shu_stack_cap := 3 + (_talent_level("shu", "桃园同心") if target.team == "player" else 0)
-		faction_reduction += 0.03 * clampi(int(target.get("shu_damage_stacks", 0)), 0, shu_stack_cap)
+		var shu_talent_level := _talent_level("shu", "桃园同心") if target.team == "player" else 0
+		faction_reduction += (0.03 + 0.01 * shu_talent_level) * clampi(int(target.get("shu_damage_stacks", 0)), 0, shu_stack_cap)
 	value *= 1.0 - clampf(faction_reduction, 0.0, 0.95)
 	if damage_type == "magic" and float(target.get("strategy_mark", 0.0)) > 0.0 and source != null:
 		value *= 1.30
@@ -2575,7 +2570,7 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		var shu_stack_cap := 3 + (_talent_level("shu", "桃园同心") if target.team == "player" else 0)
 		target.shu_damage_stacks = mini(shu_stack_cap, int(target.get("shu_damage_stacks", 0)) + 1)
 		if float(target.get("shu_damage_decay_time", 0.0)) <= 0.0:
-			target.shu_damage_decay_time = 3.0
+			target.shu_damage_decay_time = 3.0 + (_talent_level("shu", "桃园同心") if target.team == "player" else 0)
 	if source != null: _apply_all_lifesteal(source, actual_damage)
 	_tianshu_on_damage(source, target, actual_damage, direct_tianshu_damage)
 	if propagate_links and actual_damage > 0.0: _propagate_pangtong_link(target, actual_damage, visual_group)
@@ -2583,6 +2578,10 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	visual_events.append({"kind":"damage", "source_id":"" if source == null else source.id, "target_id":target.id, "team":target.team, "row":target.row, "col":target.col, "amount":round(value), "skill":true, "style":effect_style, "visual_group":visual_group, "group_style":group_style})
 	var source_name := t("环境", "Effect") if source == null else _hero_name(source.hero_id)
 	_log(source_name + t(" 对 ", " hits ") + _hero_name(target.hero_id) + t(" 造成 ", " for ") + str(round(value)) + t(" 伤害（", " damage (") + label + "）")
+	var wu_equalize_threshold := _tianshu_wu_equalize_threshold(target)
+	if target.hp > 0.0 and wu_equalize_threshold > 0.0 and float(target.hp) / maxf(1.0, float(target.max_hp)) < wu_equalize_threshold:
+		if _try_wu_equalize_and_recover(target):
+			return actual_damage
 	if target.hp <= 0:
 		if _tianshu_try_prevent_death(target):
 			return actual_damage

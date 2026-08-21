@@ -17,9 +17,15 @@ var home_faction_label: Label
 var home_motto_label: Label
 var battle_menu_overlay: Control
 var challenge_stage_grid: GridContainer
+var challenge_stage_scroll: ScrollContainer
+var challenge_detail_scroll: ScrollContainer
 var challenge_difficulty_options: OptionButton
 var challenge_stage_title: Label
 var challenge_difficulty_buttons: Array[Button] = []
+var challenge_detail_stage_label: Label
+var challenge_detail_bonus_label: Label
+var challenge_detail_star_label: Label
+var challenge_start_button: Button
 var rune_overlay: Control
 var rune_inventory_box: Container
 var rune_inventory_scroll: ScrollContainer
@@ -264,12 +270,6 @@ func _build_ui() -> void:
 	round_box.add_child(phase_label)
 	round_panel.add_child(round_box)
 	header.add_child(round_panel)
-	tianshu_header_button = _button(t("天书", "CODEX"))
-	_accent_button(tianshu_header_button, Color("#9e68bd"))
-	tianshu_header_button.custom_minimum_size = Vector2(86, 40)
-	tianshu_header_button.pressed.connect(_show_tianshu_collection)
-	tianshu_header_button.hide()
-	header.add_child(tianshu_header_button)
 	language_button = _button("")
 	language_button.custom_minimum_size = Vector2(100, 40)
 	language_button.pressed.connect(_toggle_language)
@@ -502,6 +502,13 @@ func _build_ui() -> void:
 	reserve_box = HBoxContainer.new()
 	reserve_box.add_theme_constant_override("separation", 6)
 	reserve_scroll.add_child(reserve_box)
+	tianshu_header_button = _button(t("天书阁", "CODEX"))
+	_accent_button(tianshu_header_button, Color("#9e68bd"))
+	tianshu_header_button.custom_minimum_size = Vector2(150, 92)
+	tianshu_header_button.add_theme_font_size_override("font_size", 18)
+	tianshu_header_button.pressed.connect(_show_tianshu_collection)
+	tianshu_header_button.hide()
+	reserve_row.add_child(tianshu_header_button)
 	root.add_child(reserve_panel)
 	tick_timer = Timer.new()
 	tick_timer.wait_time = TICK
@@ -915,10 +922,10 @@ func _build_tianshu_overlay() -> void:
 	_add_premium_art(tianshu_overlay, PremiumUIArt.Variant.CODEX, Color("#a66bcd"))
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 22)
-	margin.add_theme_constant_override("margin_right", 22)
-	margin.add_theme_constant_override("margin_top", 18)
-	margin.add_theme_constant_override("margin_bottom", 22)
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_bottom", 14)
 	tianshu_overlay.add_child(margin)
 	var panel := PanelContainer.new()
 	_style(panel, Color("#121018e8"), 5, Color("#b078d2"), 2)
@@ -964,7 +971,7 @@ func _build_tianshu_overlay() -> void:
 	tianshu_choice_box.add_theme_constant_override("separation", 14)
 	choices_scroll.add_child(tianshu_choice_box)
 	var owned_panel := PanelContainer.new()
-	owned_panel.custom_minimum_size.x = 330
+	owned_panel.custom_minimum_size.x = 380
 	_style(owned_panel, Color("#111117ed"), 5, Color("#765585"), 2)
 	var owned_root := VBoxContainer.new()
 	owned_root.add_theme_constant_override("separation", 8)
@@ -1014,19 +1021,18 @@ func _render_tianshu_overlay() -> void:
 			var current := _tianshu_level(book_id)
 			var target_level := mini(2, current + 1)
 			var option := VBoxContainer.new()
-			option.custom_minimum_size = Vector2(300 if _is_mobile_ui() else 355, 500)
+			option.custom_minimum_size = Vector2(330 if _is_mobile_ui() else 420, 570)
 			option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			option.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			option.add_theme_constant_override("separation", 10)
-			var group_colors := {"通用":Color("#dca6ff"), "蜀":Color("#79b284"), "魏":Color("#6f9ac4"), "吴":Color("#d08d5c"), "群":Color("#ba6f9c"), "阵营":Color("#dca6ff")}
-			var card_accent: Color = group_colors.get(str(book.group), Color("#dca6ff"))
+			var card_accent: Color = _tianshu_group_color(book)
 			var scope := _label("◆　" + str(book.group) + "天书　◆", 16, card_accent)
 			scope.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			option.add_child(scope)
 			var card := Button.new()
 			card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			card.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			card.custom_minimum_size.y = 400
+			card.custom_minimum_size.y = 460
 			card.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			card.add_theme_font_size_override("font_size", 20)
 			card.text = ("天　书\n\n✦  %s  ✦\n\n%s\n\n%s\n\n%s" % [_tianshu_name(book_id), "升级至 Ⅱ 级" if current == 1 else "获得 Ⅰ 级", _tianshu_effect_text(book_id, target_level), "点击选定 · 本回合不可更改"])
@@ -1035,8 +1041,8 @@ func _render_tianshu_overlay() -> void:
 			style.border_color = card_accent
 			style.set_border_width_all(4)
 			style.set_corner_radius_all(6)
-			style.content_margin_left = 22
-			style.content_margin_right = 22
+			style.content_margin_left = 26
+			style.content_margin_right = 26
 			style.content_margin_top = 22
 			style.content_margin_bottom = 22
 			style.shadow_color = Color(card_accent, 0.28)
@@ -1048,6 +1054,7 @@ func _render_tianshu_overlay() -> void:
 			hover.shadow_color = Color(card_accent, 0.58)
 			card.add_theme_stylebox_override("hover", hover)
 			card.pressed.connect(_choose_tianshu.bind(book_id))
+			card.add_child(_tianshu_border_overlay(book))
 			option.add_child(card)
 			var can_refresh := index < tianshu_refresh_available.size() and tianshu_refresh_available[index]
 			var refresh := _button(t("↻ 单独刷新此天书", "↻ REFRESH THIS CODEX") if can_refresh else t("✓ 本回合已刷新", "✓ REFRESH USED"))
@@ -1074,25 +1081,26 @@ func _render_tianshu_overlay() -> void:
 	for book_id_variant in owned_ids:
 		var book_id := str(book_id_variant)
 		var level := _tianshu_level(book_id)
+		var owned_accent := _tianshu_group_color(TIANSHU_BOOKS[book_id])
 		var item_panel := PanelContainer.new()
-		_style(item_panel, Color("#17141bee"), 4, Color("#765585"), 1)
+		_style(item_panel, Color("#17141bee"), 4, owned_accent, 1)
 		var item_box := VBoxContainer.new()
-		var item := _label("%s　%s %s\n%s" % [str(TIANSHU_BOOKS[book_id].group), _tianshu_name(book_id), "Ⅱ" if level == 2 else "Ⅰ", _tianshu_effect_text(book_id, level)], 14, Color("#dec8e8"))
+		var item := _label("%s　%s %s\n%s" % [str(TIANSHU_BOOKS[book_id].group), _tianshu_name(book_id), "Ⅱ" if level == 2 else "Ⅰ", _tianshu_effect_text(book_id, level)], 14, owned_accent.lightened(0.18))
 		item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		item.tooltip_text = _tianshu_effect_text(book_id, level)
 		item_box.add_child(item)
 		var replace := _button("替换 · %d 金" % _tianshu_replace_cost())
 		replace.custom_minimum_size.y = 34
 		replace.add_theme_font_size_override("font_size", 13)
-		_accent_button(replace, Color("#9a6548"))
+		_accent_button(replace, owned_accent.darkened(0.18))
 		replace.disabled = not _can_use_tianshu_pavilion() or tianshu_replacements_this_round >= 1 or gold < _tianshu_replace_cost()
 		replace.pressed.connect(_on_replace_tianshu.bind(book_id))
 		item_box.add_child(replace)
 		item_panel.add_child(item_box)
 		tianshu_owned_box.add_child(item_panel)
 	if not tianshu_pool_effect.is_empty() and round_number <= int(tianshu_pool_effect.get("end_round", 0)):
-		var remaining := int(tianshu_pool_effect.end_round) - round_number + 1
-		tianshu_owned_box.add_child(_label(t("当前武将池限制剩余 %d 回合" % remaining, "Pool restriction: %d rounds left" % remaining), 14, Color("#f0c77a")))
+		var remaining := int(tianshu_pool_effect.get("remaining_picks", 0))
+		tianshu_owned_box.add_child(_label(t("当前武将池限制剩余 %d 次选将" % remaining, "Pool restriction: %d picks left" % remaining), 14, Color("#f0c77a")))
 
 func _set_stats_metric(metric: String) -> void:
 	stats_metric = metric
@@ -1367,36 +1375,107 @@ func _build_battle_menu() -> void:
 		challenge_difficulty_buttons.append(difficulty_button)
 		difficulty_row.add_child(difficulty_button)
 	root.add_child(difficulty_row)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_enable_touch_scroll(scroll, false, true)
-	root.add_child(scroll)
-	var stage_host := Control.new()
-	stage_host.custom_minimum_size = Vector2(1450, 390)
+	var challenge_content := HBoxContainer.new()
+	challenge_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	challenge_content.add_theme_constant_override("separation", 14)
+	root.add_child(challenge_content)
+	challenge_stage_scroll = ScrollContainer.new()
+	challenge_stage_scroll.custom_minimum_size.x = 760
+	challenge_stage_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	challenge_stage_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	challenge_stage_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_enable_touch_scroll(challenge_stage_scroll, false, true)
+	challenge_content.add_child(challenge_stage_scroll)
+	var stage_host := PanelContainer.new()
+	stage_host.custom_minimum_size.x = 760
 	stage_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(stage_host)
+	stage_host.mouse_filter = Control.MOUSE_FILTER_PASS
+	_style(stage_host, Color("#17140ed8"), 4, Color("#745a35"), 1)
+	challenge_stage_scroll.add_child(stage_host)
 	_add_premium_art(stage_host, PremiumUIArt.Variant.MAP, Color("#8b6a3b"))
 	var stage_margin := MarginContainer.new()
-	stage_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stage_margin.mouse_filter = Control.MOUSE_FILTER_PASS
 	stage_margin.add_theme_constant_override("margin_left", 5)
 	stage_margin.add_theme_constant_override("margin_right", 5)
 	stage_margin.add_theme_constant_override("margin_top", 5)
 	stage_margin.add_theme_constant_override("margin_bottom", 5)
 	stage_host.add_child(stage_margin)
 	challenge_stage_grid = GridContainer.new()
-	challenge_stage_grid.columns = 10
+	challenge_stage_grid.columns = 4
 	challenge_stage_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	challenge_stage_grid.add_theme_constant_override("h_separation", 6)
-	challenge_stage_grid.add_theme_constant_override("v_separation", 7)
+	challenge_stage_grid.mouse_filter = Control.MOUSE_FILTER_PASS
+	challenge_stage_grid.add_theme_constant_override("h_separation", 9)
+	challenge_stage_grid.add_theme_constant_override("v_separation", 10)
+	challenge_stage_grid.gui_input.connect(_on_touch_scroll_input.bind(challenge_stage_scroll, false, true))
 	stage_margin.add_child(challenge_stage_grid)
+	var detail_panel := PanelContainer.new()
+	detail_panel.custom_minimum_size = Vector2(350, 0)
+	detail_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_style(detail_panel, Color("#17130de8"), 5, Color("#b48743"), 2)
+	challenge_content.add_child(detail_panel)
+	var detail_margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		detail_margin.add_theme_constant_override("margin_" + side, 18)
+	detail_panel.add_child(detail_margin)
+	var detail_box := VBoxContainer.new()
+	detail_box.add_theme_constant_override("separation", 10)
+	detail_margin.add_child(detail_box)
+	challenge_detail_scroll = ScrollContainer.new()
+	challenge_detail_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	challenge_detail_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	challenge_detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_enable_touch_scroll(challenge_detail_scroll, false, true)
+	detail_box.add_child(challenge_detail_scroll)
+	var detail_content := VBoxContainer.new()
+	detail_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_content.add_theme_constant_override("separation", 12)
+	detail_content.mouse_filter = Control.MOUSE_FILTER_PASS
+	detail_content.gui_input.connect(_on_touch_scroll_input.bind(challenge_detail_scroll, false, true))
+	challenge_detail_scroll.add_child(detail_content)
+	detail_content.add_child(_label("关卡军情", 24, Color("#f0c77a")))
+	challenge_detail_stage_label = _label("", 20, Color("#f3e3bd"))
+	challenge_detail_stage_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	challenge_detail_stage_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	detail_content.add_child(challenge_detail_stage_label)
+	var bonus_panel := PanelContainer.new()
+	bonus_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	_style(bonus_panel, Color("#211a11e8"), 3, Color("#725b37"), 1)
+	challenge_detail_bonus_label = _label("", 16, Color("#d9c7a1"))
+	challenge_detail_bonus_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	challenge_detail_bonus_label.custom_minimum_size.y = 190
+	challenge_detail_bonus_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	bonus_panel.add_child(challenge_detail_bonus_label)
+	detail_content.add_child(bonus_panel)
+	var star_title := _label("将星条件", 21, Color("#e7bd66"))
+	star_title.mouse_filter = Control.MOUSE_FILTER_PASS
+	detail_content.add_child(star_title)
+	var star_panel := PanelContainer.new()
+	star_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	_style(star_panel, Color("#171d18e8"), 3, Color("#57745f"), 1)
+	challenge_detail_star_label = _label("", 16, Color("#d6dfd2"))
+	challenge_detail_star_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	challenge_detail_star_label.custom_minimum_size.y = 175
+	challenge_detail_star_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	star_panel.add_child(challenge_detail_star_label)
+	detail_content.add_child(star_panel)
+	challenge_start_button = _button("开始战斗")
+	challenge_start_button.custom_minimum_size.y = 58
+	challenge_start_button.add_theme_font_size_override("font_size", 20)
+	_accent_button(challenge_start_button, Color("#b17b32"), true)
+	challenge_start_button.pressed.connect(_confirm_challenge)
+	detail_box.add_child(challenge_start_button)
 
 func _show_battle_menu() -> void:
 	continue_button.disabled = not FileAccess.file_exists(SAVE_PATH)
+	challenge_difficulty_options.select(clampi(selected_difficulty, 0, DIFFICULTIES.size() - 1))
+	if not _is_stage_unlocked(selected_stage, selected_difficulty): selected_stage = 1
 	battle_menu_overlay.show()
 	_render_stage_grid()
 
 func _on_challenge_difficulty_selected(index: int) -> void:
 	selected_difficulty = clampi(index, 0, DIFFICULTIES.size() - 1)
+	if not _is_stage_unlocked(selected_stage, selected_difficulty):
+		selected_stage = 1
 	_render_stage_grid()
 
 func _on_challenge_difficulty_tab(index: int) -> void:
@@ -1406,24 +1485,47 @@ func _on_challenge_difficulty_tab(index: int) -> void:
 func _render_stage_grid() -> void:
 	_clear_dynamic_children(challenge_stage_grid)
 	var difficulty := challenge_difficulty_options.selected
-	challenge_stage_title.text = "每个闯关包含 15 回合，每回合 30 秒；所有难度启用天书。解锁限制：%s" % ("开启" if limit_challenges else "关闭，全部关卡开放")
+	challenge_stage_title.text = "选择关卡查看敌军加成，再由右侧开始战斗。15 回合 · 每回合 30 秒 · 解锁限制：%s" % ("开启" if limit_challenges else "关闭")
 	for stage in range(1, 51):
 		var unlocked := _is_stage_unlocked(stage, difficulty)
 		var best := int(stage_star_records.get(_progression_key(stage, difficulty), 0))
 		var button := _button(("%02d" % stage) + "\n" + STAGE_NAMES[stage - 1] + "\n" + ("★".repeat(best) + "☆".repeat(3 - best) if unlocked else "锁"))
-		button.custom_minimum_size = Vector2(132, 72)
-		button.add_theme_font_size_override("font_size", 14)
+		button.custom_minimum_size = Vector2(176, 88)
+		button.add_theme_font_size_override("font_size", 15)
+		button.mouse_filter = Control.MOUSE_FILTER_PASS
+		button.gui_input.connect(_on_touch_scroll_input.bind(challenge_stage_scroll, false, true))
 		button.disabled = not unlocked
 		var difficulty_colors := [Color("#c8953e"), Color("#48765e"), Color("#3f688e"), Color("#774694"), Color("#963f37")]
-		_accent_button(button, difficulty_colors[difficulty], stage == 1 and unlocked)
-		button.tooltip_text = "敌将兵略 +%d；初始生命 ×%.1f%s" % [stage * 5, float(DIFFICULTIES[difficulty].hp), "；每回合启用天书三选一" if difficulty >= 3 else ""]
-		button.pressed.connect(_launch_challenge.bind(stage, difficulty))
+		_accent_button(button, difficulty_colors[difficulty], stage == selected_stage and unlocked)
+		button.tooltip_text = "关卡兵略 +%d；难度生命 +%d%%、兵略 +%d" % [_challenge_stage_strategy_bonus(stage), roundi((float(DIFFICULTIES[difficulty].hp) - 1.0) * 100.0), _challenge_difficulty_strategy_bonus(difficulty)]
+		button.pressed.connect(_select_challenge_stage.bind(stage, difficulty))
 		challenge_stage_grid.add_child(button)
 	var tab_colors := [Color("#d5a846"), Color("#4e8063"), Color("#426c91"), Color("#8250a0"), Color("#a3483d")]
 	for index in challenge_difficulty_buttons.size():
 		var tab := challenge_difficulty_buttons[index]
 		_accent_button(tab, tab_colors[index], index == difficulty)
 		tab.modulate = Color.WHITE if index == difficulty else Color(0.72, 0.72, 0.72, 0.82)
+	_render_challenge_detail()
+
+func _select_challenge_stage(stage: int, difficulty: int) -> void:
+	if not _is_stage_unlocked(stage, difficulty): return
+	selected_stage = clampi(stage, 1, STAGE_NAMES.size())
+	selected_difficulty = clampi(difficulty, 0, DIFFICULTIES.size() - 1)
+	_render_stage_grid()
+
+func _render_challenge_detail() -> void:
+	if not is_instance_valid(challenge_detail_stage_label): return
+	var difficulty := clampi(selected_difficulty, 0, DIFFICULTIES.size() - 1)
+	var data: Dictionary = DIFFICULTIES[difficulty]
+	var best := int(stage_star_records.get(_progression_key(selected_stage, difficulty), 0))
+	challenge_detail_stage_label.text = "第 %02d 关\n%s · %s\n历史最佳 %s" % [selected_stage, STAGE_NAMES[selected_stage - 1], str(data.name), "★".repeat(best) + "☆".repeat(3 - best)]
+	var total_strategy := _challenge_stage_strategy_bonus() + _challenge_difficulty_strategy_bonus()
+	challenge_detail_bonus_label.text = "当前关卡敌方阵营加成\n  兵略 +%d\n\n当前难度敌方阵营加成\n  初始生命 +%d%%\n  兵略 +%d\n\n最终兵略加成：+%d" % [_challenge_stage_strategy_bonus(), roundi((float(data.hp) - 1.0) * 100.0), _challenge_difficulty_strategy_bonus(), total_strategy]
+	challenge_detail_star_label.text = "★ 战斗胜利\n\n★ 主公结算生命 > 25,000\n\n★ 主公结算生命 > 40,000\n\n将星仅在刷新该难度历史星级时补发。"
+	challenge_start_button.disabled = not _is_stage_unlocked(selected_stage, difficulty)
+
+func _confirm_challenge() -> void:
+	_launch_challenge(selected_stage, selected_difficulty)
 
 func _launch_challenge(stage: int, difficulty: int) -> void:
 	battle_menu_overlay.hide()
@@ -1746,7 +1848,7 @@ func _render_runes(message := "") -> void:
 			spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			actions.add_child(spacer)
 		var convert_cost := int(RUNE_TIERS[int(rune.tier) - 1].convert)
-		convert_cost = ceili(convert_cost * (1.0 - 0.05 * _talent_level("all", "百炼")))
+		convert_cost = ceili(convert_cost * (1.0 - 0.10 * _talent_level("all", "百炼")))
 		var convert := _button("转换 %d" % convert_cost)
 		convert.custom_minimum_size.y = 34
 		convert.add_theme_font_size_override("font_size", 13)
@@ -2266,6 +2368,22 @@ func _build_encyclopedia() -> void:
 		faction_button.custom_minimum_size = Vector2(90, 42)
 		faction_button.pressed.connect(_set_encyclopedia_faction.bind(faction))
 		encyclopedia_hero_filters.add_child(faction_button)
+	encyclopedia_tianshu_filters = HBoxContainer.new()
+	encyclopedia_tianshu_filters.add_theme_constant_override("separation", 8)
+	root_box.add_child(encyclopedia_tianshu_filters)
+	var tianshu_filter_spacer := Control.new()
+	tianshu_filter_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	encyclopedia_tianshu_filters.add_child(tianshu_filter_spacer)
+	for faction in ["all", "shu", "wei", "wu", "qun"]:
+		var filter_name := t("通用", "GENERAL") if faction == "all" else _faction_name(faction)
+		var faction_color: Color = Color("#c9a24c") if faction == "all" else FACTION_COLORS[faction]
+		var faction_button := _button(filter_name)
+		_accent_button(faction_button, faction_color)
+		faction_button.custom_minimum_size = Vector2(78 if mobile else 96, 42)
+		faction_button.pressed.connect(_set_encyclopedia_tianshu_faction.bind(faction))
+		encyclopedia_tianshu_filter_buttons[faction] = faction_button
+		encyclopedia_tianshu_filters.add_child(faction_button)
+	encyclopedia_tianshu_filters.hide()
 	encyclopedia_bond_label = _label("", 14, Color("#e3c58c"))
 	encyclopedia_bond_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	encyclopedia_bond_label.custom_minimum_size.y = 88
@@ -2278,6 +2396,9 @@ func _build_encyclopedia() -> void:
 	encyclopedia_grid.columns = 2 if mobile else 3
 	encyclopedia_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	encyclopedia_grid.add_theme_constant_override("h_separation", 12)
+	if mobile:
+		encyclopedia_grid.set_meta("touch_scroll_enabled", true)
+		encyclopedia_grid.gui_input.connect(_on_touch_scroll_input.bind(encyclopedia_content_scroll, false, true))
 	encyclopedia_content_scroll.add_child(encyclopedia_grid)
 	encyclopedia_bond_graph = GraphEdit.new()
 	encyclopedia_bond_graph.name = "EncyclopediaBondGraph"
@@ -2311,6 +2432,12 @@ func _set_encyclopedia_mode(mode: String) -> void:
 func _set_encyclopedia_faction(faction: String) -> void:
 	_hide_encyclopedia_preview()
 	encyclopedia_faction = faction
+	_render_encyclopedia()
+
+func _set_encyclopedia_tianshu_faction(faction: String) -> void:
+	if faction not in ["all", "shu", "wei", "wu", "qun"]: return
+	encyclopedia_tianshu_faction = faction
+	encyclopedia_content_scroll.scroll_vertical = 0
 	_render_encyclopedia()
 
 func _set_encyclopedia_star(level: int) -> void:
@@ -2544,6 +2671,10 @@ func _render_encyclopedia() -> void:
 	encyclopedia_bond_tab_button.modulate = Color("#f0c77a") if showing_bonds else Color.WHITE
 	encyclopedia_tianshu_tab_button.modulate = Color("#f0c77a") if showing_tianshu else Color.WHITE
 	encyclopedia_hero_filters.visible = not (showing_weapons or showing_tianshu)
+	encyclopedia_tianshu_filters.visible = showing_tianshu
+	for faction in encyclopedia_tianshu_filter_buttons:
+		var filter_button: Button = encyclopedia_tianshu_filter_buttons[faction]
+		filter_button.modulate = Color("#f0c77a") if faction == encyclopedia_tianshu_faction else Color.WHITE
 	for star_button in encyclopedia_star_filter_buttons:
 		star_button.visible = not showing_bonds
 	encyclopedia_bond_reset_button.visible = showing_bonds
@@ -2558,7 +2689,9 @@ func _render_encyclopedia() -> void:
 		_render_encyclopedia_bond_graph()
 		return
 	if showing_tianshu:
-		encyclopedia_bond_label.text = t("天书演武与所有难度的闯关均启用；首次选择获得一级，再次选到同名天书升级为二级。当前收录 %d 本。" % TIANSHU_BOOKS.size(), "Tianshu powers the Codex Trial and all challenge difficulties; first pick grants level I, picking the same book again upgrades it to level II. %d entries in total." % TIANSHU_BOOKS.size())
+		var filtered_count := TIANSHU_BOOKS.keys().filter(func(book_id): return _tianshu_codex_faction(TIANSHU_BOOKS[book_id]) == encyclopedia_tianshu_faction).size()
+		var category_name := t("通用", "General") if encyclopedia_tianshu_faction == "all" else _faction_name(encyclopedia_tianshu_faction)
+		encyclopedia_bond_label.text = t("%s天书 · 当前展示 %d 本，共收录 %d 本。首次选择获得一级，再次选到同名天书升级为二级。" % [category_name, filtered_count, TIANSHU_BOOKS.size()], "%s codices · showing %d of %d. First pick grants level I; picking the same book again upgrades it to level II." % [category_name, filtered_count, TIANSHU_BOOKS.size()])
 		_render_tianshu_encyclopedia()
 		return
 	encyclopedia_bond_label.text = _bond_detail(encyclopedia_faction)
@@ -3041,15 +3174,46 @@ func _arrange_encyclopedia_bond_graph() -> void:
 	encyclopedia_bond_graph.scroll_offset = Vector2.ZERO
 
 func _tianshu_group_color(book: Dictionary) -> Color:
-	# 分类边框色：通用=金、阵营=阵营色、武将池=紫。
+	# 分类强调色：通用=金、阵营与单阵营武将池=对应阵营色。
 	if book.has("faction"):
 		return FACTION_COLORS[str(book.faction)]
 	if book.has("pool"):
-		return Color("#705f8f")
-	return Color("#b98a4f")
+		var pool_factions: Array = book.pool
+		if pool_factions.size() == 1:
+			return FACTION_COLORS[str(pool_factions[0])]
+		return Color("#8a6fb5")
+	return Color("#c9a24c")
+
+func _tianshu_codex_faction(book: Dictionary) -> String:
+	if book.has("faction"):
+		return str(book.faction)
+	if book.has("pool"):
+		var pool_factions: Array = book.pool
+		if pool_factions.size() == 1:
+			return str(pool_factions[0])
+	return "all"
+
+func _tianshu_border_overlay(book: Dictionary) -> TextureRect:
+	# 天书卡片边框贴图：通用=common，阵营与单阵营武将池使用对应阵营边框。
+	var file := "common.png"
+	if book.has("faction"):
+		file = str(book.faction) + "-compact.png"
+	elif book.has("pool"):
+		var pool_factions: Array = book.pool
+		file = str(pool_factions[0]) + "-compact.png" if pool_factions.size() == 1 else "qun-compact.png"
+	var border := TextureRect.new()
+	border.texture = load(CARD_BORDER_ROOT + file)
+	border.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	border.stretch_mode = TextureRect.STRETCH_SCALE
+	border.name = "TianshuBorder"
+	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	border.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return border
 
 func _render_tianshu_encyclopedia() -> void:
-	var book_ids := TIANSHU_BOOKS.keys()
+	var book_ids := TIANSHU_BOOKS.keys().filter(func(book_id):
+		return _tianshu_codex_faction(TIANSHU_BOOKS[book_id]) == encyclopedia_tianshu_faction
+	)
 	book_ids.sort_custom(func(a, b):
 		var group_a := str(TIANSHU_BOOKS[a].group)
 		var group_b := str(TIANSHU_BOOKS[b].group)
@@ -3060,23 +3224,29 @@ func _render_tianshu_encyclopedia() -> void:
 		var accent := _tianshu_group_color(book)
 		var card := PanelContainer.new()
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.mouse_filter = Control.MOUSE_FILTER_PASS
 		_style(card, Color("#1a1d1f"), 12, accent, 2)
 		encyclopedia_grid.add_child(card)
 		var card_box := VBoxContainer.new()
+		card_box.mouse_filter = Control.MOUSE_FILTER_PASS
 		card_box.add_theme_constant_override("separation", 8)
 		card.add_child(card_box)
 		var group_label := _label(str(book.group), 13, accent.lightened(0.25))
+		group_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		group_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_box.add_child(group_label)
 		var book_name := _label(_tianshu_name(str(book_id)), 22, accent.lightened(0.34))
+		book_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		book_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_box.add_child(book_name)
 		var effects: Array = book.get("effects", [])
 		var level_one := _label(t("一级：", "Level I: ") + (str(effects[0]) if effects.size() > 0 else ""), 14, Color("#e8e2cf"))
+		level_one.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		level_one.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		level_one.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card_box.add_child(level_one)
 		var level_two := _label(t("二级：", "Level II: ") + (str(effects[1]) if effects.size() > 1 else ""), 14, Color("#c9c0b1"))
+		level_two.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		level_two.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		level_two.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card_box.add_child(level_two)
@@ -3439,7 +3609,9 @@ func _render() -> void:
 	elif is_instance_valid(tianshu_overlay) and tianshu_overlay.visible and tianshu_view_only:
 		_render_tianshu_overlay()
 	elif is_instance_valid(tianshu_overlay) and tianshu_overlay.visible and not tianshu_view_only:
-		tianshu_overlay.hide()
+		# 选完天书后保持天书阁打开并切换到管理模式，方便继续购买/替换，由玩家手动关闭。
+		tianshu_view_only = true
+		_render_tianshu_overlay()
 	_render_rosters()
 	_render_reserve()
 	draft_toggle_button.text = t("隐藏选将", "HIDE DRAFT") if not draft_user_hidden else t("显示选将", "SHOW DRAFT")

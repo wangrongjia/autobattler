@@ -229,6 +229,7 @@ func _choose_hero(id: String) -> void:
 	player_units.append(unit)
 	chosen_this_round.append(id)
 	draft_picks_remaining -= 1
+	_tianshu_consume_pool_pick()
 	var locked_count := PICKS_PER_ROUND - draft_picks_remaining
 	_log(t("第%d/3轮锁定：" % locked_count, "Pick %d/3 locked: " % locked_count) + _hero_name(id))
 	if draft_picks_remaining <= 0:
