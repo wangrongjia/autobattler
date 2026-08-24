@@ -25,7 +25,7 @@ func _play_random_skill_voice(unit: Dictionary) -> void:
 	skill_voice_player.play()
 
 func _ensure_unit_fields(unit: Dictionary) -> void:
-	var defaults := {"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0, "vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":0.0, "spell_ward":0, "cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0, "faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0, "faction_cooldown_reduction":0.0, "shu_damage_stacks":0, "shu_damage_decay_time":0.0,"four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false, "burn_missing_hp_scale":false, "burn_effects":[], "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0, "freeze":0.0, "freeze_shatter_damage":0.0, "freeze_shatter_per_second":0.0, "freeze_source_id":"", "poison":0.0, "poison_ratio":0.0, "poison_stacks":0, "poison_clock":0.0, "poison_source":"", "poison_effects":[], "regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_damage_reduction":0.0, "regen_source":"", "timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_reduction":0.0, "timed_reduction_time":0.0, "timed_action_bonus":0.0, "timed_action_time":0.0, "rear_damage_reduction":0.0, "rear_damage_reduction_time":0.0, "front_damage_reduction":0.0, "front_damage_reduction_time":0.0, "all_lifesteal":0.0, "all_lifesteal_time":0.0, "bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0, "skill_value_bonus":0.0, "gaolan_skill_value_bonus":0.0, "gaolan_aura_source":"", "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0, "skill_debuff_time":0.0, "zhangbao_revives_used":0}
+	var defaults := {"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0, "vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":0.0, "spell_ward":0, "cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0, "faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0, "faction_cooldown_reduction":0.0, "shu_damage_stacks":0, "shu_damage_decay_time":0.0,"four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false, "burn_missing_hp_scale":false, "burn_effects":[], "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0, "freeze":0.0, "freeze_shatter_damage":0.0, "freeze_shatter_per_second":0.0, "freeze_source_id":"", "poison":0.0, "poison_ratio":0.0, "poison_stacks":0, "poison_clock":0.0, "poison_source":"", "poison_effects":[], "regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_damage_reduction":0.0, "regen_source":"", "timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_reduction":0.0, "timed_reduction_time":0.0, "timed_action_bonus":0.0, "timed_action_time":0.0, "rear_damage_reduction":0.0, "rear_damage_reduction_time":0.0, "front_damage_reduction":0.0, "front_damage_reduction_time":0.0, "all_lifesteal":0.0, "all_lifesteal_time":0.0, "invulnerable_time":0.0, "bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0, "skill_value_bonus":0.0, "gaolan_skill_value_bonus":0.0, "gaolan_aura_source":"", "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0, "skill_debuff_time":0.0, "zhangbao_revives_used":0}
 	for key in defaults:
 		if not unit.has(key): unit[key] = defaults[key]
 
@@ -400,9 +400,11 @@ func _unit_skill_cooldown(unit: Dictionary) -> float:
 	var original := float(heroes[unit.hero_id].cooldown)
 	var base := bond_value if bond_value > 0.0 else original
 	var talent_reduction := float(unit.get("talent_cooldown_reduction", 0.0))
-	# 符文带来的冷却缩减最多达到武将原始冷却的一半，超出部分舍弃。
-	var rune_reduction := minf(float(unit.get("rune_cooldown_reduction", 0.0)), original * 0.5)
-	return maxf(1.0, base - talent_reduction - rune_reduction - _tianshu_cooldown_reduction(unit))
+	var rune_reduction := float(unit.get("rune_cooldown_reduction", 0.0))
+	# 天赋与符文的冷却缩减合并计算，合计最多达到武将原始冷却的一半，超出部分舍弃。
+	# 天书与羁绊（如陈宫被动）的冷却缩减不受此上限约束，仅受最终 2 秒下限保护。
+	var progression_reduction := minf(talent_reduction + rune_reduction, original * 0.5)
+	return maxf(2.0, base - progression_reduction - _tianshu_cooldown_reduction(unit))
 
 func _unit_has_active_skill(unit: Dictionary) -> bool:
 	return str(heroes[unit.hero_id].get("ability", "")) != "passive"
@@ -606,6 +608,7 @@ func _process_statuses(delta: float = TICK) -> void:
 		if unit.rear_damage_reduction_time <= 0.0: unit.rear_damage_reduction = 0.0
 		unit.front_damage_reduction_time = maxf(0.0, float(unit.get("front_damage_reduction_time", 0.0)) - delta)
 		if unit.front_damage_reduction_time <= 0.0: unit.front_damage_reduction = 0.0
+		unit.invulnerable_time = maxf(0.0, float(unit.get("invulnerable_time", 0.0)) - delta)
 		if int(unit.get("shu_damage_stacks", 0)) > 0:
 			var decay := float(unit.get("shu_damage_decay_time", 0.0)) - delta
 			if decay <= 0.0:
@@ -1013,6 +1016,17 @@ func _cast_caocao_command(unit: Dictionary) -> void:
 		_damage(unit, target, amount, "physical", t("魏武震慑", "Dominion Stun"), visual_group, "multi_target")
 		var stun_duration := float(params.get("stun", 1.25)) + (float(params.get("favored_stun_bonus", 0.5)) if favored else 0.0)
 		_apply_skill_stun(unit, target, stun_duration)
+	var lord_level := _tianshu_level("wei_lord") if unit.team == "player" else 0
+	if lord_level >= 1:
+		var army_bonus := 0.15 if lord_level == 1 else 0.25
+		var army_time := 5.0 if lord_level == 1 else 6.0
+		for ally in _team_units(unit.team):
+			if not ally.alive or str(heroes[ally.hero_id].f) != "wei": continue
+			ally.timed_damage_buff = maxf(float(ally.get("timed_damage_buff", 0.0)), army_bonus)
+			ally.timed_damage_time = maxf(float(ally.get("timed_damage_time", 0.0)), army_time)
+			if lord_level >= 2:
+				ally.action = minf(ACTION_MAX, float(ally.get("action", 0.0)) + 10.0)
+		_log("[color=#7fa8e0]【魏武挥鞭】全军魏将增伤 %.0f%%，持续 %.0f 秒。[/color]" % [army_bonus * 100.0, army_time])
 	unit.cast_count = int(unit.get("cast_count", 0)) + 1
 
 func _wei_pair_count(team: String, hero_id: String, partners: Array) -> int:
@@ -1165,23 +1179,29 @@ func _cast_liubei_regen(unit: Dictionary) -> void:
 	var params: Dictionary = heroes[unit.hero_id].ability_params
 	var allies := _team_units(unit.team).filter(func(ally): return ally.alive)
 	allies.sort_custom(func(a, b): return float(a.hp) / maxf(1.0, float(a.max_hp)) < float(b.hp) / maxf(1.0, float(b.max_hp)))
-	var target = allies[0] if not allies.is_empty() else null
-	var row := int(target.row) if target != null else rng.randi_range(0, BOARD_ROWS - 1)
-	var col := int(target.col) if target != null else rng.randi_range(0, BOARD_COLUMNS - 1)
+	var target_count := 1 + (1 if _tianshu_level("shu_lord") >= 1 and unit.team == "player" else 0)
 	var duration := float(params.get("duration", 4.0)) * (1.0 + float(params.get("liushan_duration_bonus", 0.30)) if _pair_active(unit.team, "liubei", "liushan") else 1.0)
 	var heal_ratio := float(params.get("peach_heal_ratio", 1.5)) if _roster_has_all(_team_units(unit.team), ["liubei", "guanyu", "zhangfei"]) else float(params.get("heal_ratio", 1.0))
 	var heal_per_second := _unit_skill_stat_value(unit) * heal_ratio
 	var damage_reduction := float(params.get("zhuge_damage_reduction", 0.30)) * _unit_skill_effect_multiplier(unit) if _pair_active(unit.team, "liubei", "zhugeliang") else 0.0
-	if target == null:
-		ruler_regen[unit.team] = {"amount":heal_per_second, "time":duration, "clock":0.0, "source":unit.id, "damage_reduction":damage_reduction}
-		visual_events.append({"kind":"heal", "source_id":unit.id, "target_id":"", "team":unit.team, "row":row, "col":col, "amount":round(heal_per_second), "ruler":true, "style":"heal"})
-	else:
+	var shu_invulnerable: bool = _tianshu_level("shu_lord") >= 2 and unit.team == "player"
+	var picked_count := 0
+	for target in allies:
+		if picked_count >= target_count: break
+		picked_count += 1
 		target.regen_per_second = heal_per_second
 		target.regen_time = duration
 		target.regen_clock = 0.0
 		target.regen_source = unit.id
 		target.regen_damage_reduction = damage_reduction
+		if shu_invulnerable and str(heroes[target.hero_id].f) == "shu":
+			target.invulnerable_time = maxf(float(target.get("invulnerable_time", 0.0)), duration)
 		visual_events.append({"kind":"regen_apply", "source_id":unit.id, "target_id":target.id, "amount":0, "style":"heal"})
+	if picked_count == 0:
+		var row := rng.randi_range(0, BOARD_ROWS - 1)
+		var col := rng.randi_range(0, BOARD_COLUMNS - 1)
+		ruler_regen[unit.team] = {"amount":heal_per_second, "time":duration, "clock":0.0, "source":unit.id, "damage_reduction":damage_reduction}
+		visual_events.append({"kind":"heal", "source_id":unit.id, "target_id":"", "team":unit.team, "row":row, "col":col, "amount":round(heal_per_second), "ruler":true, "style":"heal"})
 
 func _cast_liushan_command(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.liushan.ability_params
@@ -1876,13 +1896,18 @@ func _cast_lvbu_skill(unit: Dictionary) -> void:
 func _cast_lvbu_sweep_once(unit: Dictionary, wave: int) -> float:
 	var params: Dictionary = heroes.lvbu.ability_params
 	var amount := _unit_skill_stat_value(unit) * float(params.get("mult", 2.20))
+	if _pair_active(unit.team, "lvbu", "gaoshun"):
+		amount += _unit_skill_stat_value(unit) * float(params.get("gaoshun_damage_bonus_mult", 0.70))
 	if _pair_active(unit.team, "lvbu", "diaochan"):
 		amount *= _missing_hp_damage_multiplier(unit, float(params.get("missing_hp_step", 0.10)), float(params.get("diaochan_bonus_per_step", 0.03)) * _unit_skill_effect_multiplier(unit))
 	var damage_dealt := 0.0
 	var visual_group := "lvbu_sweep:" + str(unit.id) + ":" + str(unit.get("cast_count", 0)) + ":" + str(wave)
 	var target_row := _fallback_enemy_row(unit)
-	var target_team := _enemy_team_id(unit.team)
-	for col_offset in [-1, 0, 1]:
+	var qun_lord_level := _tianshu_level("qun_lord") if unit.team == "player" else 0
+	var col_offsets: Array = [-1, 0, 1]
+	if qun_lord_level >= 1:
+		col_offsets = [-2, -1, 0, 1, 2]
+	for col_offset in col_offsets:
 		var target_col: int = int(unit.col) + int(col_offset)
 		if target_col < 0 or target_col >= BOARD_COLUMNS: continue
 		var tile := _enemy_tile(unit, target_row, target_col)
@@ -1893,17 +1918,19 @@ func _cast_lvbu_sweep_once(unit: Dictionary, wave: int) -> float:
 			var hp_before := float(target.hp)
 			_damage(unit, target, amount, "physical", t("无双横扫", "Peerless Sweep"), visual_group, "row_impact")
 			damage_dealt += maxf(0.0, hp_before - float(target.hp))
-	if _pair_active(unit.team, "lvbu", "gaoshun"):
-		var behind_row := target_row + 1
-		if behind_row < BOARD_ROWS:
-			var behind_tile := {"row":behind_row, "col":int(unit.col), "team":target_team}
-			var behind = _unit_at(_enemy_units(unit.team), behind_row, int(unit.col))
-			if behind == null:
-				_hit_ruler(unit, amount, behind_tile, t("飞将陷阵空击", "Flying Formation missed"), visual_group, "row_impact")
+	if qun_lord_level >= 2:
+		for sweep_entry in [[target_row + 1, -1], [target_row + 1, 0], [target_row + 1, 1], [target_row + 2, 0]]:
+			var extra_row := int(sweep_entry[0])
+			var extra_col := int(unit.col) + int(sweep_entry[1])
+			if extra_row >= BOARD_ROWS or extra_col < 0 or extra_col >= BOARD_COLUMNS: continue
+			var extra_tile := {"row":extra_row, "col":extra_col, "team":_enemy_team_id(unit.team)}
+			var extra_target = _unit_at(_enemy_units(unit.team), extra_row, extra_col)
+			if extra_target == null:
+				_hit_ruler(unit, amount, extra_tile, t("无双横扫空击", "Peerless Sweep missed"), visual_group, "row_impact")
 			else:
-				var behind_hp_before := float(behind.hp)
-				_damage(unit, behind, amount, "physical", t("飞将陷阵", "Flying Formation"), visual_group, "row_impact")
-				damage_dealt += maxf(0.0, behind_hp_before - float(behind.hp))
+				var extra_hp_before := float(extra_target.hp)
+				_damage(unit, extra_target, amount, "physical", t("无双横扫", "Peerless Sweep"), visual_group, "row_impact")
+				damage_dealt += maxf(0.0, extra_hp_before - float(extra_target.hp))
 	return damage_dealt
 
 func _missing_hp_damage_multiplier(target: Dictionary, step: float, bonus_per_step: float) -> float:
@@ -2548,6 +2575,7 @@ func _try_wu_equalize_and_recover(target: Dictionary) -> bool:
 
 func _damage(source, target: Dictionary, amount: float, damage_type: String, label: String, visual_group := "", group_style := "", scales_with_skill := false, propagate_links := true, ignore_shield := false) -> float:
 	if not target.alive: return 0.0
+	if float(target.get("invulnerable_time", 0.0)) > 0.0: return 0.0
 	var target_params: Dictionary = heroes[target.hero_id].get("ability_params", {})
 	var is_active_skill := source != null
 	if is_active_skill and int(target.get("spell_ward", 0)) > 0:
@@ -2708,6 +2736,16 @@ func _resolve_zhangbao_death(unit: Dictionary, killer, visual_group: String, gro
 
 func _on_unit_fallen(fallen: Dictionary, killer) -> void:
 	_tianshu_on_kill(killer, fallen)
+	var lord_level := _tianshu_level("wu_lord")
+	if lord_level >= 1 and str(fallen.hero_id) != "sunquan":
+		var sunquan = _combat_hero("player", "sunquan")
+		if sunquan != null and sunquan.alive:
+			var drain_ratio := 0.08 if lord_level == 1 else 0.15
+			var drained := float(fallen.max_hp) * drain_ratio
+			sunquan.max_hp = float(sunquan.max_hp) + drained
+			if lord_level >= 2:
+				sunquan.hp = minf(float(sunquan.max_hp), float(sunquan.hp) + drained)
+			_log("[color=#e58f78]【坐断东南】%s 阵亡，孙权吸取 %.0f 最大生命。[/color]" % [_hero_name(str(fallen.hero_id)), drained])
 	var zhangjiao = _combat_hero(str(fallen.team), "zhangjiao")
 	var heaven_earth_active := _pair_active(str(fallen.team), "zhangjiao", "zhangbao") or str(fallen.hero_id) == "zhangbao"
 	if zhangjiao != null and zhangjiao.alive and str(fallen.id) != str(zhangjiao.id) and heaven_earth_active:

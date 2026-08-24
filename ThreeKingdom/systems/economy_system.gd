@@ -118,7 +118,7 @@ func _replace_tianshu(book_id: String) -> bool:
 	if str(tianshu_pool_effect.get("book_id", "")) == book_id:
 		tianshu_pool_effect.clear()
 	tianshu_replacements_this_round += 1
-	_log("[color=#e5a8ff]已替换【%s %s】，获得 %d 次天书三选一。[/color]" % [_tianshu_name(book_id), "Ⅱ" if removed_level == 2 else "Ⅰ", removed_level])
+	_log("[color=#e5a8ff]已替换【%s %s】，获得 %d 次天书三选一。[/color]" % [_tianshu_name(book_id), "2级" if removed_level == 2 else "1级", removed_level])
 	var return_phase := phase
 	_begin_tianshu_draw(removed_level, "replace", return_phase, false)
 	_render()

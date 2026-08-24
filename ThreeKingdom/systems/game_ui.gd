@@ -15,6 +15,8 @@ var home_hero_name_label: Label
 var home_resource_label: Label
 var home_faction_label: Label
 var home_motto_label: Label
+var intro_popup: Control
+var tianshu_refresh_setting_button: Button
 var battle_menu_overlay: Control
 var challenge_stage_grid: GridContainer
 var challenge_stage_scroll: ScrollContainer
@@ -48,6 +50,9 @@ var rune_hero_portrait: TextureRect
 var rune_hero_name_label: Label
 var rune_batch_synthesize_button: Button
 var rune_equipped_box: VBoxContainer
+var rune_hero_detail_overlay: Control
+var rune_hero_detail_text: RichTextLabel
+var rune_hero_detail_columns: HBoxContainer
 var challenge_limit_setting_button: Button
 var result_overlay: Control
 var result_title_label: Label
@@ -60,6 +65,8 @@ var tianshu_overlay_close: Button
 var tianshu_header_button: Button
 var tianshu_gold_label: Label
 var tianshu_purchase_button: Button
+var tianshu_replace_confirm: ConfirmationDialog
+var tianshu_replace_pending := ""
 var tianshu_view_only := false
 var sell_layer: CanvasLayer
 var sell_zone: Control
@@ -507,8 +514,8 @@ func _build_ui() -> void:
 	reserve_scroll.add_child(reserve_box)
 	tianshu_header_button = _button(t("天书阁", "CODEX"))
 	_accent_button(tianshu_header_button, Color("#9e68bd"))
-	tianshu_header_button.custom_minimum_size = Vector2(150, 92)
-	tianshu_header_button.add_theme_font_size_override("font_size", 18)
+	tianshu_header_button.custom_minimum_size = Vector2(200, 96)
+	tianshu_header_button.add_theme_font_size_override("font_size", 16)
 	tianshu_header_button.pressed.connect(_show_tianshu_collection)
 	tianshu_header_button.hide()
 	reserve_row.add_child(tianshu_header_button)
@@ -962,7 +969,7 @@ func _build_tianshu_overlay() -> void:
 	tianshu_overlay_title.add_theme_color_override("font_outline_color", Color("#211029"))
 	tianshu_overlay_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(tianshu_overlay_title)
-	var subtitle := _label(t("所有天书均为彩色品质 · 同名再次选择升至Ⅱ级", "All codices share one prismatic tier · choose again to reach level II"), 14, Color("#d8b9ee"))
+	var subtitle := _label(t("所有天书均为彩色品质 · 同名再次选择升至2级", "All codices share one prismatic tier · choose again to reach level II"), 14, Color("#d8b9ee"))
 	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(subtitle)
 	tianshu_gold_label = _label("", 17, Color("#e8c96e"))
@@ -1010,6 +1017,13 @@ func _build_tianshu_overlay() -> void:
 	owned_scroll.add_child(tianshu_owned_box)
 	content.add_child(owned_panel)
 	tianshu_overlay.hide()
+	tianshu_replace_confirm = ConfirmationDialog.new()
+	tianshu_replace_confirm.title = t("确认替换", "Confirm Replace")
+	tianshu_replace_confirm.ok_button_text = t("确认替换", "Replace")
+	tianshu_replace_confirm.cancel_button_text = t("取消", "Cancel")
+	tianshu_replace_confirm.confirmed.connect(func(): _on_replace_tianshu_confirmed())
+	tianshu_replace_confirm.canceled.connect(func(): tianshu_replace_pending = "")
+	add_child(tianshu_replace_confirm)
 
 func _show_tianshu_collection() -> void:
 	if not _can_use_tianshu_pavilion(): return
@@ -1022,8 +1036,21 @@ func _on_buy_tianshu_draw() -> void:
 	_buy_tianshu_draw()
 
 func _on_replace_tianshu(book_id: String) -> void:
+	if not _can_use_tianshu_pavilion() or not tianshu_levels.has(book_id): return
+	if not is_instance_valid(tianshu_replace_confirm):
+		_on_replace_tianshu_confirmed(book_id)
+		return
+	tianshu_replace_pending = book_id
+	var level := _tianshu_level(book_id)
+	tianshu_replace_confirm.dialog_text = "确定替换【%s %s】吗？\n将获得 %d 次天书三选一。" % [_tianshu_name(book_id), "2级" if level == 2 else "1级", level]
+	tianshu_replace_confirm.popup_centered()
+
+func _on_replace_tianshu_confirmed(book_id: String = "") -> void:
+	var target := book_id if not book_id.is_empty() else tianshu_replace_pending
+	tianshu_replace_pending = ""
+	if target.is_empty(): return
 	tianshu_view_only = false
-	_replace_tianshu(book_id)
+	_replace_tianshu(target)
 
 func _render_tianshu_overlay() -> void:
 	if not is_instance_valid(tianshu_overlay): return
@@ -1058,7 +1085,7 @@ func _render_tianshu_overlay() -> void:
 			card.custom_minimum_size.y = 460
 			card.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			card.add_theme_font_size_override("font_size", 20)
-			card.text = ("天　书\n\n✦  %s  ✦\n\n%s\n\n%s\n\n%s" % [_tianshu_name(book_id), "升级至 Ⅱ 级" if current == 1 else "获得 Ⅰ 级", _tianshu_effect_text(book_id, target_level), "点击选定 · 本回合不可更改"])
+			card.text = ("天　书\n\n✦  %s  ✦\n\n%s\n\n%s\n\n%s" % [_tianshu_name(book_id), "升级至2级" if current == 1 else "获得1级", _tianshu_effect_text(book_id, target_level), "点击选定 · 本回合不可更改"])
 			var style := StyleBoxFlat.new()
 			style.bg_color = card_accent.darkened(0.72)
 			style.border_color = card_accent
@@ -1079,7 +1106,7 @@ func _render_tianshu_overlay() -> void:
 			card.pressed.connect(_choose_tianshu.bind(book_id))
 			card.add_child(_tianshu_border_overlay(book))
 			option.add_child(card)
-			var can_refresh := index < tianshu_refresh_available.size() and tianshu_refresh_available[index]
+			var can_refresh := tianshu_infinite_refresh or (index < tianshu_refresh_available.size() and tianshu_refresh_available[index])
 			var refresh := _button(t("↻ 单独刷新此天书", "↻ REFRESH THIS CODEX") if can_refresh else t("✓ 本回合已刷新", "✓ REFRESH USED"))
 			_accent_button(refresh, card_accent)
 			refresh.disabled = not can_refresh
@@ -1089,7 +1116,7 @@ func _render_tianshu_overlay() -> void:
 			tianshu_choice_box.add_child(option)
 	else:
 		var replace_remaining := maxi(0, 1 - tianshu_replacements_this_round)
-		var intro := _label("天书阁\n\n500 金币购买一次天书三选一\n300 金币替换一本天书（本回合剩余 %d / 1 次）\n替换Ⅱ级天书可连续选择两次\n\n当前利息上限：%d　下回合基础收入：%d" % [replace_remaining, _gold_interest_cap(), _round_base_gold_income()], 18, Color("#c9c0b1"))
+		var intro := _label("天书阁\n\n500 金币购买一次天书三选一\n300 金币替换一本天书（本回合剩余 %d / 1 次）\n替换2级天书可连续选择两次\n\n当前利息上限：%d　下回合基础收入：%d" % [replace_remaining, _gold_interest_cap(), _round_base_gold_income()], 18, Color("#c9c0b1"))
 		intro.custom_minimum_size = Vector2(600, 120)
 		intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		tianshu_choice_box.add_child(intro)
@@ -1106,15 +1133,22 @@ func _render_tianshu_overlay() -> void:
 		var level := _tianshu_level(book_id)
 		var owned_accent := _tianshu_group_color(TIANSHU_BOOKS[book_id])
 		var item_panel := PanelContainer.new()
+		item_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_style(item_panel, Color("#17141bee"), 4, owned_accent, 1)
 		var item_box := VBoxContainer.new()
-		var item := _label("%s　%s %s\n%s" % [str(TIANSHU_BOOKS[book_id].group), _tianshu_name(book_id), "Ⅱ" if level == 2 else "Ⅰ", _tianshu_effect_text(book_id, level)], 14, owned_accent.lightened(0.18))
-		item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		item.tooltip_text = _tianshu_effect_text(book_id, level)
-		item_box.add_child(item)
-		var replace := _button("替换 · %d 金" % _tianshu_replace_cost())
-		replace.custom_minimum_size.y = 34
-		replace.add_theme_font_size_override("font_size", 13)
+		var item_box_inner := VBoxContainer.new()
+		item_box_inner.add_theme_constant_override("separation", 4)
+		var title_row := _label("【%s】%s　%s" % ["2级" if level == 2 else "1级", str(TIANSHU_BOOKS[book_id].group), _tianshu_name(book_id)], 18, owned_accent.lightened(0.3))
+		title_row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		item_box_inner.add_child(title_row)
+		var effect_line := _label(_tianshu_effect_text(book_id, level), 15, Color("#c9c0b1"))
+		effect_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		effect_line.tooltip_text = _tianshu_effect_text(book_id, level)
+		item_box_inner.add_child(effect_line)
+		item_box.add_child(item_box_inner)
+		var replace := _button(("替换2级 · %d 金（可得两次三选一）" if level == 2 else "替换1级 · %d 金") % _tianshu_replace_cost())
+		replace.custom_minimum_size.y = 40
+		replace.add_theme_font_size_override("font_size", 15)
 		_accent_button(replace, owned_accent.darkened(0.18))
 		replace.disabled = not _can_use_tianshu_pavilion() or tianshu_replacements_this_round >= 1 or gold < _tianshu_replace_cost()
 		replace.pressed.connect(_on_replace_tianshu.bind(book_id))
@@ -1183,17 +1217,24 @@ func _build_main_menu() -> void:
 	var faction_banner := PanelContainer.new()
 	faction_banner.custom_minimum_size.x = 175
 	_style(faction_banner, Color("#10261fdd"), 3, Color("#80693f"), 1)
+	faction_banner.mouse_filter = Control.MOUSE_FILTER_STOP
+	faction_banner.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	faction_banner.tooltip_text = t("点击查看游戏介绍", "Click for the game guide")
+	faction_banner.gui_input.connect(func(event):
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			_show_intro_popup()
+	)
 	var banner_box := VBoxContainer.new()
 	banner_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	banner_box.add_theme_constant_override("separation", 10)
 	var seal := _label("◆", 44, Color("#d8b96f"))
 	seal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner_box.add_child(seal)
-	home_faction_label = _label("江东\n吴", 30, Color("#d5bd7e"))
+	home_faction_label = _label(t("游戏\n介绍", "GAME\nGUIDE"), 30, Color("#d5bd7e"))
 	home_faction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner_box.add_child(home_faction_label)
 	banner_box.add_child(_label("────────", 12, Color("#6e5a37")))
-	home_motto_label = _label("弓腰姬\n英姿无双", 17, Color("#b7a17a"))
+	home_motto_label = _label(t("玩法·属性\n规则·胜负", "Rules &\nAttributes"), 17, Color("#b7a17a"))
 	home_motto_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner_box.add_child(home_motto_label)
 	faction_banner.add_child(banner_box)
@@ -1258,6 +1299,7 @@ func _build_main_menu() -> void:
 	_build_rune_overlay()
 	_build_talent_overlay()
 	_build_result_overlay()
+	_build_intro_popup()
 	_refresh_home()
 	draft_overlay.hide()
 
@@ -1267,14 +1309,62 @@ func _refresh_home() -> void:
 	var faction := str(heroes[home_hero_id].f)
 	home_hero_name_label.text = _hero_name(home_hero_id) + " · " + _faction_name(faction)
 	home_hero_name_label.add_theme_color_override("font_color", FACTION_COLORS[faction].lightened(0.32))
-	if is_instance_valid(home_faction_label):
-		var regions := {"shu":"汉室\n蜀", "wei":"中原\n魏", "wu":"江东\n吴", "qun":"群雄\n群"}
-		home_faction_label.text = str(regions.get(faction, _faction_name(faction)))
-		home_faction_label.add_theme_color_override("font_color", FACTION_COLORS[faction].lightened(0.42))
-	if is_instance_valid(home_motto_label):
-		var mottos := {"shu":"仁德昭烈\n匡扶汉室", "wei":"雄才大略\n横槊赋诗", "wu":"江东英杰\n虎踞龙盘", "qun":"逐鹿天下\n乱世争锋"}
-		home_motto_label.text = str(mottos.get(faction, "天下英豪"))
 	home_resource_label.text = "将魂  %d　　将星  %d / 750" % [general_souls, general_stars]
+
+func _show_intro_popup() -> void:
+	if is_instance_valid(intro_popup):
+		intro_popup.show()
+
+func _intro_rich_page(tab_title: String, content: String) -> RichTextLabel:
+	var page := RichTextLabel.new()
+	page.name = tab_title
+	page.bbcode_enabled = true
+	page.scroll_active = true
+	page.custom_minimum_size = Vector2(880, 520)
+	page.add_theme_font_size_override("normal_font_size", 18)
+	page.add_theme_font_size_override("bold_font_size", 19)
+	page.text = content
+	return page
+
+func _build_intro_popup() -> void:
+	intro_popup = ColorRect.new()
+	intro_popup.color = Color("#050608e6")
+	intro_popup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	intro_popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	intro_popup.z_index = 1200
+	intro_popup.gui_input.connect(func(event):
+		if event is InputEventMouseButton and event.pressed:
+			intro_popup.hide()
+	)
+	add_child(intro_popup)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	intro_popup.add_child(center)
+	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_style(panel, Color("#12140ff5"), 14, Color("#b98a4f"), 2)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var header := _label(t("游戏介绍（点击空白处关闭）", "GAME GUIDE (click outside to close)"), 22, Color("#f0c77a"))
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(header)
+	var tabs := TabContainer.new()
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.add_theme_font_size_override("font_size", 18)
+	box.add_child(tabs)
+	var c := "[color=#90c59e][b]"
+	var e := "[/b][/color]"
+	tabs.add_child(_intro_rich_page(t("基础玩法", "BASICS"),
+		c + "一局游戏怎么玩" + e + "\n每关分三个阶段：[b]选将 → 布阵 → 战斗[/b]。选将阶段进行三轮三选一（候选从左到右固定为前军、中军、后军），布阵阶段把武将放上 5×3 棋盘，随后进行 [b]30 秒自动战斗[/b]——战斗中武将按行动条自动行动与施放技能，玩家不操作。\n\n共 [b]15 关[/b]，之后进入没有时间限制的最终决战。闯关与天书演武模式还含金币经济：卖出武将回收金币、每回合有收入与利息，详情见备战席右侧的天书阁。\n\n" + c + "武将管理" + e + "\n棋盘与备战席（9 格）内的武将可自由拖动上阵；上阵过的武将只能场上换位或拖到顶部售卖区卖出。天书通过天书阁购买与替换：3/6/9/12/15 回合各有一次免费三选一。"))
+	tabs.add_child(_intro_rich_page(t("胜负与主公", "VICTORY"),
+		c + "胜负条件" + e + "\n双方各有一位主公（[b]50000[/b] 生命，天赋可提高）。[b]任一方主公生命归零即落败[/b]；普通关 30 秒到时则比较双方主公剩余生命判定胜负，敌方主公会保留剩余生命进入后续关卡。\n\n" + c + "两条重要隐藏规则" + e + "\n[b]1. 攻击空格伤害主公[/b]：技能随机打到没有武将的空格时，伤害全额由敌方主公承受——留空阵是有代价的，但也可能浪费敌方技能。\n[b]2. 溢出治疗转化[/b]：治疗超出目标最大生命的部分，按 [b]30%[/b] 转化为我方主公的生命（天书·泽被苍生可提升至 50%/80%）。\n\n最终决战没有 30 秒限制，直到一方主公倒下为止。"))
+	tabs.add_child(_intro_rich_page(t("属性与养成", "ATTRIBUTES"),
+		c + "三大属性" + e + "\n[b]生命[/b]：武将的生存基础。\n[b]兵略值[/b]：全员基准 100，决定技能强度——\"230% 兵略值伤害\"即造成 100×2.3 = 230 点伤害。天赋、符文可提高兵略，从而放大所有技能。\n[b]技能冷却[/b]：行动条攒满一轮所需的时间，冷却越短出手越快。\n\n" + c + "冷却缩减规则（重要）" + e + "\n· 天赋与符文的冷却缩减[b]合并计算，合计最多减原始冷却的一半[/b]；\n· 天书与羁绊（如陈宫被动）的缩减不受此上限约束；\n· 所有缩减叠加后，最终冷却[b]最低 2 秒[/b]。\n\n" + c + "永久养成" + e + "\n[b]将星[/b]：通关按主公剩余血量评 1~3 星，用于点亮天赋树（5 棵：通用+四阵营，5 星=1 点）。\n[b]将魂[/b]：每次通关都给，用于抽符文（单抽 200、十连 2000）。符文分正（单属性）/ 均（双属性）/ 极（一减一增），两枚同阶可合成一枚高阶，每名武将最多装备 3 枚。"))
+	tabs.add_child(_intro_rich_page(t("战场规则", "BATTLE"),
+		c + "前军 / 中军 / 后军" + e + "\n前军[b]只能站前排且只打前排[/b]；中军站前排可打全场、站中排打前中排、站后排只打前排；后军[b]任意站位随机攻击全场[/b]。合理利用站位改变射程是布阵的核心。\n\n" + c + "行动条" + e + "\n武将行动条从 0 涨到 100 即行动一次并施放技能；增速受减速、沉默影响，眩晕/冻结/魅惑/恐惧期间停止。\n\n" + c + "常见战斗效果" + e + "\n眩晕（停止行动）、冻结（停止，受伤提前解冻并追加破冰伤害）、魅惑（停止）、恐惧（停止+持续伤害）、中毒（层数伤害，逐秒衰减）、灼烧（持续伤害）、减速（行动条变慢）、易碎（受到伤害提高）。\n\n" + c + "羁绊" + e + "\n[b]阵营羁绊[/b]：按场上同阵营人数 2/5/8 分三档——蜀承伤降低、魏控制时长提高、吴最大生命提高、群冷却缩短，8 人时各解锁强力终极效果。\n[b]组合羁绊[/b]：特定武将组合触发（桃园结义、五虎上将、四英杰等），完整关系见 图鉴 → 羁绊图。"))
+	intro_popup.hide()
 
 func _full_overlay(z: int = 1150, art_variant: int = PremiumUIArt.Variant.BACKDROP, accent := UI_GOLD) -> ColorRect:
 	var overlay := ColorRect.new()
@@ -1679,9 +1769,16 @@ func _build_rune_overlay() -> void:
 	rune_hero_portrait.custom_minimum_size = Vector2(320, 150)
 	rune_hero_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	rune_hero_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rune_hero_portrait.mouse_filter = Control.MOUSE_FILTER_STOP
+	rune_hero_portrait.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	rune_hero_portrait.tooltip_text = "点击查看武将属性详情"
+	rune_hero_portrait.gui_input.connect(_on_rune_hero_card_input)
 	hero_box.add_child(rune_hero_portrait)
 	rune_hero_name_label = _label("", 24, Color("#f0c77a"))
 	rune_hero_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rune_hero_name_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	rune_hero_name_label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	rune_hero_name_label.gui_input.connect(_on_rune_hero_card_input)
 	hero_box.add_child(rune_hero_name_label)
 	rune_equipped_box = VBoxContainer.new()
 	rune_equipped_box.add_theme_constant_override("separation", 6)
@@ -1694,7 +1791,7 @@ func _build_rune_overlay() -> void:
 	columns.add_child(inventory_column)
 	var inventory_header := HBoxContainer.new()
 	inventory_header.mouse_filter = Control.MOUSE_FILTER_PASS
-	rune_status_label = _label("", 14, Color("#c9c0b1"))
+	rune_status_label = _label("", 16, Color("#c9c0b1"))
 	rune_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rune_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	inventory_header.add_child(rune_status_label)
@@ -1721,6 +1818,147 @@ func _build_rune_overlay() -> void:
 	for index in rune_faction_options.item_count:
 		if str(rune_faction_options.get_item_metadata(index)) == home_faction: rune_faction_options.select(index)
 	_populate_rune_heroes(home_faction, home_hero_id)
+	_build_rune_hero_detail_overlay()
+
+func _on_rune_hero_card_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_show_rune_hero_detail()
+
+func _build_rune_hero_detail_overlay() -> void:
+	rune_hero_detail_overlay = ColorRect.new()
+	rune_hero_detail_overlay.color = Color("#050608e0")
+	rune_hero_detail_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	rune_hero_detail_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	rune_hero_detail_overlay.z_index = 1200
+	rune_hero_detail_overlay.gui_input.connect(func(event):
+		if event is InputEventMouseButton and event.pressed:
+			rune_hero_detail_overlay.hide()
+	)
+	add_child(rune_hero_detail_overlay)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	rune_hero_detail_overlay.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(920, 0)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_style(panel, Color("#141713f2"), 14, Color("#557b61"), 2)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+	var header := _label("武将属性详情（点击空白处关闭）", 20, Color("#f0c77a"))
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(header)
+	rune_hero_detail_columns = HBoxContainer.new()
+	rune_hero_detail_columns.add_theme_constant_override("separation", 14)
+	box.add_child(rune_hero_detail_columns)
+	rune_hero_detail_text = RichTextLabel.new()
+	rune_hero_detail_text.bbcode_enabled = true
+	rune_hero_detail_text.fit_content = true
+	rune_hero_detail_text.scroll_active = false
+	rune_hero_detail_text.custom_minimum_size = Vector2(880, 300)
+	rune_hero_detail_text.add_theme_font_size_override("normal_font_size", 17)
+	rune_hero_detail_text.add_theme_font_size_override("bold_font_size", 18)
+	box.add_child(rune_hero_detail_text)
+	rune_hero_detail_overlay.hide()
+
+func _rune_stat_panel(title: String, accent: Color, hp: int, strategy: int, cooldown: float, delta_hp := 0, delta_strategy := 0, delta_cooldown := 0.0) -> PanelContainer:
+	var stat_panel := PanelContainer.new()
+	stat_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stat_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_style(stat_panel, Color("#10140fee"), 10, accent, 2)
+	var stat_box := VBoxContainer.new()
+	stat_box.add_theme_constant_override("separation", 8)
+	stat_panel.add_child(stat_box)
+	var title_label := _label(title, 18, accent)
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stat_box.add_child(title_label)
+	var rows: Array = [
+		["生命", str(hp), delta_hp],
+		["兵略", str(strategy), delta_strategy],
+		["冷却", "%.1f秒" % cooldown, delta_cooldown],
+	]
+	for row in rows:
+		var row_box := HBoxContainer.new()
+		row_box.add_theme_constant_override("separation", 8)
+		var key := _label(str(row[0]), 17, Color("#c9c0b1"))
+		key.custom_minimum_size.x = 52
+		row_box.add_child(key)
+		var value := _label(str(row[1]), 21, Color("#e8e2cf"))
+		value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row_box.add_child(value)
+		var delta := float(row[2])
+		if absf(delta) >= 0.05:
+			var delta_text := ("+%.0f" % delta) if absf(delta) >= 1.0 else ("%+.1f" % delta)
+			var is_cooldown := str(row[0]) == "冷却"
+			var is_gain := (delta < 0.0) if is_cooldown else (delta > 0.0)
+			var delta_label := _label(delta_text + ("秒" if is_cooldown else ""), 15, Color("#90c59e") if is_gain else Color("#df7878"))
+			row_box.add_child(delta_label)
+		stat_box.add_child(row_box)
+	return stat_panel
+
+func _hide_rune_hero_detail() -> void:
+	if is_instance_valid(rune_hero_detail_overlay):
+		rune_hero_detail_overlay.hide()
+
+func _show_rune_hero_detail() -> void:
+	var hero_id := _selected_rune_hero()
+	if hero_id.is_empty() or not is_instance_valid(rune_hero_detail_text) or not is_instance_valid(rune_hero_detail_columns): return
+	var hero: Dictionary = heroes[hero_id]
+	var base_hp := float(hero.hp)
+	var base_strategy := float(hero.skill_value)
+	var base_cooldown := float(hero.cooldown)
+	var talent := _talent_stat_bonus(hero_id)
+	var runes := _rune_stat_bonus(hero_id)
+	var rune_hp := maxf(float(runes.hp), -base_hp * 0.30)
+	var talent_hp := base_hp + float(talent.hp)
+	var talent_strategy := base_strategy + float(talent.strategy)
+	var progression_cap := base_cooldown * 0.5
+	var talent_cooldown := maxf(2.0, base_cooldown - minf(float(talent.cooldown), progression_cap))
+	var final_hp := base_hp + float(talent.hp) + rune_hp
+	var final_strategy := base_strategy + float(talent.strategy) + float(runes.strategy)
+	var final_cooldown := maxf(2.0, base_cooldown - minf(float(talent.cooldown) + float(runes.cooldown), progression_cap))
+	_clear_dynamic_children(rune_hero_detail_columns)
+	rune_hero_detail_columns.add_child(_rune_stat_panel("初始属性", Color("#7a9b6a"), roundi(base_hp), roundi(base_strategy), base_cooldown))
+	rune_hero_detail_columns.add_child(_rune_stat_panel("天赋加成", Color("#b98a4f"), roundi(talent_hp), roundi(talent_strategy), talent_cooldown, roundi(talent.hp), roundi(talent.strategy), -minf(float(talent.cooldown), progression_cap)))
+	rune_hero_detail_columns.add_child(_rune_stat_panel("天赋 + 符文", Color("#c56a5a"), roundi(final_hp), roundi(final_strategy), final_cooldown, roundi(float(talent.hp) + rune_hp), roundi(float(talent.strategy) + float(runes.strategy)), -minf(float(talent.cooldown) + float(runes.cooldown), progression_cap)))
+	rune_hero_detail_text.text = _rune_hero_detail_content(hero_id, final_strategy)
+	rune_hero_detail_overlay.show()
+
+func _resolve_strategy_numbers(text: String, strategy: float) -> String:
+	# 把 "N%兵略值" 换算成具体点数,"N×/N*兵略值%" 换算成具体百分比。
+	var percent := RegEx.new()
+	percent.compile("(\\d+(?:\\.\\d+)?)%兵略值")
+	var output := ""
+	var last := 0
+	for m in percent.search_all(text):
+		var value := roundi(strategy * float(m.get_string(1)) / 100.0)
+		output += text.substr(last, m.get_start() - last) + str(value) + "点"
+		last = m.get_end()
+	output += text.substr(last)
+	var ratio := RegEx.new()
+	ratio.compile("(\\d+(?:\\.\\d+)?)[×*]兵略值%")
+	var output2 := ""
+	last = 0
+	for m in ratio.search_all(output):
+		var value := roundi(float(m.get_string(1)) * strategy)
+		output2 += output.substr(last, m.get_start() - last) + "+" + str(value) + "%"
+		last = m.get_end()
+	output2 += output.substr(last)
+	return output2
+
+func _rune_hero_detail_content(hero_id: String, final_strategy: float) -> String:
+	var bb := ""
+	bb += "[color=#90c59e][b]技能（按最终兵略 %d 换算）[/b][/color]\n" % roundi(final_strategy)
+	bb += _resolve_strategy_numbers(_skill_detail(hero_id), final_strategy)
+	var bond_text := _hero_bond_detail(hero_id)
+	var bond_parts := bond_text.split("\n\n")
+	if bond_parts.size() > 1 and str(bond_parts[bond_parts.size() - 1]).begins_with("阵营羁绊"):
+		bond_parts.remove_at(bond_parts.size() - 1)
+	if not bond_parts.is_empty():
+		bb += "\n\n[color=#90c59e][b]羁绊（按最终兵略换算）[/b][/color]\n"
+		bb += _resolve_strategy_numbers("\n\n".join(bond_parts), final_strategy)
+	return bb
 
 func _show_runes() -> void:
 	rune_overlay.show()
@@ -1791,22 +2029,24 @@ func _render_runes(message := "") -> void:
 		if rune == null: continue
 		var tier_data: Dictionary = RUNE_TIERS[int(rune.tier) - 1]
 		var equipped_panel := PanelContainer.new()
-		equipped_panel.custom_minimum_size.y = 66
+		equipped_panel.custom_minimum_size.y = 60
 		_style(equipped_panel, Color("#141815"), 5, Color(str(tier_data.hex)), 2)
 		var equipped_row := HBoxContainer.new()
 		equipped_row.add_theme_constant_override("separation", 10)
-		var equipped_gem := _label("◆\n" + str(tier_data.name), 14, Color(str(tier_data.hex)).lightened(0.18))
-		equipped_gem.custom_minimum_size.x = 54
+		var equipped_gem := _label("◆", 20, Color(str(tier_data.hex)))
+		equipped_gem.custom_minimum_size.x = 36
 		equipped_gem.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		equipped_gem.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		equipped_row.add_child(equipped_gem)
-		var equipped_text := _label(_rune_display_name(rune) + "\n" + _rune_description(rune), 12, Color(str(tier_data.hex)).lightened(0.22))
+		var equipped_text := _label("[%s] %s %s" % [str(tier_data.name), _rune_display_name(rune), _rune_description(rune)], 14, Color(str(tier_data.hex)).lightened(0.22))
 		equipped_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		equipped_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		equipped_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		equipped_text.tooltip_text = _rune_description(rune)
 		equipped_row.add_child(equipped_text)
 		var remove := _button("卸下")
-		remove.custom_minimum_size = Vector2(64, 38)
-		remove.add_theme_font_size_override("font_size", 13)
+		remove.custom_minimum_size = Vector2(66, 38)
+		remove.add_theme_font_size_override("font_size", 14)
 		remove.pressed.connect(_on_unequip_rune.bind(hero_id, int(uid)))
 		equipped_row.add_child(remove)
 		equipped_panel.add_child(equipped_row)
@@ -1815,7 +2055,8 @@ func _render_runes(message := "") -> void:
 	var sorted_runes := rune_inventory.filter(func(rune):
 		var tier_matches := rune_tier_filter == 0 or int(rune.tier) == rune_tier_filter
 		var class_matches := rune_class_filter.is_empty() or str(_rune_kind(str(rune.kind)).get("class", "")) == rune_class_filter
-		return tier_matches and class_matches
+		var not_equipped := _rune_equipped_hero(int(rune.uid)).is_empty()
+		return tier_matches and class_matches and not_equipped
 	)
 	sorted_runes.sort_custom(_rune_inventory_sort)
 	var filter_name := "全部" if rune_tier_filter == 0 else str(RUNE_TIERS[rune_tier_filter - 1].name)
@@ -1834,24 +2075,24 @@ func _render_runes(message := "") -> void:
 	for rune in sorted_runes:
 		var tier_data: Dictionary = RUNE_TIERS[int(rune.tier) - 1]
 		var panel := PanelContainer.new()
-		panel.custom_minimum_size = Vector2(0, 112)
+		panel.custom_minimum_size = Vector2(0, 148)
 		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		panel.mouse_filter = Control.MOUSE_FILTER_PASS
-		_style(panel, Color("#131713ee"), 5, Color(str(tier_data.hex)).darkened(0.12), 2)
+		_style(panel, Color("#131713ee"), 6, Color(str(tier_data.hex)).darkened(0.12), 2)
 		var card_box := VBoxContainer.new()
 		card_box.mouse_filter = Control.MOUSE_FILTER_PASS
-		card_box.add_theme_constant_override("separation", 5)
+		card_box.add_theme_constant_override("separation", 7)
 		var row := HBoxContainer.new()
 		row.mouse_filter = Control.MOUSE_FILTER_PASS
-		row.add_theme_constant_override("separation", 10)
+		row.add_theme_constant_override("separation", 12)
 		var rune_class := str(_rune_kind(str(rune.kind)).get("class", ""))
-		var gem := _label("◆", 30, Color(str(tier_data.hex)))
-		gem.custom_minimum_size.x = 38
+		var gem := _label("◆", 38, Color(str(tier_data.hex)))
+		gem.custom_minimum_size.x = 46
 		gem.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		gem.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		gem.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(gem)
-		var info := _label(_rune_display_name(rune) + "　[" + rune_class + "]\n" + _rune_description(rune), 15, Color(str(tier_data.hex)).lightened(0.22))
+		var info := _label(_rune_display_name(rune) + "　[" + rune_class + "]\n" + _rune_description(rune), 18, Color(str(tier_data.hex)).lightened(0.22))
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1859,9 +2100,9 @@ func _render_runes(message := "") -> void:
 		var owner := _rune_equipped_hero(int(rune.uid))
 		card_box.add_child(row)
 		var actions := HBoxContainer.new()
-		actions.add_theme_constant_override("separation", 6)
+		actions.add_theme_constant_override("separation", 8)
 		if not owner.is_empty():
-			var owner_label := _label("已装备 · " + _hero_name(owner), 12, Color("#b7ae9f"))
+			var owner_label := _label("已装备 · " + _hero_name(owner), 15, Color("#b7ae9f"))
 			owner_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			owner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			owner_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1873,15 +2114,15 @@ func _render_runes(message := "") -> void:
 		var convert_cost := int(RUNE_TIERS[int(rune.tier) - 1].convert)
 		convert_cost = ceili(convert_cost * (1.0 - 0.10 * _talent_level("all", "百炼")))
 		var convert := _button("转换 %d" % convert_cost)
-		convert.custom_minimum_size.y = 34
-		convert.add_theme_font_size_override("font_size", 13)
+		convert.custom_minimum_size.y = 44
+		convert.add_theme_font_size_override("font_size", 16)
 		convert.mouse_filter = Control.MOUSE_FILTER_PASS
 		convert.disabled = general_souls < convert_cost
 		convert.pressed.connect(_on_convert_rune.bind(int(rune.uid)))
 		actions.add_child(convert)
 		var equip := _button("卸下" if owner == hero_id else "装备")
-		equip.custom_minimum_size.y = 34
-		equip.add_theme_font_size_override("font_size", 13)
+		equip.custom_minimum_size.y = 44
+		equip.add_theme_font_size_override("font_size", 16)
 		_accent_button(equip, Color(str(tier_data.hex)))
 		equip.mouse_filter = Control.MOUSE_FILTER_PASS
 		equip.disabled = not owner.is_empty() and owner != hero_id or (owner.is_empty() and equipped.size() >= 3)
@@ -2171,6 +2412,10 @@ func _build_settings_overlay() -> void:
 		enemy_strategy_setting_options.add_item(t("敌方兵略值：", "Enemy Strategy: ") + str(100 + i * 5), i)
 	enemy_strategy_setting_options.item_selected.connect(_set_enemy_strategy)
 	box.add_child(enemy_strategy_setting_options)
+	tianshu_refresh_setting_button = _button("")
+	tianshu_refresh_setting_button.custom_minimum_size = Vector2(360, 48)
+	tianshu_refresh_setting_button.pressed.connect(_toggle_tianshu_refresh_setting)
+	box.add_child(tianshu_refresh_setting_button)
 	challenge_limit_setting_button = _button("")
 	challenge_limit_setting_button.custom_minimum_size = Vector2(360, 48)
 	challenge_limit_setting_button.pressed.connect(_toggle_challenge_limit_setting)
@@ -2260,6 +2505,8 @@ func _refresh_settings_ui() -> void:
 		for i in range(21):
 			enemy_strategy_setting_options.set_item_text(i, t("敌方兵略值：", "Enemy Strategy: ") + str(100 + i * 5))
 		enemy_strategy_setting_options.select(int(enemy_strategy_bonus / 5))
+	if is_instance_valid(tianshu_refresh_setting_button):
+		tianshu_refresh_setting_button.text = t("天书无限刷新（调试）：开启", "Infinite codex refresh (debug): ON") if tianshu_infinite_refresh else t("天书无限刷新（调试）：关闭", "Infinite codex refresh (debug): OFF")
 	if is_instance_valid(challenge_limit_setting_button):
 		challenge_limit_setting_button.text = "闯关解锁限制：开启" if limit_challenges else "闯关解锁限制：关闭（全部开放）"
 
@@ -2288,6 +2535,11 @@ func _set_enemy_strategy(index: int) -> void:
 	_save_settings()
 	_refresh_settings_ui()
 
+func _toggle_tianshu_refresh_setting() -> void:
+	tianshu_infinite_refresh = not tianshu_infinite_refresh
+	_save_settings()
+	_refresh_settings_ui()
+
 func _apply_board_side_layout() -> void:
 	if not is_instance_valid(battle_workspace) or not is_instance_valid(battle_arena_panel) or not is_instance_valid(battle_info_panel): return
 	battle_workspace.move_child(battle_arena_panel, 0 if board_side == "left" else 1)
@@ -2307,6 +2559,7 @@ func _load_settings() -> void:
 		if enemy_faction_filter not in ["", "shu", "wei", "wu", "qun"]: enemy_faction_filter = ""
 		if board_side not in ["left", "right"]: board_side = "left"
 		enemy_strategy_bonus = clampi(int(config.get_value("battle", "enemy_strategy_bonus", 0)), 0, 100)
+		tianshu_infinite_refresh = bool(config.get_value("debug", "tianshu_infinite_refresh", false))
 		limit_challenges = bool(config.get_value("battle", "limit_challenges", true))
 	battle_speed = game_speed
 
@@ -2319,6 +2572,7 @@ func _save_settings() -> void:
 	config.set_value("interface", "show_hero_codex_images", show_hero_codex_images)
 	config.set_value("interface", "board_side", board_side)
 	config.set_value("battle", "enemy_strategy_bonus", enemy_strategy_bonus)
+	config.set_value("debug", "tianshu_infinite_refresh", tianshu_infinite_refresh)
 	config.set_value("battle", "limit_challenges", limit_challenges)
 	config.save(SETTINGS_PATH)
 
@@ -2849,7 +3103,7 @@ func _bond_graph_data(faction: String) -> Dictionary:
 				["tyrant_peerless", "暴虐无双", "Tyrant and Peerless", ["lvbu", "dongzhuo"], "2人", "2 heroes", "吕布按横扫实际伤害的20%回血；董卓伤害提高至自身当前生命30%。", "Lu Bu heals for 20% of actual sweep damage; Dong Zhuo deals 30% of current HP."],
 				["hero_beauty", "英雄美人", "Hero and Beauty", ["lvbu", "diaochan"], "2人", "2 heroes", "吕布每损失10%生命增伤4%；被貂蝉魅惑者每秒攻击相邻友军。", "Lu Bu gains 4% damage per 10% HP missing; charmed enemies attack adjacent allies each second."],
 				["peerless_strategy", "谋定无双", "Peerless Strategy", ["lvbu", "chengong"], "2人", "2 heroes", "吕布横扫有30%概率再释放一次；陈宫冷却光环额外减少0.8秒。", "Lu Bu has a 30% repeat chance; Chen Gong's aura reduces another 0.8s."],
-				["flying_formation", "飞将陷阵", "Flying General Formation", ["lvbu", "gaoshun"], "2人", "2 heroes", "吕布横扫追加目标正后方单元格；高顺技能额外攻击1人。", "Lu Bu also strikes the tile directly behind the primary target; Gao Shun gains 1 target."],
+				["flying_formation", "飞将陷阵", "Flying General Formation", ["lvbu", "gaoshun"], "2人", "2 heroes", "吕布无双横扫伤害增加70%兵略值；高顺技能额外攻击1人。", "Lu Bu's sweep deals 70% more Strategy damage; Gao Shun gains 1 target."],
 				["tyrant_beauty", "暴君倾城", "Tyrant and Beauty", ["dongzhuo", "diaochan"], "2人", "2 heroes", "董卓最大生命提高40%；貂蝉魅惑延长3.6秒并恢复自身300%兵略值生命。", "Dong Zhuo gains 40% max HP; Diao Chan gains 3.6s charm and heals herself for 300% Strategy."],
 				["strategy_formation", "谋陷并驱", "Strategy and Formation", ["chengong", "gaoshun"], "2人", "2 heroes", "陈宫冷却光环额外减少0.8秒；高顺易碎延长6.3秒。", "Chen Gong's aura reduces another 0.8s; Gao Shun's Fragile gains 6.3s."],
 				["hebei_twins", "河北双雄", "Hebei Twin Champions", ["yanliang", "wenchou"], "2人", "2 heroes", "颜良、文丑各增加1个目标，并分别减少30%/50%兵略值伤害。", "Yan Liang and Wen Chou each gain 1 target but lose 30%/50% Strategy damage."],
@@ -3246,29 +3500,30 @@ func _render_tianshu_encyclopedia() -> void:
 		var book: Dictionary = TIANSHU_BOOKS[str(book_id)]
 		var accent := _tianshu_group_color(book)
 		var card := PanelContainer.new()
+		card.custom_minimum_size = Vector2(0, 230)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.mouse_filter = Control.MOUSE_FILTER_PASS
 		_style(card, Color("#1a1d1f"), 12, accent, 2)
 		encyclopedia_grid.add_child(card)
 		var card_box := VBoxContainer.new()
 		card_box.mouse_filter = Control.MOUSE_FILTER_PASS
-		card_box.add_theme_constant_override("separation", 8)
+		card_box.add_theme_constant_override("separation", 10)
 		card.add_child(card_box)
-		var group_label := _label(str(book.group), 13, accent.lightened(0.25))
+		var group_label := _label("◆ " + str(book.group) + " ◆", 16, accent.lightened(0.25))
 		group_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		group_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_box.add_child(group_label)
-		var book_name := _label(_tianshu_name(str(book_id)), 22, accent.lightened(0.34))
+		var book_name := _label(_tianshu_name(str(book_id)), 30, accent.lightened(0.34))
 		book_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		book_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_box.add_child(book_name)
 		var effects: Array = book.get("effects", [])
-		var level_one := _label(t("一级：", "Level I: ") + (str(effects[0]) if effects.size() > 0 else ""), 14, Color("#e8e2cf"))
+		var level_one := _label(t("一级：", "Level I: ") + (str(effects[0]) if effects.size() > 0 else ""), 18, Color("#e8e2cf"))
 		level_one.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		level_one.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		level_one.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card_box.add_child(level_one)
-		var level_two := _label(t("二级：", "Level II: ") + (str(effects[1]) if effects.size() > 1 else ""), 14, Color("#c9c0b1"))
+		var level_two := _label(t("二级：", "Level II: ") + (str(effects[1]) if effects.size() > 1 else ""), 18, Color("#c9c0b1"))
 		level_two.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		level_two.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		level_two.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -3479,7 +3734,7 @@ func _hero_bond_detail(hero_id: String) -> String:
 		[["lvbu", "dongzhuo"], "暴虐无双", "Tyrant and Peerless", {"lvbu":["按无双横扫对武将造成的实际伤害20%恢复自身生命；护盾和空格伤害不计入。", "Heal for 20% of actual hero HP damage from Peerless Sweep; shield and empty-tile damage do not count."], "dongzhuo":["暴君横征伤害提高至自身当前生命值30%。", "Tyrant's Might rises to 30% of current HP."]}],
 		[["lvbu", "diaochan"], "英雄美人", "Hero and Beauty", {"lvbu":["每损失10%生命，无双横扫伤害提高4%。", "Gain 4% Peerless Sweep damage per 10% HP missing."], "diaochan":["魅惑期间，目标每秒随机攻击一名相邻友军，造成被魅惑者100%兵略值伤害。", "Each second, the charmed target attacks a random adjacent ally for 100% of its own Strategy."]}],
 		[["lvbu", "chengong"], "谋定无双", "Peerless Strategy", {"lvbu":["无双横扫有30%概率连续释放两次。", "Peerless Sweep has a 30% chance to cast twice."], "chengong":["智迟谋速的冷却减少额外增加0.8秒。", "Measured Formation reduces cooldown by another 0.8s."]}],
-		[["lvbu", "gaoshun"], "飞将陷阵", "Flying General Formation", {"lvbu":["无双横扫追加攻击正前方敌军后方的单元格。", "Peerless Sweep also hits the tile behind the facing enemy."], "gaoshun":["陷阵之志的目标额外增加1名。", "Formation Resolve gains 1 target."]}],
+		[["lvbu", "gaoshun"], "飞将陷阵", "Flying General Formation", {"lvbu":["无双横扫造成的伤害增加70%兵略值。", "Peerless Sweep damage gains 70% Strategy."], "gaoshun":["陷阵之志的目标额外增加1名。", "Formation Resolve gains 1 target."]}],
 		[["dongzhuo", "diaochan"], "暴君倾城", "Tyrant and Beauty", {"dongzhuo":["自身最大生命值提高40%。", "Gain 40% max HP."], "diaochan":["魅惑持续时间增加3.6秒，且貂蝉恢复300%兵略值生命。", "Charm gains 3.6s and Diao Chan heals herself for 300% Strategy."]}],
 		[["chengong", "gaoshun"], "谋陷并驱", "Strategy and Formation", {"chengong":["智迟谋速的冷却减少额外增加0.8秒。", "Measured Formation reduces cooldown by another 0.8s."], "gaoshun":["陷阵之志的易碎持续时间增加6.3秒。", "Formation Resolve Fragile duration gains 6.3s."]}],
 		[["yanliang", "wenchou"], "河北双雄", "Hebei Twin Champions", {"yanliang":["技能目标增加1名，伤害减少30%兵略值。", "Gain 1 target but lose 30% Strategy damage."], "wenchou":["技能目标增加1名，伤害减少50%兵略值。", "Gain 1 target but lose 50% Strategy damage."]}],
@@ -3582,7 +3837,7 @@ func _render() -> void:
 	load_button.text = t("读取", "LOAD")
 	menu_button.text = t("主菜单", "MENU")
 	speed_button.text = str(int(game_speed)) + "×"
-	tianshu_header_button.text = t("天书阁", "CODEX") + " · 金 " + str(gold)
+	tianshu_header_button.text = _tianshu_pavilion_button_text()
 	tianshu_header_button.visible = _tianshu_enabled()
 	tianshu_header_button.disabled = battle_running or phase not in ["draft", "placement"]
 	save_button.disabled = battle_running
@@ -3651,9 +3906,16 @@ func _render() -> void:
 	battle_pause_button.text = t("继续", "RESUME") if battle_paused else t("暂停", "PAUSE")
 	battle_pause_button.visible = phase == "combat" and battle_running
 
+func _tianshu_pavilion_button_text() -> String:
+	var interest := mini(floori(float(gold) / 10.0), _gold_interest_cap())
+	return t("天书阁", "CODEX") + " · 金 " + str(gold) + "\n" \
+		+ t("利息：", "Interest: ") + str(interest) + " / " + str(_gold_interest_cap()) + "\n" \
+		+ t("收入：", "Income: +") + str(_round_base_gold_income())
+
 func _refresh_economy_ui() -> void:
 	if is_instance_valid(tianshu_header_button):
-		tianshu_header_button.text = t("天书阁", "CODEX") + " · 金 " + str(gold)
+		tianshu_header_button.text = _tianshu_pavilion_button_text()
+		tianshu_header_button.tooltip_text = t("回合开始时先结算利息（每 10 金币 +1，上限可被天书/天赋提高），再发放基础收入。", "Round start settles interest first (1 per 10 gold, cap raisable), then base income.")
 		tianshu_header_button.disabled = battle_running or phase not in ["draft", "placement"]
 	if is_instance_valid(tianshu_gold_label):
 		tianshu_gold_label.text = "金　%d" % gold
@@ -4133,10 +4395,22 @@ func _can_drop_board(_at_position: Vector2, data, _row: int, _col: int) -> bool:
 	if phase not in ["draft", "placement"] or not (data is Dictionary) or not data.has("unit_id"): return false
 	var source = _find_by_id(player_units, str(data.unit_id))
 	if source == null or not _can_unit_use_row(source, _row): return false
+	# 君主书限制：持书君主场上最多同时存活一个，场上那个阵亡后备战席的才能上阵。
+	if int(source.row) < 0 and _is_lord_book_hero(str(source.hero_id)):
+		for unit in player_units:
+			if int(unit.row) >= 0 and unit.alive and str(unit.hero_id) == str(source.hero_id) and unit.id != source.id:
+				return false
 	var occupant = _unit_at(player_units, _row, _col)
 	if occupant == null or occupant.id == source.id: return true
 	if int(source.row) < 0: return true
 	return _can_unit_use_row(occupant, int(source.row))
+
+func _is_lord_book_hero(hero_id: String) -> bool:
+	for raw_book_id in tianshu_levels:
+		var book: Dictionary = TIANSHU_BOOKS.get(str(raw_book_id), {})
+		if book.has("lord") and str(book.lord) == hero_id:
+			return true
+	return false
 
 func _drop_board(_at_position: Vector2, data, row: int, col: int) -> void:
 	if not _can_drop_board(_at_position, data, row, col): return

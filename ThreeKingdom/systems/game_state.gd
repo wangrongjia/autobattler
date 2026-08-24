@@ -184,6 +184,7 @@ var draft_faction_filter := ""     # 我方选将阵营过滤(空=全部, 或 sh
 var enemy_faction_filter := ""     # 敌方随机武将阵营过滤
 var board_side := "left"           # 棋盘位置:left=居左,right=居右
 var enemy_strategy_bonus := 0      # 敌方兵略值加成(0~100, 实际兵略值=100+此值)
+var tianshu_infinite_refresh := false  # 天书无限刷新(调试用, 开启后三选一可无限刷新)
 
 var heroes := {
 	"liubei":{"zh":"刘备", "en":"Liu Bei", "f":"shu", "hp":3740, "skill_value":100, "cooldown":6.0, "range":3, "skill":"Benevolent Renewal", "zh_skill":"仁德回春", "ability":"signature", "ability_params":{"duration":4.0, "heal_ratio":1.0, "peach_heal_ratio":2.0, "liushan_duration_bonus":0.30, "zhuge_damage_reduction":0.30}, "summary":"仁德回春：为当前生命比例最低的友军施加持续4秒、每秒100%兵略值的治疗。", "en_summary":"Regenerate the ally with the lowest HP ratio for 4s at 100% Strategy per second.", "detail_zh":"仁德回春：为当前生命比例最低的友军施加持续4秒、每秒100%兵略值的治疗。", "detail_en":"Regenerate the ally with the lowest HP ratio for 4s at 100% Strategy per second."},

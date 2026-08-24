@@ -26,6 +26,14 @@ const TIANSHU_BOOKS := {
 	"jungong_juezhi":{"name":"军功爵制", "en":"Military Merit", "group":"通用·经济", "effects":["我方每击杀一名敌将，立即获得 40 金币。", "每次击杀获得 80 金币，且击杀者本回合兵略 +20。"]},
 	"mage_guoshi":{"name":"马革裹尸", "en":"Shrouded in Horsehide", "group":"通用·经济", "effects":["我方武将每阵亡一名，立即获得 40 金币。", "每次阵亡获得 90 金币。"]},
 	"maidu_huanzhu":{"name":"买椟还珠", "en":"Keep the Casket", "group":"通用·经济", "effects":["天书替换费用降低 80（降至 220）。", "天书替换费用降低 200（降至 100）。"]},
+	"shu_talents":{"name":"西川英杰录", "en":"Shu Talents", "group":"蜀", "faction":"shu", "effects":["立即随机获得 2 名蜀阵营武将加入备战席。", "立即随机获得 3 名蜀阵营武将加入备战席。"]},
+	"wei_talents":{"name":"中原英才志", "en":"Wei Talents", "group":"魏", "faction":"wei", "effects":["立即随机获得 2 名魏阵营武将加入备战席。", "立即随机获得 3 名魏阵营武将加入备战席。"]},
+	"wu_talents":{"name":"江东英杰传", "en":"Wu Talents", "group":"吴", "faction":"wu", "effects":["立即随机获得 2 名吴阵营武将加入备战席。", "立即随机获得 3 名吴阵营武将加入备战席。"]},
+	"qun_talents":{"name":"乱世豪杰谱", "en":"Qun Talents", "group":"群", "faction":"qun", "effects":["立即随机获得 2 名群阵营武将加入备战席。", "立即随机获得 3 名群阵营武将加入备战席。"]},
+	"shu_lord":{"name":"汉昭烈帝", "en":"Emperor Zhaolie", "group":"蜀", "faction":"shu", "lord":"liubei", "effects":["仁德回春的治疗目标数 +1；刘备最大生命 +2000。", "治疗目标数 +1；被治疗的蜀国武将在治疗期间免疫所有伤害；刘备最大生命再 +5000。"]},
+	"wei_lord":{"name":"魏武挥鞭", "en":"Wei Whip", "group":"魏", "faction":"wei", "lord":"caocao", "effects":["曹操施放技能后，全体魏将伤害提高 15%，持续 5 秒；曹操最大生命 +2000。", "增伤提高至 25% 持续 6 秒，且施放时全体魏将行动条 +10；曹操最大生命再 +5000。"]},
+	"wu_lord":{"name":"坐断东南", "en":"Throne of the Southeast", "group":"吴", "faction":"wu", "lord":"sunquan", "effects":["任意武将阵亡时，孙权吸取其 8% 最大生命转化为自身最大生命（无上限）；孙权最大生命 +2000。", "吸取提高至 15%，且当前生命同步增加吸收值；孙权最大生命再 +5000。"]},
+	"qun_lord":{"name":"金吾飞将", "en":"Golden Wings", "group":"群", "faction":"qun", "lord":"lvbu", "effects":["无双横扫改为攻击正前方及其左右各 2 格（最多前排 5 格）；吕布最大生命 +2000。", "额外覆盖正前方整列与中排左右格（站前排正中共 9 格）；吕布最大生命再 +5000。"]},
 	"shu_jianbi":{"name":"汉室坚壁", "en":"Han Bulwark", "group":"蜀", "faction":"shu", "effects":["蜀将受到伤害降低 5%。", "减伤提高至 10%。"]},
 	"shu_rende":{"name":"仁德遗泽", "en":"Legacy of Benevolence", "group":"蜀", "faction":"shu", "effects":["蜀将治疗提高 20%；溢出治疗的 30%转化为护盾。", "治疗提高 40%，护盾转化提高至 60%。"]},
 	"shu_beifa":{"name":"北伐不息", "en":"Endless Northern March", "group":"蜀", "faction":"shu", "effects":["蜀将每次施法，本回合兵略 +10，最多 3 层。", "每次 +20，最多 5 层。"]},
@@ -46,10 +54,10 @@ const TIANSHU_BOOKS := {
 	"qun_huangtian":{"name":"黄天雷契", "en":"Yellow Heaven Pact", "group":"群", "faction":"qun", "effects":["群将累计施法 5 次后，雷击 2 个随机敌方格，造成 200%平均兵略伤害。", "每 4 次触发，雷击 3 格造成 200%平均兵略伤害，并有 20%概率眩晕 1 秒。"]},
 	"qun_xiaoxiong":{"name":"枭雄并起", "en":"Rival Warlords", "group":"群", "faction":"qun", "effects":["每名上阵群将使全体群将兵略 +4，最多计入 8 名。", "每名群将提高至兵略 +8，最多计入 8 名。"]},
 	"qun_yujin":{"name":"余烬燎原", "en":"Embers Rekindled", "group":"群", "faction":"qun", "effects":["我方群将阵亡时，存活群将行动条 +10、本场兵略 +6，最多触发 3 次。", "行动条提高至 +20、本场兵略 +12，最多触发 5 次。"]},
-	"pool_shu":{"name":"蜀汉求贤令", "en":"Shu Recruitment Edict", "group":"武将池", "pool":["shu"], "effects":["当前回合的下两次选将只出现蜀将。", "当前和下一回合的下三次选将只出现蜀将。"]},
-	"pool_wei":{"name":"魏庭求贤令", "en":"Wei Recruitment Edict", "group":"武将池", "pool":["wei"], "effects":["当前回合的下两次选将只出现魏将。", "当前和下一回合的下三次选将只出现魏将。"]},
-	"pool_wu":{"name":"江东求贤令", "en":"Wu Recruitment Edict", "group":"武将池", "pool":["wu"], "effects":["当前回合的下两次选将只出现吴将。", "当前和下一回合的下三次选将只出现吴将。"]},
-	"pool_qun":{"name":"群雄求贤令", "en":"Qun Recruitment Edict", "group":"武将池", "pool":["qun"], "effects":["当前回合的下两次选将只出现群将。", "当前和下一回合的下三次选将只出现群将。"]}
+	"pool_shu":{"name":"蜀汉求贤令", "en":"Shu Recruitment Edict", "group":"武将池", "pool":["shu"], "effects":["下两次选将只出现蜀将。", "下四次选将只出现蜀将；每个候选位额外刷新1次。"]},
+	"pool_wei":{"name":"魏庭求贤令", "en":"Wei Recruitment Edict", "group":"武将池", "pool":["wei"], "effects":["下两次选将只出现魏将。", "下四次选将只出现魏将；每个候选位额外刷新1次。"]},
+	"pool_wu":{"name":"江东求贤令", "en":"Wu Recruitment Edict", "group":"武将池", "pool":["wu"], "effects":["下两次选将只出现吴将。", "下四次选将只出现吴将；每个候选位额外刷新1次。"]},
+	"pool_qun":{"name":"群雄求贤令", "en":"Qun Recruitment Edict", "group":"武将池", "pool":["qun"], "effects":["下两次选将只出现群将。", "下四次选将只出现群将；每个候选位额外刷新1次。"]}
 }
 
 var tianshu_levels := {}
@@ -96,11 +104,31 @@ func _tianshu_book_faction(book: Dictionary) -> String:
 	if book.has("pool") and not Array(book.pool).is_empty(): return str(Array(book.pool)[0])
 	return ""
 
+func _tianshu_lord_requirement_met(book_id: String, book: Dictionary) -> bool:
+	# 君主书出现前提：一级需≥2本本阵营天书；升级二级需≥2本二级本阵营天书。
+	# 君主书互斥：已持有任意君主书时，其他君主书不再出现。
+	if not book.has("lord"): return true
+	for raw_book_id in tianshu_levels:
+		var other: Dictionary = TIANSHU_BOOKS.get(str(raw_book_id), {})
+		if other.has("lord") and str(raw_book_id) != book_id:
+			return false
+	var faction := str(book.faction)
+	var owned := 0
+	var owned_max := 0
+	for raw_book_id in tianshu_levels:
+		var other: Dictionary = TIANSHU_BOOKS.get(str(raw_book_id), {})
+		if str(other.get("faction", "")) != faction or other.has("lord"): continue
+		owned += 1
+		if _tianshu_level(str(raw_book_id)) >= 2: owned_max += 1
+	return owned_max >= 2 if _tianshu_level(book_id) >= 1 else owned >= 2
+
 func _tianshu_candidates_for_slot(index: int, excluded: Array) -> Array:
 	return TIANSHU_BOOKS.keys().filter(func(raw_book_id):
 		var book_id := str(raw_book_id)
 		if _tianshu_level(book_id) >= 2 or excluded.has(book_id): return false
-		var is_common := _tianshu_book_faction(TIANSHU_BOOKS[book_id]).is_empty()
+		var book: Dictionary = TIANSHU_BOOKS[book_id]
+		if not _tianshu_lord_requirement_met(book_id, book): return false
+		var is_common := _tianshu_book_faction(book).is_empty()
 		return is_common if index == 0 else not is_common
 	)
 
@@ -124,15 +152,17 @@ func _begin_tianshu_draw(count: int, reason: String, return_phase: String, gener
 
 func _refresh_tianshu_choice(index: int) -> void:
 	if phase != "tianshu" or index < 0 or index >= tianshu_choices.size(): return
-	if index >= tianshu_refresh_available.size() or not tianshu_refresh_available[index]: return
-	var previous := tianshu_choices[index]
+	if not tianshu_infinite_refresh:
+		if index >= tianshu_refresh_available.size() or not tianshu_refresh_available[index]: return
+	var previous := str(tianshu_choices[index])
 	var excluded := tianshu_choices.duplicate()
 	var pool := _tianshu_candidates_for_slot(index, excluded)
 	pool = pool.filter(func(book_id): return str(book_id) != previous)
 	if pool.is_empty(): return
 	pool.shuffle()
 	tianshu_choices[index] = str(pool[0])
-	tianshu_refresh_available[index] = false
+	if not tianshu_infinite_refresh:
+		tianshu_refresh_available[index] = false
 	_render()
 
 func _choose_tianshu(book_id: String) -> void:
@@ -142,8 +172,13 @@ func _choose_tianshu(book_id: String) -> void:
 	tianshu_levels[book_id] = new_level
 	var book: Dictionary = TIANSHU_BOOKS[book_id]
 	if book.has("pool"):
-		tianshu_pool_effect = {"book_id":book_id, "factions":Array(book.pool).duplicate(), "end_round":round_number + (1 if new_level >= 2 else 0), "remaining_picks":3 if new_level >= 2 else 2, "level":new_level}
-	_log("[color=#e5a8ff]【天书·%s %s】%s[/color]" % [_tianshu_name(book_id), "Ⅱ" if new_level == 2 else "Ⅰ", _tianshu_effect_text(book_id, new_level)])
+		# 单阵营求贤令：不限定回合，纯按次数生效（一级 2 次、二级 4 次）。
+		# 双阵营盟书：维持回合内次数制（一级本回合 2 次、二级跨下一回合 3 次）。
+		var single_pool := Array(book.pool).size() == 1
+		var pool_end := 9999 if single_pool else round_number + (1 if new_level >= 2 else 0)
+		var pool_picks := (4 if new_level >= 2 else 2) if single_pool else (3 if new_level >= 2 else 2)
+		tianshu_pool_effect = {"book_id":book_id, "factions":Array(book.pool).duplicate(), "end_round":pool_end, "remaining_picks":pool_picks, "level":new_level}
+	_log("[color=#e5a8ff]【天书·%s %s】%s[/color]" % [_tianshu_name(book_id), "2级" if new_level == 2 else "1级", _tianshu_effect_text(book_id, new_level)])
 	_apply_tianshu_acquisition_effect(book_id, old_level, new_level)
 	tianshu_draws_remaining = maxi(0, tianshu_draws_remaining - 1)
 	if tianshu_draws_remaining > 0:
@@ -161,6 +196,45 @@ func _choose_tianshu(book_id: String) -> void:
 func _apply_tianshu_acquisition_effect(book_id: String, old_level: int, new_level: int) -> void:
 	if book_id == "taozhu_yice" and new_level > old_level and has_method("_earn_gold"):
 		call("_earn_gold", 300 if new_level == 1 else 600, "天书·陶朱遗策")
+	var talent_books := {"shu_talents":"shu", "wei_talents":"wei", "wu_talents":"wu", "qun_talents":"qun"}
+	if talent_books.has(book_id) and new_level > old_level:
+		_recruit_faction_heroes(str(talent_books[book_id]), 2 if new_level == 1 else 3)
+	var lord_book: Dictionary = TIANSHU_BOOKS.get(book_id, {})
+	if lord_book.has("lord") and new_level > old_level:
+		var lord_hp := 2000.0 if new_level == 1 else 5000.0
+		_apply_lord_book_bonus(str(lord_book.lord), lord_hp)
+
+func _apply_lord_book_bonus(lord_id: String, hp_bonus: float) -> void:
+	# 君主书保底：场上同名君主去重（保留血量最高的一个），备战席可存多个，全部提升生命。
+	var hero_template: Dictionary = heroes.get(lord_id, {})
+	if hero_template.is_empty(): return
+	hero_template.hp = int(float(hero_template.hp) + hp_bonus)
+	# 场上去重：只保留血量最高的一个，移除多余的
+	var keep = null
+	for unit in player_units:
+		if str(unit.hero_id) != lord_id or int(unit.row) < 0: continue
+		if keep == null or float(unit.hp) > float(keep.hp):
+			keep = unit
+	if keep != null:
+		for unit in player_units.duplicate():
+			if str(unit.hero_id) == lord_id and int(unit.row) >= 0 and unit != keep:
+				player_units.erase(unit)
+				_log("[color=#e5a8ff]【君主天书】移除了场上多余的%s。[/color]" % _hero_name(lord_id))
+	# 所有该君主（含备战席）生命提升
+	for unit in player_units:
+		if str(unit.hero_id) != lord_id: continue
+		unit.max_hp = float(unit.max_hp) + hp_bonus
+		unit.hp = minf(float(unit.max_hp), float(unit.hp) + hp_bonus)
+	_log("[color=#e5a8ff]【君主天书】%s 最大生命 +%.0f。[/color]" % [_hero_name(lord_id), hp_bonus])
+
+func _recruit_faction_heroes(faction: String, count: int) -> void:
+	var pool: Array = heroes.keys().filter(func(id): return str(heroes[id].f) == faction)
+	pool.shuffle()
+	var picked: Array = pool.slice(0, mini(count, pool.size()))
+	for hero_id in picked:
+		player_units.append(_make_roster_unit("player", str(hero_id)))
+	if not picked.is_empty():
+		_log("[color=#e5a8ff]【天书】随机获得 %d 名%s阵营武将加入备战席。[/color]" % [picked.size(), _faction_name(faction)])
 
 func _active_tianshu_pool_factions() -> Array:
 	if tianshu_pool_effect.is_empty() or int(tianshu_pool_effect.get("remaining_picks", 0)) <= 0 or round_number > int(tianshu_pool_effect.get("end_round", 0)):
