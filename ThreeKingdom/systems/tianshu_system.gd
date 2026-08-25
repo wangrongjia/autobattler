@@ -179,6 +179,7 @@ func _choose_tianshu(book_id: String) -> void:
 		var pool_picks := (4 if new_level >= 2 else 2) if single_pool else (3 if new_level >= 2 else 2)
 		tianshu_pool_effect = {"book_id":book_id, "factions":Array(book.pool).duplicate(), "end_round":pool_end, "remaining_picks":pool_picks, "level":new_level}
 	_log("[color=#e5a8ff]【天书·%s %s】%s[/color]" % [_tianshu_name(book_id), "2级" if new_level == 2 else "1级", _tianshu_effect_text(book_id, new_level)])
+	_play_sfx("tianshu", -5.0, 100, 0.0) # 选定天书:落卷声
 	_apply_tianshu_acquisition_effect(book_id, old_level, new_level)
 	tianshu_draws_remaining = maxi(0, tianshu_draws_remaining - 1)
 	if tianshu_draws_remaining > 0:

@@ -4,7 +4,7 @@ const REGISTERED_HERO_BALANCE = preload("res://ThreeKingdom/data/registered_hero
 
 const BOARD_COLUMNS := 5           # 棋盘列数(横向 5 格)
 const BOARD_ROWS := 3              # 棋盘行数(纵向 3 行:前排 row0/中排 row1/后排 row2)
-const RULER_MAX_HP := 50000        # 主公最大血量(主公血量归零则游戏结束)
+const RULER_MAX_HP := 100000       # 主公最大血量(主公血量归零则游戏结束)
 const ROUND_LIMIT := 15            # 总关卡数(15 关备战 + 1 场最终决战)
 const BATTLE_LIMIT := 30.0         # 每关战斗时长(秒),最终决战无此限制
 const TICK := 0.2                  # 战斗循环间隔:每 0.2 秒"走一步"(推进行动条)
@@ -118,6 +118,14 @@ var ground_effects: Array = []     # 空格上的持续地面效果；伤害按�
 var battle_stats := {}             # 本场战斗统计:单位 ID → {damage, healing, taken, control}
 var last_battle_stats: Array = []  # 上一场战斗的统计(用于战斗间隙展示)
 var skill_voice_player: AudioStreamPlayer # 武将技能台词共用声道；忙碌时跳过新台词，避免多人同时说话
+var peace_bgm_player: AudioStreamPlayer   # 非战斗场景循环 BGM；与战斗 BGM 交叉淡入淡出切换
+var battle_bgm_player: AudioStreamPlayer  # 战斗场景循环 BGM；与和平 BGM 交叉淡入淡出切换
+var _bgm_target := ""                     # 当前 BGM 目标模式:"peace"/"battle"；仅在模式变化时触发交叉淡变
+var _bgm_tweens := {}                     # BGM 播放器 → 音量渐变 Tween(切换前先 kill，避免新旧渐变叠加)
+var sfx_players: Array[AudioStreamPlayer] = [] # 战斗/界面音效轮转池，多条音效可同时播放
+var sfx_streams := {}                     # 音效类别 → 已加载音频流数组(启动时一次性加载)
+var sfx_cursor := 0                       # 音效池轮转游标
+var _sfx_last_msec := {}                  # 音效类别 → 上次播放时刻(同类音效节流，避免刷屏)
 
 var stats_title_label: Label       # 统计区标题
 var stats_chart: VBoxContainer     # 统计柱状图容器
@@ -211,6 +219,12 @@ func _log(_text_value: String) -> void:
 
 func _render_combat_boards() -> void:
 	pass
+
+func _play_sfx(_category: String, _volume_db := -6.0, _min_interval_msec := 60, _pitch_jitter := 0.10) -> void:
+	pass # 音效占位:具体实现在 game_ui.gd(_play_sfx 轮转池)
+
+func _play_hero_voice(_hero_id: String, _force := false) -> void:
+	pass # 台词占位:具体实现在 combat_system.gd(_play_hero_voice 技能台词声道)
 
 func _update_action_bars() -> void:
 	pass

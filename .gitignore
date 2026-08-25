@@ -4,3 +4,4 @@ Target/
 .DS_Store
 *.apk
 *.idsig
+audio_dl/

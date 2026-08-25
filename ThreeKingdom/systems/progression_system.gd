@@ -3,23 +3,17 @@ extends "res://ThreeKingdom/systems/game_state.gd"
 # 独立于单局快速战斗存档的永久养成数据。
 const PROGRESSION_SAVE_PATH := "user://three_kingdoms_progression.json"
 const STAGE_NAMES := [
-	"涿郡之战", "广宗之战", "下曲阳之战", "陈留之战", "虎牢关之战",
-	"洛阳之战", "荥阳之战", "长安之战", "濮阳之战", "徐州之战",
-	"兖州之战", "寿春之战", "宛城之战", "下邳之战", "许昌之战",
-	"官渡之战", "白马之战", "延津之战", "邺城之战", "黎阳之战",
-	"新野之战", "博望坡之战", "襄阳之战", "江夏之战", "夏口之战",
-	"赤壁之战", "南郡之战", "江陵之战", "长沙之战", "桂阳之战",
-	"零陵之战", "武陵之战", "合肥之战", "潼关之战", "汉中之战",
-	"定军山之战", "樊城之战", "麦城之战", "夷陵之战", "白帝城之战",
-	"街亭之战", "陈仓之战", "祁山之战", "武都之战", "五丈原之战",
-	"上方谷之战", "剑阁之战", "成都之战", "建业之战", "洛阳终章之战"
+	"涿郡之战", "虎牢关之战", "官渡之战", "博望坡之战", "赤壁之战",
+	"南郡之战", "合肥之战", "潼关之战", "汉中之战", "定军山之战",
+	"樊城之战", "夷陵之战", "街亭之战", "五丈原之战", "上方谷之战",
+	"剑阁之战", "成都之战", "建业之战", "洛阳终章之战", "天下归一战"
 ]
 const DIFFICULTIES := [
 	{"name":"简单", "en":"EASY", "hp":1.0, "strategy":0},
-	{"name":"一般", "en":"NORMAL", "hp":1.2, "strategy":10},
-	{"name":"困难", "en":"HARD", "hp":1.5, "strategy":20},
-	{"name":"王者", "en":"KING", "hp":1.7, "strategy":30},
-	{"name":"地狱", "en":"HELL", "hp":2.2, "strategy":50}
+	{"name":"一般", "en":"NORMAL", "hp":1.2, "strategy":20},
+	{"name":"困难", "en":"HARD", "hp":1.5, "strategy":50},
+	{"name":"王者", "en":"KING", "hp":1.7, "strategy":70},
+	{"name":"地狱", "en":"HELL", "hp":2.0, "strategy":100}
 ]
 const RUNE_TIERS := [
 	{"name":"一阶", "color":"白", "hex":"#dedede", "chance":0.50, "power":4.0, "balanced":2.5, "extreme":5.0, "penalty":1.0, "convert":100},
@@ -154,21 +148,21 @@ func _sanitize_progression() -> void:
 			continue
 		var cleaned: Array = []
 		for uid in rune_loadouts[hero_id]:
-			if rune_ids.has(str(int(uid))) and not cleaned.has(int(uid)) and cleaned.size() < 3: cleaned.append(int(uid))
+			if rune_ids.has(str(int(uid))) and not cleaned.has(int(uid)) and cleaned.size() < 6: cleaned.append(int(uid))
 		rune_loadouts[hero_id] = cleaned
 
 func _is_stage_unlocked(stage: int, difficulty: int) -> bool:
-	if stage < 1 or stage > 50 or difficulty < 0 or difficulty >= DIFFICULTIES.size(): return false
+	if stage < 1 or stage > STAGE_NAMES.size() or difficulty < 0 or difficulty >= DIFFICULTIES.size(): return false
 	if not limit_challenges: return true
 	if difficulty == 0: return stage == 1 or int(stage_star_records.get(_progression_key(stage - 1, 0), 0)) > 0
 	return _is_stage_unlocked(stage, 0) and int(stage_star_records.get(_progression_key(stage, difficulty - 1), 0)) > 0
 
 func _challenge_strategy_bonus() -> float:
 	if game_mode != "challenge": return float(enemy_strategy_bonus)
-	return float(selected_stage * 5 + int(DIFFICULTIES[selected_difficulty].strategy))
+	return float(selected_stage * 10 + int(DIFFICULTIES[selected_difficulty].strategy))
 
 func _challenge_stage_strategy_bonus(stage := selected_stage) -> int:
-	return clampi(int(stage), 1, STAGE_NAMES.size()) * 5
+	return clampi(int(stage), 1, STAGE_NAMES.size()) * 10
 
 func _challenge_difficulty_strategy_bonus(difficulty := selected_difficulty) -> int:
 	return int(DIFFICULTIES[clampi(int(difficulty), 0, DIFFICULTIES.size() - 1)].strategy)
@@ -177,10 +171,10 @@ func _challenge_enemy_hp_multiplier() -> float:
 	return float(DIFFICULTIES[selected_difficulty].hp) if game_mode == "challenge" else 1.0
 
 func _challenge_stars_for_hp() -> int:
-	return 3 if player_ruler_hp > 40000 else (2 if player_ruler_hp > 25000 else 1)
+	return 3 if player_ruler_hp > 80000 else (2 if player_ruler_hp > 50000 else 1)
 
 func _challenge_soul_reward(stars: int) -> int:
-	return 300 + 50 * (selected_stage - 1) + 50 * selected_difficulty + 100 * (stars - 1)
+	return 2 * (300 + 50 * (selected_stage - 1) + 50 * selected_difficulty + 100 * (stars - 1))
 
 func _complete_challenge(victory: bool) -> Dictionary:
 	var result := {"victory":victory, "stage":selected_stage, "difficulty":selected_difficulty, "stars":0, "new_stars":0, "souls":0}
@@ -300,7 +294,7 @@ func _equip_rune(hero_id: String, uid: int) -> bool:
 	if not heroes.has(hero_id) or _rune_by_uid(uid) == null: return false
 	_unequip_rune_everywhere(uid)
 	var slots: Array = rune_loadouts.get(hero_id, [])
-	if slots.size() >= 3: return false
+	if slots.size() >= 6: return false
 	slots.append(uid)
 	rune_loadouts[hero_id] = slots
 	_save_progression()
@@ -358,19 +352,19 @@ func _talent_node(tree_id: String, node_name: String) -> Array:
 
 func _talent_effect_description(tree_id: String, node_name: String) -> String:
 	var specials := {
-		"all:明君":"每级使我方主公最大生命值增加 2000，满级增加 4000。",
+		"all:明君":"每级使我方主公最大生命值增加 4000，满级增加 8000。",
 		"all:神算":"每场战斗开局随机 3 名友军行动条 +30。",
 		"all:百炼":"每级使符文转换消耗降低 10%，满级降低 20%。",
 		"all:天命":"所有阵营羁绊数值额外提高 20%。",
 		"all:群英":"所有武将生命 +400、兵略 +10、技能冷却减少 0.5 秒。",
-		"all:长治":"我方主公最大生命值增加 5000。",
-		"shu:汉室坚壁":"每级使蜀阵营 2/5/8 人羁绊减伤各增加 1%，满级变为 4%/7%/10%。",
+		"all:长治":"我方主公最大生命值增加 10000。",
+		"shu:汉室坚壁":"1级：第 1 回合开始时随机获得 1 名蜀阵营武将加入备战席；2级：前 2 回合每回合各获得 1 名。",
 		"shu:桃园同心":"每级使蜀阵营 8 人羁绊叠层上限 +1、每层减伤 +1%、持续时间 +1 秒。",
-		"wei:中枢令典":"每级使魏阵营 2/5/8 人羁绊控制强化各增加 1%，满级变为 4%/7%/10%。",
+		"wei:中枢令典":"1级：第 1 回合开始时随机获得 1 名魏阵营武将加入备战席；2级：前 2 回合每回合各获得 1 名。",
 		"wei:乘胜追击":"每级使魏阵营 8 人羁绊对减益目标伤害提高 4%，满级由 8%提高到 16%。",
-		"wu:三世基业":"每级使吴阵营 2/5/8 人羁绊生命加成各增加 1%，满级变为 4%/7%/10%。",
+		"wu:三世基业":"1级：第 1 回合开始时随机获得 1 名吴阵营武将加入备战席；2级：前 2 回合每回合各获得 1 名。",
 		"wu:同舟共济":"1级：8 人羁绊均摊后回复由 5%提高到 7%；2级提高到 9%。",
-		"qun:烽火燎原":"每级使群阵营 2/5/8 人羁绊冷却强化各增加 1%，满级变为 4%/7%/10%。",
+		"qun:烽火燎原":"1级：第 1 回合开始时随机获得 1 名群阵营武将加入备战席；2级：前 2 回合每回合各获得 1 名。",
 		"qun:逐鹿中原":"每级使群阵营 8 人羁绊的技能连发概率提高 4%，满级由 8%提高到 16%。"
 	}
 	var key := _talent_key(tree_id, node_name)
@@ -391,13 +385,13 @@ func _talent_points_before_layer(tree_id: String, layer: int) -> int:
 
 func _can_upgrade_talent(tree_id: String, node_name: String) -> bool:
 	var node := _talent_node(tree_id, node_name)
-	if node.is_empty() or general_stars < 5: return false
+	if node.is_empty() or general_stars < 2: return false
 	if _talent_level(tree_id, node_name) >= int(node[2]): return false
 	return _talent_points_before_layer(tree_id, int(node[1])) >= int(node[6])
 
 func _upgrade_talent(tree_id: String, node_name: String) -> bool:
 	if not _can_upgrade_talent(tree_id, node_name): return false
-	general_stars -= 5
+	general_stars -= 2
 	var key := _talent_key(tree_id, node_name)
 	talent_levels[key] = int(talent_levels.get(key, 0)) + 1
 	_save_progression()
@@ -408,7 +402,7 @@ func _reset_talent_tree(tree_id: String) -> int:
 	var refunded := 0
 	for node in TALENT_TREES[tree_id].nodes:
 		var key := _talent_key(tree_id, str(node[0]))
-		refunded += int(talent_levels.get(key, 0)) * 5
+		refunded += int(talent_levels.get(key, 0)) * 2
 		talent_levels.erase(key)
 	general_stars += refunded
 	_save_progression()
@@ -455,15 +449,17 @@ func _apply_progression_to_new_unit(unit: Dictionary) -> void:
 	unit.rune_cooldown_reduction = float(runes.cooldown)
 
 func _player_ruler_max_hp() -> int:
-	return RULER_MAX_HP + 2000 * _talent_level("all", "明君") + 5000 * _talent_level("all", "长治")
+	return RULER_MAX_HP + 4000 * _talent_level("all", "明君") + 10000 * _talent_level("all", "长治")
 
 func _talent_bond_multiplier(team: String) -> float:
 	return 1.2 if team == "player" and _talent_level("all", "天命") > 0 else 1.0
 
-func _talent_faction_tier_bonus(team: String, faction: String) -> float:
-	if team != "player": return 0.0
+func _talent_faction_recruit_rounds(faction: String) -> int:
+	# 第 4 层阵营天赋(汉室坚壁/中枢令典/三世基业/烽火燎原)：
+	# 等级为几，对局前几回合每回合开始时各随机获得 1 名该阵营武将，直接加入备战席。
 	var node_names := {"shu":"汉室坚壁", "wei":"中枢令典", "wu":"三世基业", "qun":"烽火燎原"}
-	return 0.01 * float(_talent_level(faction, str(node_names[faction])))
+	if not node_names.has(faction): return 0
+	return clampi(_talent_level(faction, str(node_names[faction])), 0, 2)
 
 func _talent_opening_action_bonus() -> bool:
 	return _talent_level("all", "神算") > 0

@@ -11,10 +11,11 @@ func _skill_voice_paths(hero_id: String) -> Array[String]:
 			paths.append(path)
 	return paths
 
-func _play_random_skill_voice(unit: Dictionary) -> void:
-	if not is_instance_valid(skill_voice_player) or skill_voice_player.playing:
-		return
-	var paths := _skill_voice_paths(str(unit.get("hero_id", "")))
+func _play_hero_voice(hero_id: String, force := false) -> void:
+	# 武将台词：选将锁定/上阵时喊话(force=true 立即重播)；技能释放不再播台词，交由击打音效表现。
+	if not is_instance_valid(skill_voice_player): return
+	if not force and skill_voice_player.playing: return
+	var paths := _skill_voice_paths(hero_id)
 	if paths.is_empty():
 		return
 	var selected_path := paths[rng.randi_range(0, paths.size() - 1)]
@@ -134,9 +135,8 @@ func _apply_faction_bonuses(announce := true) -> void:
 		for unit in _team_units(team):
 			var faction: String = heroes[unit.hero_id].f
 			var tier := _faction_tier_for_count(int(counts[faction])) if unit.alive else 0
-			var tier_bonus := _talent_faction_tier_bonus(team, faction)
 			var destiny_mult := _talent_bond_multiplier(team)
-			var tier_value := (_faction_tier_value(tier, [0.02, 0.05, 0.08]) + (tier_bonus if tier > 0 else 0.0)) * destiny_mult
+			var tier_value := _faction_tier_value(tier, [0.02, 0.05, 0.08]) * destiny_mult
 			unit.faction_tier = tier
 			unit.faction_damage_reduction = tier_value if faction == "shu" else 0.0
 			unit.faction_control_bonus = tier_value if faction == "wei" else 0.0
@@ -154,11 +154,6 @@ func _apply_faction_bonuses(announce := true) -> void:
 				_log(_faction_name(faction) + " " + str(FACTION_BOND_TIERS[int(unit.faction_tier) - 1]) + t("人羁绊：", "-unit bond: ") + mechanic)
 
 func _apply_opening_skills() -> void:
-	var passive_units := combat_units.filter(func(unit):
-		return unit.alive and str(unit.hero_id) in ["liushan", "chengong", "gaolan"]
-	)
-	if not passive_units.is_empty():
-		_play_random_skill_voice(passive_units[rng.randi_range(0, passive_units.size() - 1)])
 	if _talent_opening_action_bonus():
 		var allies := combat_units.filter(func(unit): return unit.team == "player" and unit.alive)
 		allies.shuffle()
@@ -715,7 +710,6 @@ func _process_statuses(delta: float = TICK) -> void:
 	_tianshu_process_tick(delta)
 
 func _perform_action(unit: Dictionary) -> void:
-	_play_random_skill_voice(unit)
 	visual_events.append({"kind":"charge", "source_id":unit.id, "target_id":unit.id, "amount":0, "style":"magic"})
 	_cast_active_skill(unit)
 	_after_active_skill(unit)
@@ -2696,7 +2690,6 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	return actual_damage
 
 func _resolve_zhangbao_death(unit: Dictionary, killer, visual_group: String, group_style: String) -> bool:
-	_play_random_skill_voice(unit)
 	var params: Dictionary = heroes.zhangbao.ability_params
 	var explosion_group := "zhangbao_death:" + str(unit.id) + ":" + str(unit.get("zhangbao_revives_used", 0))
 	var targets: Array = []

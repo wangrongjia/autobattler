@@ -60,15 +60,23 @@ func _play_single_visual_event(event: Dictionary) -> void:
 	var profile := _hero_fx(str(source_unit.hero_id) if source_unit != null else "")
 	var kind := str(event.get("kind", ""))
 	if kind in ["damage", "heal", "empty"] and is_instance_valid(actor) and actor != target:
-		if style == "melee": await _play_melee_strike(actor, target, speed_scale, profile, bool(event.get("skill", false)))
-		elif style in ["ranged", "magic", "heal"]: await _play_projectile(actor, target, style, speed_scale, profile, bool(event.get("skill", false)))
+		var skill_shot := bool(event.get("skill", false))
+		var strike_sfx := kind != "heal" # 治疗飞行不配起手攻击音，其余普攻挥击/技能重击与动画同步
+		if style == "melee":
+			if strike_sfx: _play_sfx("heavy" if skill_shot else "melee")
+			await _play_melee_strike(actor, target, speed_scale, profile, skill_shot)
+		elif style in ["ranged", "magic", "heal"]:
+			if strike_sfx: _play_sfx("heavy" if skill_shot else "melee", -8.0, 60, 0.16)
+			await _play_projectile(actor, target, style, speed_scale, profile, skill_shot)
 	if not is_instance_valid(target): return
 	match kind:
 		"damage":
+			_play_sfx("hit") # 受击命中与飘字/后坐同步
 			_floating_damage_text(target, int(event.get("amount", 0)))
 			var hit_tween := _start_hit_recoil(target, speed_scale)
 			await hit_tween.finished
 		"death":
+			_play_sfx("death", -5.0, 80, 0.08) # 阵亡倒地闷响与死亡动画同步
 			var death_tween := _start_death_ghost(target, str(event.get("target_id", "")), speed_scale)
 			if death_tween != null: await death_tween.finished
 		"heal", "regen", "regen_apply":
@@ -125,6 +133,11 @@ func _play_grouped_damage(grouped_events: Array) -> void:
 			target = tile_cell_refs.get(str(event.team) + ":" + str(event.row) + ":" + str(event.col))
 		if is_instance_valid(target) and not targets.has(target): targets.append(target)
 	var speed_scale := 1.0 / game_speed
+	# 群体伤害起手音:火球链用重击，燃/毒等持续伤害不配起手音(只有落点受击声)，其余按挥击。
+	if group_style == "fireball_chain":
+		_play_sfx("heavy", -5.0, 100, 0.08)
+	elif group_style not in ["row_burn", "tile_burn", "burn_tick", "poison_tick", "poison_apply", "weak_apply", "fear_tick"]:
+		_play_sfx("melee", -7.0, 70, 0.14)
 	var custom_impacts := false
 	if group_style in ["row_burn", "tile_burn", "burn_tick"]:
 		await _play_grouped_burn(grouped_events, speed_scale)
@@ -149,6 +162,7 @@ func _play_grouped_damage(grouped_events: Array) -> void:
 				if is_instance_valid(column_tile): strike_targets.append(column_tile)
 		await _play_signature_weapon(actor, strike_targets, profile, speed_scale)
 	if not custom_impacts:
+		if not damage_events.is_empty(): _play_sfx("hit") # 群体受击只响一声，避免多目标音效轰炸
 		var last_hit_tween: Tween
 		for event in damage_events:
 			var target: Control = unit_cell_refs.get(event.get("target_id", ""))
@@ -169,8 +183,9 @@ func _play_grouped_damage(grouped_events: Array) -> void:
 	var last_death_tween: Tween
 	for event in grouped_events:
 		if event.get("kind", "") != "death": continue
-		var target: Control = unit_cell_refs.get(event.get("target_id", ""))
+		var target: Control = unit_cell_refs.get(str(event.get("target_id", "")))
 		if not is_instance_valid(target): continue
+		if last_death_tween == null: _play_sfx("death", -5.0, 80, 0.08) # 群体阵亡只响第一声
 		last_death_tween = _start_death_ghost(target, str(event.get("target_id", "")), speed_scale)
 	if last_death_tween != null: await last_death_tween.finished
 

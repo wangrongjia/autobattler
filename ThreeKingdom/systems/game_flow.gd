@@ -31,6 +31,9 @@ func _new_game() -> void:
 		_log("[color=#e5a8ff]天书演武开始：第 3/6/9/12/15 回合免费选天书，其他抽取可在天书阁购买。[/color]")
 	else:
 		_log(t("征战开始：每关进行三轮三选一，选项从左到右固定为前军、中军、后军。", "Campaign begins with three pick-one-of-three rounds; slots are fixed to Vanguard, Midguard, and Rearguard."))
+	if game_mode == "challenge":
+		# 闯关模式：每回合开始(选将阶段)自动保存，中途退出后可从本回合继续。
+		_save_game(true)
 	_render()
 
 func _start_quick_game() -> void:
@@ -44,7 +47,7 @@ func _start_tianshu_game() -> void:
 func _start_challenge(stage: int, difficulty: int) -> bool:
 	if not _is_stage_unlocked(stage, difficulty): return false
 	game_mode = "challenge"
-	selected_stage = clampi(stage, 1, 50)
+	selected_stage = clampi(stage, 1, 20)
 	selected_difficulty = clampi(difficulty, 0, DIFFICULTIES.size() - 1)
 	_new_game()
 	return true
@@ -151,6 +154,32 @@ func _sanitize_loaded_units(value, expected_team: String) -> Array:
 		result.append(unit)
 	return result
 
+func _challenge_run_snapshot() -> Dictionary:
+	# 读取存档中"进行中"的闯关对局(未结束的挑战模式),供关卡界面定位与续战。
+	if not FileAccess.file_exists(SAVE_PATH): return {}
+	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if file == null: return {}
+	var data = JSON.parse_string(file.get_as_text())
+	file.close()
+	if typeof(data) != TYPE_DICTIONARY: return {}
+	if str(data.get("game_mode", "")) != "challenge": return {}
+	if str(data.get("phase", "")) == "finished": return {}
+	return {
+		"stage": clampi(int(data.get("selected_stage", 1)), 1, STAGE_NAMES.size()),
+		"difficulty": clampi(int(data.get("selected_difficulty", 0)), 0, DIFFICULTIES.size() - 1),
+		"round": clampi(int(data.get("round_number", 1)), 1, ROUND_LIMIT)
+	}
+
+func _clear_run_save() -> void:
+	# 闯关结算后清除本局自动存档,关卡界面不再把该关当成"进行中";非本局存档不动。
+	var snapshot := _challenge_run_snapshot()
+	if snapshot.is_empty(): return
+	if int(snapshot.stage) != selected_stage or int(snapshot.difficulty) != selected_difficulty: return
+	var dir := DirAccess.open("user://")
+	if dir != null and FileAccess.file_exists(SAVE_PATH):
+		dir.remove(SAVE_PATH.get_file())
+	if is_instance_valid(continue_button): continue_button.disabled = true
+
 func _prepare_round() -> void:
 	phase = "draft"
 	draft_user_hidden = false
@@ -160,11 +189,25 @@ func _prepare_round() -> void:
 	draft_roster_baseline = player_units.duplicate(true)
 	selected_unit = ""
 	_settle_round_economy()
-	_add_enemy_wave()    # 每关从指定阵营（或全阵营）随机加入3名敌将
+	_add_enemy_wave()    # 每回合敌方增援:普通难度随机3人;王者上互相有羁绊的三人组;地狱同阵营三人组;满员不挤人、阵亡后补位
+	_grant_faction_talent_recruits()  # 第4层阵营天赋:前N回合每回合开始时随机获得1名本阵营武将入备战席
 	if _tianshu_enabled() and _is_free_tianshu_round():
 		_begin_tianshu_draw(1, "free", "draft", true)
 	else:
 		_generate_choices()
+
+func _grant_faction_talent_recruits() -> void:
+	# 第 4 层阵营天赋(汉室坚壁/中枢令典/三世基业/烽火燎原)：
+	# 等级为几，对局前几回合每回合开始时各随机获得 1 名本阵营武将，直接加入备战席(row=-1)。
+	var talent_names := {"shu":"汉室坚壁", "wei":"中枢令典", "wu":"三世基业", "qun":"烽火燎原"}
+	for faction in ["shu", "wei", "wu", "qun"]:
+		if round_number > _talent_faction_recruit_rounds(faction): continue
+		var pool: Array = heroes.keys().filter(func(id): return str(heroes[id].f) == faction)
+		if pool.is_empty(): continue
+		pool.shuffle()
+		var hero_id := str(pool[0])
+		player_units.append(_make_roster_unit("player", hero_id))
+		_log("[color=#e5c97a]【天赋·%s】%s 加入备战席。[/color]" % [talent_names[faction], _hero_name(hero_id)])
 
 func _generate_choices() -> void:
 	choices = []
@@ -208,21 +251,130 @@ func _refresh_draft_choice(choice_index: int) -> void:
 func _refresh_shop(choice_index := 0) -> void:
 	_refresh_draft_choice(int(choice_index))
 
+# 敌方增援三人组:组内武将互相存在真实羁绊(双人/三人/四人/五人羁绊皆有,逐步凑齐即触发)
+const ENEMY_SQUADS := [
+	{"faction": "shu", "name": "桃园结义", "heroes": ["liubei", "guanyu", "zhangfei"]},
+	{"faction": "shu", "name": "五虎·前锋", "heroes": ["guanyu", "zhangfei", "zhaoyun"]},
+	{"faction": "shu", "name": "五虎·骠骑", "heroes": ["zhaoyun", "huangzhong", "machao"]},
+	{"faction": "shu", "name": "西凉铁骑", "heroes": ["machao", "madai", "weiyan"]},
+	{"faction": "shu", "name": "飞火流星", "heroes": ["weiyan", "huangzhong", "madai"]},
+	{"faction": "wei", "name": "魏武亲卫", "heroes": ["caocao", "dianwei", "xuchu"]},
+	{"faction": "wei", "name": "魏谋三杰", "heroes": ["xunyu", "guojia", "jiaxu"]},
+	{"faction": "wei", "name": "夏侯宗族", "heroes": ["xiahouyuan", "xiahoudun", "caoren"]},
+	{"faction": "wei", "name": "五子·先锋", "heroes": ["zhangliao", "yuejin", "zhanghe"]},
+	{"faction": "wei", "name": "五子·后军", "heroes": ["zhanghe", "xuhuang", "yujin"]},
+	{"faction": "wu", "name": "江东都督", "heroes": ["zhouyu", "huanggai", "xiaoqiao"]},
+	{"faction": "wu", "name": "锦帆虎臣", "heroes": ["taishici", "ganning", "lvmeng"]},
+	{"faction": "wu", "name": "孙氏之志", "heroes": ["sunjian", "sunce", "sunquan"]},
+	{"faction": "wu", "name": "江东双璧", "heroes": ["sunce", "taishici", "daqiao"]},
+	{"faction": "wu", "name": "社稷之臣", "heroes": ["luxun", "sunquan", "lusu"]},
+	{"faction": "wu", "name": "四英杰", "heroes": ["zhouyu", "luxun", "lvmeng"]},
+	{"faction": "qun", "name": "飞将亲随", "heroes": ["lvbu", "chengong", "gaoshun"]},
+	{"faction": "qun", "name": "河北庭柱", "heroes": ["yanliang", "wenchou", "qunzhanghe"]},
+	{"faction": "qun", "name": "庭柱后援", "heroes": ["qunzhanghe", "gaolan", "wenchou"]},
+	{"faction": "qun", "name": "暴君倾城", "heroes": ["dongzhuo", "diaochan", "lvbu"]}
+]
+
+# 双人羁绊关系表(地狱难度增援时优先选择与当前场上阵容有羁绊关联的三人组)
+const BOND_PAIRS := [
+	["caocao", "dianwei"], ["caocao", "xuchu"], ["dianwei", "xuchu"], ["chengong", "gaoshun"],
+	["chengong", "lvbu"], ["dingfeng", "xusheng"], ["dongzhuo", "diaochan"], ["gaolan", "qunzhanghe"],
+	["guojia", "jiaxu"], ["huanggai", "sunjian"], ["jiaxu", "xunyu"], ["luxun", "sunquan"],
+	["lvmeng", "ganning"], ["machao", "madai"], ["sunce", "daqiao"], ["sunce", "taishici"],
+	["taishici", "ganning"], ["weiyan", "huangzhong"], ["weiyan", "madai"], ["xiahouyuan", "caoren"],
+	["xiahouyuan", "xiahoudun"], ["zhanghe", "xuhuang"], ["zhangliao", "yuejin"],
+	["zhouyu", "huanggai"], ["zhouyu", "xiaoqiao"]
+]
+
+# 地狱难度:整关同一阵营大羁绊主题,每回合补充3名该阵营互相有羁绊的武将
+const HELL_THEMES := [
+	{"faction": "shu", "name": "蜀·王道之师"},
+	{"faction": "shu", "name": "蜀·北伐雄师"},
+	{"faction": "wei", "name": "魏·虎豹精锐"},
+	{"faction": "wei", "name": "魏·宗室名将"},
+	{"faction": "wu", "name": "吴·江东英才"},
+	{"faction": "wu", "name": "吴·虎臣水军"},
+	{"faction": "qun", "name": "群·飞将无双"},
+	{"faction": "qun", "name": "群·乱世枭雄"}
+]
+
 func _add_enemy_wave() -> void:
-	var pool: Array = heroes.keys().filter(func(hero_id): return enemy_faction_filter.is_empty() or str(heroes[hero_id].f) == enemy_faction_filter)
-	pool.shuffle()
-	var wave: Array = pool.slice(0, mini(3, pool.size()))
-	for hero_id in wave:
-		var unit := _make_roster_unit("enemy", hero_id)
-		enemy_units.append(unit)
-		_auto_place_enemy(unit)
+	# 通用规则:每回合最多增援3名敌将;场上15格满员(全为存活敌将)时不增援,阵亡空位后继续补充。
+	# 阵亡武将可以同名重新生成(是全新单位,不是复活);不再把场上武将挤下场。
+	var alive_deployed := 0
+	for unit in enemy_units:
+		if unit.alive and int(unit.row) >= 0: alive_deployed += 1
+	var wave_limit := mini(3, BOARD_ROWS * BOARD_COLUMNS - alive_deployed)
+	if wave_limit <= 0:
+		_log(t("第 %d 关敌军阵容满员，暂无增援。" % round_number, "Stage %d: the enemy lineup is full. No reinforcements." % round_number))
+		return
+	var wave: Array = []
+	var wave_title := ""
+	if game_mode == "challenge" and selected_difficulty == 3:
+		# 王者:全阵营随机,每回合上阵一套互相有羁绊的三人组
+		var king_squad: Dictionary = ENEMY_SQUADS[rng.randi_range(0, ENEMY_SQUADS.size() - 1)]
+		wave = (king_squad.heroes as Array).duplicate()
+		wave_title = str(king_squad.name)
+	elif game_mode == "challenge" and selected_difficulty >= 4:
+		# 地狱:整关同一阵营,每回合补充3名该阵营互相有羁绊、且优先与当前阵容关联的武将
+		var theme: Dictionary = HELL_THEMES[(selected_stage - 1) % HELL_THEMES.size()]
+		wave_title = str(theme.name)
+		var faction_pool: Array = ENEMY_SQUADS.filter(func(s): return str(s.faction) == str(theme.faction))
+		var linked: Array = faction_pool.filter(func(s): return _squad_linked_to_roster(s))
+		var pick_from := linked if not linked.is_empty() else faction_pool
+		var hell_squad: Dictionary = pick_from[rng.randi_range(0, pick_from.size() - 1)]
+		wave = (hell_squad.heroes as Array).duplicate()
+	else:
+		# 简单/一般/困难/其它模式:随机3名(可重复出现同名新单位)
+		var random_pool: Array = heroes.keys().filter(func(hero_id): return enemy_faction_filter.is_empty() or str(heroes[hero_id].f) == enemy_faction_filter)
+		random_pool.shuffle()
+		wave = random_pool.slice(0, wave_limit)
 	var wave_names: Array[String] = []
-	for hero_id in wave: wave_names.append(_hero_name(str(hero_id)))
-	_log(t("第 %d 关敌军随机选择：" % round_number, "Stage %d enemy random picks: " % round_number) + "、".join(wave_names))
+	for hero_id in wave.slice(0, wave_limit):
+		if _spawn_enemy_unit(str(hero_id)):
+			wave_names.append(_hero_name(str(hero_id)))
+	if wave_names.is_empty():
+		_log(t("第 %d 关敌军暂无有效增援。" % round_number, "Stage %d: no valid enemy reinforcements." % round_number))
+		return
+	if wave_title.is_empty():
+		_log(t("第 %d 关敌军随机选择：" % round_number, "Stage %d enemy random picks: " % round_number) + "、".join(wave_names))
+	else:
+		_log("[color=#e8916d]" + t("【%s】第 %d 回合敌方增援：" % [wave_title, round_number], "[%s] Round %d enemy reinforcements: " % [wave_title, round_number]) + "、".join(wave_names) + "[/color]")
+
+func _spawn_enemy_unit(hero_id: String) -> bool:
+	# 生成一名敌将并自动布阵;没有可用空位时直接放弃生成,不挤占场上现有武将。
+	if not heroes.has(hero_id): return false
+	var hero: Dictionary = heroes[hero_id]
+	var rows := [0, 1, 2] if bool(hero.get("all_rows", false)) else ([0] if int(hero.range) == 1 else ([0, 1, 2] if hero.range <= 2 else [2, 1, 0]))
+	for row in rows:
+		for col in BOARD_COLUMNS:
+			if _unit_at(enemy_units, row, col) != null: continue
+			var unit := _make_roster_unit("enemy", hero_id)
+			unit.row = row
+			unit.col = col
+			enemy_units.append(unit)
+			return true
+	return false
+
+func _squad_linked_to_roster(squad: Dictionary) -> bool:
+	# 判断三人组是否与当前场上存活敌将存在羁绊关联(同名或双人羁绊)。
+	for raw_hero_id in squad.get("heroes", []):
+		var hero_id := str(raw_hero_id)
+		for unit in enemy_units:
+			if not unit.alive or int(unit.row) < 0: continue
+			var unit_hero := str(unit.hero_id)
+			if unit_hero == hero_id or _heroes_bonded(unit_hero, hero_id): return true
+	return false
+
+func _heroes_bonded(a: String, b: String) -> bool:
+	for pair in BOND_PAIRS:
+		if (pair[0] == a and pair[1] == b) or (pair[0] == b and pair[1] == a): return true
+	return false
 
 func _choose_hero(id: String) -> void:
 	if battle_running or phase != "draft" or not choices.has(id): return
 	if not _can_accept_hero(id):
+		_play_sfx("error", -6.0, 150, 0.0)
 		_log(t("场上和备战区均已满。", "The field and reserve are both full."))
 		return
 	var unit := _make_roster_unit("player", id)
@@ -232,6 +384,7 @@ func _choose_hero(id: String) -> void:
 	_tianshu_consume_pool_pick()
 	var locked_count := PICKS_PER_ROUND - draft_picks_remaining
 	_log(t("第%d/3轮锁定：" % locked_count, "Pick %d/3 locked: " % locked_count) + _hero_name(id))
+	_play_hero_voice(id, true) # 选将锁定：武将喊话
 	if draft_picks_remaining <= 0:
 		phase = "placement"
 		draft_user_hidden = true
@@ -246,23 +399,6 @@ func _can_accept_hero(hero_id: String) -> bool:
 func _try_upgrade(roster: Array, hero_id: String):
 	# Compatibility shim for old callers/saves. Duplicate heroes remain separate.
 	return null
-
-func _auto_place_enemy(unit: Dictionary) -> void:
-	var hero: Dictionary = heroes[unit.hero_id]
-	var rows := [0, 1, 2] if bool(hero.get("all_rows", false)) else ([0] if int(hero.range) == 1 else ([0, 1, 2] if hero.range <= 2 else [2, 1, 0]))
-	for row in rows:
-		for col in BOARD_COLUMNS:
-			if _unit_at(enemy_units, row, col) == null:
-				unit.row = row
-				unit.col = col
-				return
-	var deployed := enemy_units.filter(func(existing): return existing.alive and existing.row >= 0 and existing.id != unit.id and _can_unit_use_row(unit, int(existing.row)))
-	if not deployed.is_empty():
-		var replaced: Dictionary = deployed[0]
-		unit.row = replaced.row
-		unit.col = replaced.col
-		replaced.row = -1
-		replaced.col = -1
 
 func _auto_place_player() -> void:
 	if phase != "placement": return
@@ -289,9 +425,13 @@ func _auto_place_player() -> void:
 			unit.row = -1
 			unit.col = -1
 			_log(_hero_name(unit.hero_id) + t(" 已进入备战区。", " moved to the reserve."))
-		pending_unit_ids.pop_front()
-		if placed: _log(_hero_name(unit.hero_id) + t(" 已自动布阵。", " was placed automatically."))
-	_render()
+			pending_unit_ids.pop_front()
+			if placed:
+				_log(_hero_name(unit.hero_id) + t(" 已自动布阵。", " was placed automatically."))
+				_play_sfx("deploy", -10.0, 100, 0.08) # 自动布阵与手动上阵同款拔刀音，台词只在第一位喊，避免连播
+				if not is_instance_valid(skill_voice_player) or not skill_voice_player.playing:
+					_play_hero_voice(str(unit.hero_id))
+		_render()
 
 func _on_player_cell(row: int, col: int) -> void:
 	if phase not in ["draft", "placement"] or battle_running: return
@@ -384,11 +524,13 @@ func _finish_battle() -> void:
 		if decisive or round_number >= ROUND_LIMIT:
 			phase = "finished"
 			var challenge_result := _complete_challenge(player_won if decisive else player_ruler_hp > enemy_ruler_hp)
+			_clear_run_save()
 			if has_method("_show_battle_result"):
 				call_deferred("_show_battle_result", challenge_result)
 		if not decisive and round_number < ROUND_LIMIT:
 			round_number += 1
 			_prepare_round()
+			_save_game(true)
 			_log("进入闯关第 %d / 15 回合：主公生命与现有阵容继续保留。" % round_number)
 	elif game_mode == "tianshu":
 		if decisive or round_number >= ROUND_LIMIT:

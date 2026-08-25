@@ -57,6 +57,7 @@ func _earn_gold(amount: int, reason := "") -> int:
 	if earned <= 0:
 		return 0
 	gold += earned
+	_play_sfx("coin", -7.0, 150, 0.08) # 获得金币:回合结算/出售/利息等入口统一从这里出声
 	if not reason.is_empty():
 		_log("[color=#e8c96e]【金币】%s +%d，当前 %d。[/color]" % [reason, earned, gold])
 	if has_method("_refresh_economy_ui"):
