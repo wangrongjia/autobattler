@@ -1,6 +1,7 @@
 extends "res://ThreeKingdom/systems/combat_system.gd"
 
 const PremiumUIArt = preload("res://ThreeKingdom/ui/premium_ui_art.gd")
+const BattleReportChart = preload("res://ThreeKingdom/ui/battle_report_chart.gd")
 
 var _encyclopedia_touch_origins := {}
 const CARD_BORDER_ROOT := "res://ThreeKingdom/animations/border/"
@@ -61,6 +62,13 @@ var talent_tree_id := "all"
 var talent_detail_label: Label
 var talent_tree_canvas: Control
 var talent_tree_tabs := {}
+var talent_detail_name_label: Label
+var talent_detail_level_label: Label
+var talent_upgrade_button: Button
+var talent_upgrade_hint_label: Label
+var selected_talent_node := ""
+var talent_node_panels := {}
+var talent_notice := ""
 var rune_faction_options: OptionButton
 var rune_tier_filter := 0
 var rune_filter_buttons: Array[Button] = []
@@ -76,6 +84,20 @@ var challenge_limit_setting_button: Button
 var result_overlay: Control
 var result_title_label: Label
 var result_detail_label: Label
+var result_star_labels: Array[Label] = []   # 三星判定动画的三颗星标签(依次点亮)
+var result_mvp_panel: PanelContainer        # 本局 MVP 特写面板
+var result_mvp_portrait: TextureRect        # MVP 立绘
+var result_mvp_name_label: Label
+var result_mvp_stats_label: Label
+var result_kings_box: VBoxContainer         # 伤害/治疗/控制三项数据王徽章行
+var result_chart_panel: PanelContainer      # 战斗回放图表面板
+var result_chart: Control                   # BattleReportChart 折线图实例
+var result_chart_hint: Label                # 无回放数据时的占位提示
+var result_lineup_row: HBoxContainer        # 双方阵容终况整行(淡入动画)
+var result_lineup_player_flow: HFlowContainer
+var result_lineup_enemy_flow: HFlowContainer
+var result_tween: Tween                     # 结算入场动画主时间线(重入时先 kill)
+var result_star_tweens: Array[Tween] = []   # 各颗星的点亮动画
 var tianshu_overlay: Control
 var tianshu_choice_box: HBoxContainer
 var tianshu_owned_box: VBoxContainer
@@ -1418,7 +1440,7 @@ func _build_intro_popup() -> void:
 	tabs.add_child(_intro_rich_page(t("胜负与主公", "VICTORY"),
 		c + "胜负条件" + e + "\n双方各有一位主公（[b]100000[/b] 生命，天赋可提高）。[b]任一方主公生命归零即落败[/b]；普通关 30 秒到时则比较双方主公剩余生命判定胜负，敌方主公会保留剩余生命进入后续关卡。\n\n" + c + "两条重要隐藏规则" + e + "\n[b]1. 攻击空格伤害主公[/b]：技能随机打到没有武将的空格时，伤害全额由敌方主公承受——留空阵是有代价的，但也可能浪费敌方技能。\n[b]2. 溢出治疗转化[/b]：治疗超出目标最大生命的部分，按 [b]30%[/b] 转化为我方主公的生命（天书·泽被苍生可提升至 50%/80%）。\n\n最终决战没有 30 秒限制，直到一方主公倒下为止。"))
 	tabs.add_child(_intro_rich_page(t("属性与养成", "ATTRIBUTES"),
-		c + "三大属性" + e + "\n[b]生命[/b]：武将的生存基础。\n[b]兵略值[/b]：全员基准 100，决定技能强度——\"230% 兵略值伤害\"即造成 100×2.3 = 230 点伤害。天赋、符文可提高兵略，从而放大所有技能。\n[b]技能冷却[/b]：行动条攒满一轮所需的时间，冷却越短出手越快。\n\n" + c + "冷却缩减规则（重要）" + e + "\n· 天赋与符文的冷却缩减[b]合并计算，合计最多减原始冷却的一半[/b]；\n· 天书与羁绊（如陈宫被动）的缩减不受此上限约束；\n· 所有缩减叠加后，最终冷却[b]最低 2 秒[/b]。\n\n" + c + "永久养成" + e + "\n[b]将星[/b]：通关按主公剩余血量评 1~3 星，用于点亮天赋树（5 棵：通用+四阵营，2 星=1 点）。\n[b]将魂[/b]：每次通关都给，用于抽符文（单抽 200、十连 2000）。符文分正（单属性）/ 均（双属性）/ 极（一减一增），两枚同阶可合成一枚高阶，每名武将最多装备 6 枚。"))
+		c + "三大属性" + e + "\n[b]生命[/b]：武将的生存基础。\n[b]兵略值[/b]：全员基准 100，决定技能强度——\"230% 兵略值伤害\"即造成 100×2.3 = 230 点伤害。天赋、符文可提高兵略，从而放大所有技能。\n[b]技能冷却[/b]：行动条攒满一轮所需的时间，冷却越短出手越快。\n\n" + c + "冷却缩减规则（重要）" + e + "\n· 天赋与符文的冷却缩减[b]合并计算，合计最多减原始冷却的一半[/b]；\n· 天书与羁绊（如陈宫被动）的缩减不受此上限约束；\n· 所有缩减叠加后，最终冷却[b]最低 2 秒[/b]。\n\n" + c + "永久养成" + e + "\n[b]将星[/b]：通关按主公剩余血量评 1~3 星，用于点亮天赋树（5 棵：通用+四阵营，2 星=1 点）。\n[b]将魂[/b]：每次通关都给，未通关按敌方主公战损比例等比发放，用于抽符文（单抽 200、十连 2000）。符文分正（单属性）/ 均（双属性）/ 极（一减一增），两枚同阶可合成一枚高阶，每名武将最多装备 6 枚。"))
 	tabs.add_child(_intro_rich_page(t("战场规则", "BATTLE"),
 		c + "前军 / 中军 / 后军" + e + "\n前军[b]只能站前排且只打前排[/b]；中军站前排可打全场、站中排打前中排、站后排只打前排；后军[b]任意站位随机攻击全场[/b]。合理利用站位改变射程是布阵的核心。\n\n" + c + "行动条" + e + "\n武将行动条从 0 涨到 100 即行动一次并施放技能；增速受减速、沉默影响，眩晕/冻结/魅惑/恐惧期间停止。\n\n" + c + "常见战斗效果" + e + "\n眩晕（停止行动）、冻结（停止，受伤提前解冻并追加破冰伤害）、魅惑（停止）、恐惧（停止+持续伤害）、中毒（层数伤害，逐秒衰减）、灼烧（持续伤害）、减速（行动条变慢）、易碎（受到伤害提高）。\n\n" + c + "羁绊" + e + "\n[b]阵营羁绊[/b]：按场上同阵营人数 2/5/8 分三档——蜀承伤降低、魏控制时长提高、吴最大生命提高、群冷却缩短，8 人时各解锁强力终极效果。\n[b]组合羁绊[/b]：特定武将组合触发（桃园结义、五虎上将、四英杰等），完整关系见 图鉴 → 羁绊图。"))
 	intro_popup.hide()
@@ -1773,29 +1795,170 @@ func _start_tianshu_from_menu() -> void:
 
 func _build_result_overlay() -> void:
 	result_overlay = _full_overlay(1600, PremiumUIArt.Variant.HOME, Color("#b88a50"))
+	var compact := _is_mobile_ui()
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	result_overlay.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(620, 420)
+	panel.custom_minimum_size = Vector2(848, 624) if compact else Vector2(1024, 680)
 	_style(panel, Color("#15120df2"), 6, Color("#b88a50"), 3)
 	center.add_child(panel)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_bottom", 18)
+	panel.add_child(margin)
 	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 24)
-	panel.add_child(box)
-	result_title_label = _label("", 48, Color("#f0c77a"))
+	box.add_theme_constant_override("separation", 8)
+	margin.add_child(box)
+	# 标题
+	result_title_label = _label("", 42, Color("#f0c77a"))
 	result_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_title_label.add_theme_constant_override("outline_size", 5)
+	result_title_label.add_theme_color_override("font_outline_color", Color("#1b1007"))
+	result_title_label.resized.connect(func(): result_title_label.pivot_offset = result_title_label.size * 0.5)
 	box.add_child(result_title_label)
-	result_detail_label = _label("", 20, Color("#d8cfbd"))
+	# 三星判定
+	var star_box := HBoxContainer.new()
+	star_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	star_box.add_theme_constant_override("separation", 14)
+	box.add_child(star_box)
+	result_star_labels.clear()
+	for index in 3:
+		var star := _outlined_label("★", 46, Color("#f0c77a"))
+		star.custom_minimum_size = Vector2(60, 56)
+		star.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		star.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		star.pivot_offset = Vector2(30.0, 28.0)
+		star.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		star_box.add_child(star)
+		result_star_labels.append(star)
+	var star_hint := _label(t("主公剩余生命越多，评价星级越高", "More ruler HP remaining earns higher stars"), 11, Color("#9e8769"))
+	star_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(star_hint)
+	# 奖励行
+	result_detail_label = _label("", 16, Color("#d8cfbd"))
 	result_detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(result_detail_label)
+	# 中部：MVP 特写 + 战斗回放曲线
+	var middle := HBoxContainer.new()
+	middle.add_theme_constant_override("separation", 12)
+	middle.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(middle)
+	_build_result_mvp_panel(middle, compact)
+	_build_result_chart_panel(middle, compact)
+	# 双方阵容终况
+	result_lineup_row = HBoxContainer.new()
+	result_lineup_row.add_theme_constant_override("separation", 12)
+	box.add_child(result_lineup_row)
+	result_lineup_player_flow = _build_result_lineup_panel(result_lineup_row, t("我方阵容终况", "Allied Lineup"), Color("#5ca873"), compact)
+	result_lineup_enemy_flow = _build_result_lineup_panel(result_lineup_row, t("敌方阵容终况", "Enemy Lineup"), Color("#c16458"), compact)
+	# 返回按钮
+	var back_row := HBoxContainer.new()
+	back_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(back_row)
 	var back := _button("点击返回主页")
 	_accent_button(back, Color("#b98a4f"), true)
-	back.custom_minimum_size = Vector2(320, 64)
-	back.add_theme_font_size_override("font_size", 20)
+	back.custom_minimum_size = Vector2(300, 54)
+	back.add_theme_font_size_override("font_size", 19)
 	back.pressed.connect(_return_home_from_result)
-	box.add_child(back)
+	back_row.add_child(back)
+
+func _build_result_mvp_panel(parent: Container, compact: bool) -> void:
+	result_mvp_panel = PanelContainer.new()
+	result_mvp_panel.custom_minimum_size = Vector2(252 if compact else 306, 0)
+	_style(result_mvp_panel, Color("#101410f0"), 5, Color("#6e5a36"), 2)
+	parent.add_child(result_mvp_panel)
+	var mvp_box := VBoxContainer.new()
+	mvp_box.add_theme_constant_override("separation", 6)
+	result_mvp_panel.add_child(mvp_box)
+	var header := _label(t("本局 MVP", "Battle MVP"), 17, UI_GOLD_LIGHT)
+	header.add_theme_constant_override("outline_size", 3)
+	header.add_theme_color_override("font_outline_color", Color("#1b1007"))
+	mvp_box.add_child(header)
+	var portrait_row := HBoxContainer.new()
+	portrait_row.add_theme_constant_override("separation", 10)
+	mvp_box.add_child(portrait_row)
+	var frame := PanelContainer.new()
+	frame.custom_minimum_size = Vector2(92, 108) if compact else Vector2(112, 132)
+	_style(frame, Color("#0a0c0a"), 4, Color("#e8c96e"), 2)
+	portrait_row.add_child(frame)
+	result_mvp_portrait = TextureRect.new()
+	result_mvp_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	result_mvp_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	result_mvp_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_child(result_mvp_portrait)
+	var info_box := VBoxContainer.new()
+	info_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_box.add_theme_constant_override("separation", 4)
+	portrait_row.add_child(info_box)
+	result_mvp_name_label = _label("--", 19, Color("#f0c77a"))
+	result_mvp_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	info_box.add_child(result_mvp_name_label)
+	result_mvp_stats_label = _label("", 12, Color("#cfc6b2"))
+	result_mvp_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info_box.add_child(result_mvp_stats_label)
+	result_kings_box = VBoxContainer.new()
+	result_kings_box.add_theme_constant_override("separation", 3)
+	mvp_box.add_child(result_kings_box)
+
+func _build_result_chart_panel(parent: Container, compact: bool) -> void:
+	result_chart_panel = PanelContainer.new()
+	result_chart_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style(result_chart_panel, Color("#10100ef0"), 5, Color("#6e5a36"), 2)
+	parent.add_child(result_chart_panel)
+	var chart_box := VBoxContainer.new()
+	chart_box.add_theme_constant_override("separation", 6)
+	result_chart_panel.add_child(chart_box)
+	var header := _label(t("战斗回放", "Battle Replay"), 17, UI_GOLD_LIGHT)
+	header.add_theme_constant_override("outline_size", 3)
+	header.add_theme_color_override("font_outline_color", Color("#1b1007"))
+	chart_box.add_child(header)
+	var legend := HBoxContainer.new()
+	legend.add_theme_constant_override("separation", 12)
+	chart_box.add_child(legend)
+	for entry in [
+		{"color":Color("#5ca873"), "text":t("我方主公生命", "Allied ruler HP")},
+		{"color":Color("#c16458"), "text":t("敌方主公生命", "Enemy ruler HP")},
+		{"color":Color("#e8c96e"), "text":t("我方累计伤害", "Allied damage")},
+		{"color":Color("#8f4d43"), "text":t("敌方累计伤害", "Enemy damage")},
+	]:
+		var item := HBoxContainer.new()
+		item.add_theme_constant_override("separation", 4)
+		var dot := ColorRect.new()
+		dot.color = entry.color
+		dot.custom_minimum_size = Vector2(10, 10)
+		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		item.add_child(dot)
+		item.add_child(_label(str(entry.text), 11, Color("#a89e8a")))
+		legend.add_child(item)
+	result_chart = BattleReportChart.new()
+	result_chart.custom_minimum_size = Vector2(0, 150 if compact else 208)
+	result_chart.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	result_chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	chart_box.add_child(result_chart)
+	result_chart_hint = _label(t("本局没有可用的回放数据。", "No replay data for this run."), 11, Color("#887e70"))
+	result_chart_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_chart_hint.hide()
+	chart_box.add_child(result_chart_hint)
+
+func _build_result_lineup_panel(parent: Container, title_text: String, accent: Color, compact: bool) -> HFlowContainer:
+	var lineup_panel := PanelContainer.new()
+	lineup_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style(lineup_panel, Color("#10100ef0"), 5, Color("#6e5a36"), 2)
+	parent.add_child(lineup_panel)
+	var panel_box := VBoxContainer.new()
+	panel_box.add_theme_constant_override("separation", 5)
+	lineup_panel.add_child(panel_box)
+	var header := _label(title_text, 13, accent.lightened(0.25))
+	panel_box.add_child(header)
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 5)
+	flow.add_theme_constant_override("v_separation", 5)
+	panel_box.add_child(flow)
+	return flow
 
 func _show_battle_result(result: Dictionary) -> void:
 	var victory := bool(result.get("victory", false))
@@ -1803,12 +1966,241 @@ func _show_battle_result(result: Dictionary) -> void:
 	result_title_label.text = "胜利" if victory else "失败"
 	result_title_label.add_theme_color_override("font_color", Color("#f0c77a") if victory else Color("#e07070"))
 	var difficulty := int(result.get("difficulty", -1))
+	var stars := 0
 	if difficulty >= 0:
-		var stars := int(result.get("stars", 0))
-		result_detail_label.text = "%s · %s\n%s\n将魂 +%d　将星 +%d" % [STAGE_NAMES[int(result.stage) - 1], str(DIFFICULTIES[difficulty].name), "★".repeat(stars) + "☆".repeat(3 - stars), int(result.get("souls", 0)), int(result.get("new_stars", 0))] if victory else "%s · %s\n主公阵亡，本次没有奖励" % [STAGE_NAMES[int(result.stage) - 1], str(DIFFICULTIES[difficulty].name)]
+		stars = int(result.get("stars", 0)) if victory else 0
+		var stage_name: String = STAGE_NAMES[int(result.stage) - 1]
+		var difficulty_name: String = str(DIFFICULTIES[difficulty].name)
+		if victory:
+			result_detail_label.text = "%s · %s\n%s\n将魂 +%d　将星 +%d" % [stage_name, difficulty_name, "★".repeat(stars) + "☆".repeat(3 - stars), int(result.get("souls", 0)), int(result.get("new_stars", 0))]
+		elif int(result.get("souls", 0)) > 0:
+			result_detail_label.text = "%s · %s\n虽败犹荣：敌方主公战损 %d%%\n将魂 +%d（按战损比例发放）" % [stage_name, difficulty_name, int(round(float(result.get("damage_ratio", 0.0)) * 100.0)), int(result.get("souls", 0))]
+		else:
+			result_detail_label.text = "%s · %s\n未能击伤敌方主公，本次没有奖励" % [stage_name, difficulty_name]
 	else:
+		stars = _display_stars_for_hp() if victory else 0
 		result_detail_label.text = "天下归心" if victory else "主公阵亡"
+	_populate_result_mvp()
+	_populate_result_chart()
+	_populate_result_lineup()
 	result_overlay.show()
+	_play_result_sequence(victory, stars)
+
+func _display_stars_for_hp() -> int:
+	# 非闯关模式的展示用星级：按主公剩余生命比例 80%/50% 评 3/2 星，仅用于结算动画，不影响奖励。
+	var max_hp := float(_player_ruler_max_hp())
+	if max_hp <= 0.0: return 0
+	var ratio := float(player_ruler_hp) / max_hp
+	return 3 if ratio >= 0.8 else (2 if ratio >= 0.5 else (1 if ratio > 0.0 else 0))
+
+func _compute_battle_mvp() -> Dictionary:
+	# 整关累计统计评选我方 MVP 与三项数据王；读档等无累计数据时回退上一场战斗统计。
+	var rows: Array = []
+	for row in stage_stats_totals.values():
+		if str(row.get("team", "")) == "player": rows.append(row)
+	if rows.is_empty():
+		for row in last_battle_stats:
+			if str(row.get("team", "")) == "player": rows.append(row)
+	if rows.is_empty(): return {"mvp": null, "kings": {}}
+	var maxes := {"damage": 0.0, "healing": 0.0, "control": 0.0}
+	for row in rows:
+		for key in maxes: maxes[key] = maxf(maxes[key], float(row.get(key, 0.0)))
+	var kings := {}
+	for key in maxes:
+		var leader = null
+		for row in rows:
+			if leader == null or float(row.get(key, 0.0)) > float(leader.get(key, 0.0)): leader = row
+		if leader != null and float(leader.get(key, 0.0)) > 0.0: kings[key] = leader
+	# 加权评分：伤害 0.5 / 治疗 0.3 / 控制 0.2，全零类别自动剔除并重新归一。
+	var weights := {"damage": 0.5, "healing": 0.3, "control": 0.2}
+	var weight_sum := 0.0
+	for key in weights:
+		if maxes[key] > 0.0: weight_sum += weights[key]
+	if weight_sum <= 0.0: return {"mvp": null, "kings": kings}
+	var mvp = null
+	var best := -1.0
+	for row in rows:
+		var score := 0.0
+		for key in weights:
+			if maxes[key] <= 0.0: continue
+			score += weights[key] / weight_sum * (float(row.get(key, 0.0)) / maxes[key])
+		if score > best:
+			best = score
+			mvp = row
+	return {"mvp": mvp, "kings": kings}
+
+func _populate_result_mvp() -> void:
+	var data := _compute_battle_mvp()
+	var mvp = data.mvp
+	_clear_dynamic_children(result_kings_box)
+	if mvp == null:
+		result_mvp_portrait.texture = null
+		result_mvp_name_label.text = t("暂无数据", "No data")
+		result_mvp_stats_label.text = ""
+		return
+	result_mvp_portrait.texture = _portrait_texture(str(mvp.hero_id))
+	result_mvp_name_label.text = _hero_name(str(mvp.hero_id))
+	result_mvp_stats_label.text = "%s %s\n%s %s\n%s %s" % [
+		t("伤害", "Damage"), str(int(round(float(mvp.get("damage", 0.0))))),
+		t("治疗", "Healing"), str(int(round(float(mvp.get("healing", 0.0))))),
+		t("控制", "Control"), "%.1fs" % float(mvp.get("control", 0.0))]
+	var kings: Dictionary = data.kings
+	var king_meta := [
+		{"key":"damage", "icon":"⚔", "label":t("伤害最高", "Top damage")},
+		{"key":"healing", "icon":"✚", "label":t("治疗最高", "Top healing")},
+		{"key":"control", "icon":"✦", "label":t("控制最高", "Top control")},
+	]
+	for meta in king_meta:
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override("separation", 5)
+		var king = kings.get(meta.key)
+		var text := "%s %s：—" % [str(meta.icon), str(meta.label)]
+		if king != null:
+			var value := float(king.get(meta.key, 0.0))
+			var value_text := "%.1fs" % value if str(meta.key) == "control" else str(int(round(value)))
+			text = "%s %s：%s %s" % [str(meta.icon), str(meta.label), _hero_name(str(king.hero_id)), value_text]
+		line.add_child(_label(text, 12, Color("#d8cfbd")))
+		result_kings_box.add_child(line)
+
+func _populate_result_chart() -> void:
+	var samples: Array = stage_replay_curve
+	if samples.size() < 2:
+		result_chart.hide()
+		result_chart_hint.show()
+		return
+	result_chart.show()
+	result_chart_hint.hide()
+	var pr_points: Array = []
+	var er_points: Array = []
+	var pd_points: Array = []
+	var ed_points: Array = []
+	var x_max := 0.0
+	var y_max := 1.0
+	var first: Dictionary = samples[0]
+	# 起点：生命取首个采样值、伤害从 0 开始，保证曲线从图表左侧出发。
+	pr_points.append(Vector2(0.0, float(first.pr)))
+	er_points.append(Vector2(0.0, float(first.er)))
+	pd_points.append(Vector2(0.0, 0.0))
+	ed_points.append(Vector2(0.0, 0.0))
+	for sample in samples:
+		var t_value := float(sample.t)
+		x_max = maxf(x_max, t_value)
+		for value in [float(sample.pr), float(sample.er), float(sample.pd), float(sample.ed)]:
+			y_max = maxf(y_max, value)
+		pr_points.append(Vector2(t_value, float(sample.pr)))
+		er_points.append(Vector2(t_value, float(sample.er)))
+		pd_points.append(Vector2(t_value, float(sample.pd)))
+		ed_points.append(Vector2(t_value, float(sample.ed)))
+	var marks: Array = []
+	var mark_labels: Array = []
+	for index in stage_replay_round_marks.size():
+		var mark := float(stage_replay_round_marks[index])
+		if mark < x_max - 1.0:
+			marks.append(mark)
+			mark_labels.append(t("第%d回" % (index + 1), "R%d" % (index + 1)))
+	var y_ticks: Array = []
+	for index in 5:
+		y_ticks.append(_format_axis_value(y_max * float(index) / 4.0))
+	result_chart.configure([
+		{"name":"pr", "color":Color("#5ca873"), "points":pr_points, "width":2.5, "glow":true},
+		{"name":"er", "color":Color("#c16458"), "points":er_points, "width":2.5, "glow":true},
+		{"name":"pd", "color":Color("#e8c96e"), "points":pd_points, "width":1.5, "alpha":0.78},
+		{"name":"ed", "color":Color("#8f4d43"), "points":ed_points, "width":1.5, "alpha":0.78},
+	], x_max, y_max, marks, mark_labels, y_ticks)
+
+func _format_axis_value(value: float) -> String:
+	if language == "en":
+		return "%.1fk" % (value / 1000.0) if value >= 1000.0 else str(int(round(value)))
+	return ("%.1f万" % (value / 10000.0)) if value >= 10000.0 else str(int(round(value)))
+
+func _populate_result_lineup() -> void:
+	_clear_dynamic_children(result_lineup_player_flow)
+	_clear_dynamic_children(result_lineup_enemy_flow)
+	if last_battle_lineup.is_empty():
+		result_lineup_player_flow.add_child(_label(t("暂无数据", "No data"), 11, Color("#887e70")))
+		return
+	for entry in last_battle_lineup:
+		var flow := result_lineup_player_flow if str(entry.team) == "player" else result_lineup_enemy_flow
+		flow.add_child(_make_result_lineup_chip(entry))
+
+func _make_result_lineup_chip(entry: Dictionary) -> Control:
+	var compact := _is_mobile_ui()
+	var alive := bool(entry.get("alive", false))
+	var accent := Color("#5ca873") if str(entry.get("team", "")) == "player" else Color("#c16458")
+	var chip := PanelContainer.new()
+	_style(chip, Color("#0d1010ee"), 4, accent if alive else Color("#3c3a33"), 1)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 5)
+	chip.add_child(row)
+	var portrait := _portrait_rect(str(entry.hero_id))
+	portrait.custom_minimum_size = Vector2(30, 30) if compact else Vector2(36, 36)
+	row.add_child(portrait)
+	var col := VBoxContainer.new()
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 1)
+	row.add_child(col)
+	var name_text := _hero_name(str(entry.hero_id))
+	if not alive: name_text = "† " + name_text
+	col.add_child(_label(name_text, 10, accent.lightened(0.2) if alive else Color("#6e6a5e")))
+	var max_hp := maxf(1.0, float(entry.get("max_hp", 1.0)))
+	var hp_bar := ProgressBar.new()
+	hp_bar.show_percentage = false
+	hp_bar.min_value = 0.0
+	hp_bar.max_value = 1.0
+	hp_bar.value = clampf(float(entry.get("hp", 0.0)) / max_hp, 0.0, 1.0)
+	hp_bar.custom_minimum_size = Vector2(50 if compact else 58, 5)
+	var hp_bg := StyleBoxFlat.new()
+	hp_bg.bg_color = Color("#090b0f")
+	hp_bg.set_corner_radius_all(2)
+	var hp_fill := StyleBoxFlat.new()
+	hp_fill.bg_color = accent if alive else Color("#54514a")
+	hp_fill.set_corner_radius_all(2)
+	hp_bar.add_theme_stylebox_override("background", hp_bg)
+	hp_bar.add_theme_stylebox_override("fill", hp_fill)
+	col.add_child(hp_bar)
+	if not alive: chip.modulate = Color(1.0, 1.0, 1.0, 0.62)
+	return chip
+
+func _play_result_sequence(victory: bool, stars: int) -> void:
+	if result_tween != null and result_tween.is_valid(): result_tween.kill()
+	for star_tween in result_star_tweens:
+		if star_tween != null and star_tween.is_valid(): star_tween.kill()
+	result_star_tweens.clear()
+	for star in result_star_labels:
+		star.modulate = Color(0.40, 0.38, 0.32, 1.0)
+		star.scale = Vector2.ONE
+	result_title_label.scale = Vector2(0.5, 0.5)
+	result_title_label.modulate.a = 0.0
+	result_mvp_panel.modulate.a = 0.0
+	result_chart_panel.modulate.a = 0.0
+	result_lineup_row.modulate.a = 0.0
+	if result_chart.has_method("set_reveal"): result_chart.call("set_reveal", 0.0)
+	var tween := create_tween()
+	result_tween = tween
+	tween.tween_property(result_title_label, "modulate:a", 1.0, 0.22)
+	tween.parallel().tween_property(result_title_label, "scale", Vector2.ONE, 0.30).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var lit := maxi(0, stars) if victory else 0
+	tween.tween_interval(0.10)
+	for index in lit:
+		tween.tween_callback(_pop_result_star.bind(index))
+		tween.tween_interval(0.42)
+	if lit == 0: tween.tween_interval(0.25)
+	tween.tween_property(result_mvp_panel, "modulate:a", 1.0, 0.28)
+	tween.parallel().tween_property(result_chart_panel, "modulate:a", 1.0, 0.28)
+	tween.parallel().tween_method(func(value: float): result_chart.call("set_reveal", value), 0.0, 1.0, 0.85).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_interval(0.12)
+	tween.tween_property(result_lineup_row, "modulate:a", 1.0, 0.30)
+
+func _pop_result_star(index: int) -> void:
+	if index >= result_star_labels.size(): return
+	var star := result_star_labels[index]
+	star.pivot_offset = star.size * 0.5
+	_play_sfx("coin", -5.0, 40, 0.20)
+	var pop := create_tween()
+	result_star_tweens.append(pop)
+	pop.tween_property(star, "modulate", Color.WHITE, 0.16)
+	pop.parallel().tween_property(star, "scale", Vector2(1.42, 1.42), 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pop.tween_property(star, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _return_home_from_result() -> void:
 	result_overlay.hide()
@@ -2326,6 +2718,10 @@ func _on_unequip_rune(hero_id: String, uid: int) -> void:
 	_unequip_rune(hero_id, uid)
 	_render_runes()
 
+const TALENT_LAYER_COLORS: Array[Color] = [
+	Color("#365d43"), Color("#3d6b5c"), Color("#41627a"), Color("#765585"), Color("#9a6b32"),
+]
+
 func _build_talent_overlay() -> void:
 	talent_overlay = _full_overlay(1150, PremiumUIArt.Variant.TALENT, Color("#987030"))
 	var root := _overlay_panel(talent_overlay, "天赋", func(): talent_overlay.hide(); _refresh_home())
@@ -2334,7 +2730,7 @@ func _build_talent_overlay() -> void:
 	content.add_theme_constant_override("separation", 12)
 	root.add_child(content)
 	var navigation_panel := PanelContainer.new()
-	navigation_panel.custom_minimum_size.x = 220
+	navigation_panel.custom_minimum_size.x = 200
 	_style(navigation_panel, Color("#111511ed"), 5, Color("#665535"), 2)
 	var navigation := VBoxContainer.new()
 	navigation.add_theme_constant_override("separation", 9)
@@ -2350,8 +2746,8 @@ func _build_talent_overlay() -> void:
 	navigation.add_child(HSeparator.new())
 	for tree_id in ["all", "shu", "wei", "wu", "qun"]:
 		var tab := _button(str(TALENT_TREES[tree_id].name))
-		tab.custom_minimum_size.y = 58
-		tab.add_theme_font_size_override("font_size", 18)
+		tab.custom_minimum_size.y = 60
+		tab.add_theme_font_size_override("font_size", 19)
 		var faction := str(TALENT_TREES[tree_id].faction)
 		var tab_color: Color = Color("#b98a4f") if faction.is_empty() else FACTION_COLORS[faction]
 		_accent_button(tab, tab_color, tree_id == "all")
@@ -2371,7 +2767,7 @@ func _build_talent_overlay() -> void:
 	tree_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_style(tree_panel, Color("#11130fe3"), 5, Color("#796137"), 2)
 	var tree_host := Control.new()
-	tree_host.custom_minimum_size = Vector2(850, 650)
+	tree_host.custom_minimum_size = Vector2(880, 650)
 	tree_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tree_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tree_panel.add_child(tree_host)
@@ -2384,19 +2780,34 @@ func _build_talent_overlay() -> void:
 	tree_host.add_child(talent_content_box)
 	content.add_child(tree_panel)
 	var detail_panel := PanelContainer.new()
-	detail_panel.custom_minimum_size.x = 330
+	detail_panel.custom_minimum_size.x = 410
 	_style(detail_panel, Color("#211b12f2"), 5, Color("#a37a48"), 2)
 	var detail_box := VBoxContainer.new()
 	detail_box.add_theme_constant_override("separation", 10)
-	detail_box.add_child(_label("天赋详情", 24, Color("#d8b96f")))
-	talent_detail_label = _label("点击任一天赋节点查看完整效果。", 16, Color("#ead9b5"))
+	detail_box.add_child(_label("天赋详情", 26, Color("#d8b96f")))
+	talent_detail_name_label = _label("—", 24, Color("#f4e2ae"))
+	talent_detail_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail_box.add_child(talent_detail_name_label)
+	talent_detail_level_label = _label("", 15, Color("#c9b68e"))
+	talent_detail_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail_box.add_child(talent_detail_level_label)
+	detail_box.add_child(HSeparator.new())
+	talent_detail_label = _label("点击左侧任一天赋名字查看完整效果。", 17, Color("#ead9b5"))
 	talent_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	talent_detail_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	talent_detail_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	detail_box.add_child(talent_detail_label)
-	var detail_hint := _label("选择节点查看完整效果\n满足前置后可消耗 2 将星升级", 13, Color("#8f816e"))
-	detail_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	detail_box.add_child(detail_hint)
+	talent_upgrade_button = _button("升级 · 2 将星")
+	talent_upgrade_button.custom_minimum_size = Vector2(0, 48)
+	talent_upgrade_button.add_theme_font_size_override("font_size", 17)
+	talent_upgrade_button.disabled = true
+	_accent_button(talent_upgrade_button, Color("#6f6353"))
+	talent_upgrade_button.pressed.connect(_on_upgrade_selected_talent)
+	detail_box.add_child(talent_upgrade_button)
+	talent_upgrade_hint_label = _label("", 12, Color("#9a8b74"))
+	talent_upgrade_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	talent_upgrade_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail_box.add_child(talent_upgrade_hint_label)
 	detail_panel.add_child(detail_box)
 	content.add_child(detail_panel)
 
@@ -2406,70 +2817,65 @@ func _show_talents() -> void:
 
 func _select_talent_tree(tree_id: String) -> void:
 	talent_tree_id = tree_id
-	talent_detail_label.text = str(TALENT_TREES[tree_id].name) + "：点击节点查看完整效果与当前等级。"
+	selected_talent_node = ""
 	_render_talents()
 
 func _render_talents(message := "") -> void:
+	talent_notice = message
 	_clear_dynamic_children(talent_content_box)
+	talent_node_panels.clear()
 	var invested := 0
 	for node in TALENT_TREES[talent_tree_id].nodes: invested += _talent_level(talent_tree_id, str(node[0]))
 	talent_resource_label.text = "★ 将星 %d / 300\n%s · %d 点" % [general_stars, str(TALENT_TREES[talent_tree_id].name), invested]
-	if not message.is_empty(): talent_detail_label.text = message
-	var layer_colors := [Color("#365d43"), Color("#3d6b5c"), Color("#41627a"), Color("#765585"), Color("#9a6b32")]
 	var canvas_size := talent_content_box.size
 	if canvas_size.x < 500.0 or canvas_size.y < 500.0:
-		canvas_size = Vector2(850, 650)
+		canvas_size = Vector2(880, 650)
 	var tree_points := {}
 	for layer in range(1, 6):
-		var layer_color: Color = layer_colors[layer - 1]
+		var layer_color: Color = TALENT_LAYER_COLORS[layer - 1]
 		var layer_nodes: Array = TALENT_TREES[talent_tree_id].nodes.filter(func(node): return int(node[1]) == layer)
 		if layer_nodes.is_empty(): continue
 		var requirement := int(layer_nodes[0][6])
 		var unlocked := _talent_points_before_layer(talent_tree_id, layer) >= requirement
-		var y := canvas_size.y - 116.0 - float(layer - 1) * 122.0
-		var node_width := minf(184.0, (canvas_size.x - 115.0) / float(layer_nodes.size()) - 8.0)
-		var layer_node_size := Vector2(node_width, 102)
-		var layer_caption := _label("第%d层 · %s" % [layer, "冠冕" if layer == 5 else ("枝干" if layer >= 3 else "根基")], 13, layer_color.lightened(0.38) if unlocked else Color("#746f66"))
-		layer_caption.position = Vector2(14, y + 35)
-		layer_caption.custom_minimum_size = Vector2(105, 26)
+		var y := canvas_size.y - 112.0 - float(layer - 1) * 116.0
+		var node_width := minf(216.0, (canvas_size.x - 110.0) / float(layer_nodes.size()) - 10.0)
+		var layer_node_size := Vector2(node_width, 68)
+		var layer_caption := _label("第%d层 · %s" % [layer, "冠冕" if layer == 5 else ("枝干" if layer >= 3 else "根基")], 15, layer_color.lightened(0.38) if unlocked else Color("#746f66"))
+		layer_caption.position = Vector2(12, y + 21)
+		layer_caption.custom_minimum_size = Vector2(108, 26)
 		talent_content_box.add_child(layer_caption)
 		var points: Array = []
 		for node_index in layer_nodes.size():
 			var node: Array = layer_nodes[node_index]
+			var node_name := str(node[0])
 			var x := canvas_size.x * float(node_index + 1) / float(layer_nodes.size() + 1)
-			var level := _talent_level(talent_tree_id, str(node[0]))
+			var level := _talent_level(talent_tree_id, node_name)
+			var selected := node_name == selected_talent_node
 			var node_panel := PanelContainer.new()
 			node_panel.position = Vector2(x - layer_node_size.x * 0.5, y)
 			node_panel.custom_minimum_size = layer_node_size
 			node_panel.size = layer_node_size
-			_style(node_panel, layer_color.darkened(0.50) if unlocked else Color("#1b1b19"), 50, layer_color.lightened(0.28) if unlocked else Color("#4e4b46"), 3)
+			var border: Color = layer_color.lightened(0.28) if unlocked else Color("#4e4b46")
+			if selected: border = Color("#f2d489")
+			_style(node_panel, layer_color.darkened(0.50) if unlocked else Color("#1b1b19"), 18, border, 3 if selected else 2)
 			var node_box := VBoxContainer.new()
-			node_box.add_theme_constant_override("separation", 2)
+			node_box.add_theme_constant_override("separation", 1)
 			var detail := Button.new()
 			detail.flat = true
-			detail.text = ("%s　%d / %d" % [str(node[0]), level, int(node[2])]) if unlocked else ("🔒 " + str(node[0]))
-			detail.custom_minimum_size.y = 28
-			detail.add_theme_font_size_override("font_size", 16)
+			detail.text = node_name if unlocked else ("🔒 " + node_name)
+			detail.custom_minimum_size.y = 30
+			detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			detail.add_theme_font_size_override("font_size", 19)
 			detail.add_theme_color_override("font_color", Color("#fff0c9") if unlocked else Color("#7b7770"))
-			detail.tooltip_text = _talent_effect_description(talent_tree_id, str(node[0]))
-			detail.pressed.connect(_show_talent_detail.bind(talent_tree_id, str(node[0])))
+			detail.tooltip_text = _talent_effect_description(talent_tree_id, node_name)
+			detail.pressed.connect(_select_talent_node.bind(talent_tree_id, node_name))
 			node_box.add_child(detail)
-			var effect_text := _label(_talent_effect_description(talent_tree_id, str(node[0])), 11, Color("#d9d0bf") if unlocked else Color("#6c6963"))
-			effect_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			effect_text.max_lines_visible = 2
-			effect_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-			effect_text.custom_minimum_size.y = 31
-			effect_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			node_box.add_child(effect_text)
-			var upgrade := _button("升级 · 2 将星")
-			upgrade.custom_minimum_size.y = 28
-			upgrade.add_theme_font_size_override("font_size", 12)
-			_accent_button(upgrade, layer_color)
-			upgrade.disabled = not _can_upgrade_talent(talent_tree_id, str(node[0]))
-			upgrade.pressed.connect(_on_upgrade_talent.bind(talent_tree_id, str(node[0])))
-			node_box.add_child(upgrade)
+			var level_label := _label(("Lv %d / %d" % [level, int(node[2])]) if unlocked else "未解锁", 12, Color("#d9cba6") if unlocked else Color("#6c6963"))
+			level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			node_box.add_child(level_label)
 			node_panel.add_child(node_box)
 			talent_content_box.add_child(node_panel)
+			talent_node_panels[node_name] = node_panel
 			points.append(Vector2(x, y + layer_node_size.y * 0.5))
 		tree_points[layer] = points
 	if is_instance_valid(talent_tree_canvas) and talent_tree_canvas.has_method("set_tree_points"):
@@ -2477,15 +2883,55 @@ func _render_talents(message := "") -> void:
 	for tree_id in talent_tree_tabs:
 		var tab: Button = talent_tree_tabs[tree_id]
 		tab.modulate = Color.WHITE if tree_id == talent_tree_id else Color(0.68, 0.68, 0.68, 0.82)
+	_refresh_talent_detail()
+
+func _select_talent_node(tree_id: String, node_name: String) -> void:
+	if tree_id != talent_tree_id: return
+	selected_talent_node = node_name
+	_render_talents()
 
 func _show_talent_detail(tree_id: String, node_name: String) -> void:
+	_select_talent_node(tree_id, node_name)
+
+func _refresh_talent_detail() -> void:
+	var node := _talent_node(talent_tree_id, selected_talent_node)
+	if node.is_empty():
+		talent_detail_name_label.text = "—"
+		talent_detail_level_label.text = ""
+		talent_detail_label.text = str(TALENT_TREES[talent_tree_id].name) + "：点击任一天赋名字查看完整效果与当前等级。"
+		talent_upgrade_button.disabled = true
+		_accent_button(talent_upgrade_button, Color("#6f6353"))
+		talent_upgrade_hint_label.text = talent_notice
+		return
+	var node_name := selected_talent_node
+	var level := _talent_level(talent_tree_id, node_name)
+	var layer := int(node[1])
+	talent_detail_name_label.text = node_name
+	talent_detail_level_label.text = "%s · 第 %d 层 · 当前 %d / %d 级" % [str(TALENT_TREES[talent_tree_id].name), layer, level, int(node[2])]
+	talent_detail_label.text = _talent_effect_description(talent_tree_id, node_name)
+	talent_upgrade_button.disabled = not _can_upgrade_talent(talent_tree_id, node_name)
+	_accent_button(talent_upgrade_button, TALENT_LAYER_COLORS[layer - 1])
+	var hint := _talent_upgrade_hint(talent_tree_id, node_name)
+	talent_upgrade_hint_label.text = talent_notice if not talent_notice.is_empty() else hint
+
+func _talent_upgrade_hint(tree_id: String, node_name: String) -> String:
 	var node := _talent_node(tree_id, node_name)
-	var level := _talent_level(tree_id, node_name)
-	talent_detail_label.text = "%s · %s　当前 %d / %d 级\n%s" % [str(TALENT_TREES[tree_id].name), node_name, level, int(node[2]), _talent_effect_description(tree_id, node_name)]
+	if node.is_empty(): return ""
+	if _talent_level(tree_id, node_name) >= int(node[2]): return "已达最高等级。"
+	var layer := int(node[1])
+	if _talent_points_before_layer(tree_id, layer) < int(node[6]):
+		return "前置不足：需在前 %d 层累计投入 %d 点将星。" % [layer, int(node[6])]
+	if general_stars < 2: return "将星不足：升级需要 2 颗将星。"
+	return "满足前置后可消耗 2 将星升级"
+
+func _on_upgrade_selected_talent() -> void:
+	if selected_talent_node.is_empty(): return
+	_on_upgrade_talent(talent_tree_id, selected_talent_node)
 
 func _on_upgrade_talent(tree_id: String, node_name: String) -> void:
-	_upgrade_talent(tree_id, node_name)
-	_render_talents()
+	if _upgrade_talent(tree_id, node_name):
+		selected_talent_node = node_name
+		_render_talents("已升级 %s。" % node_name)
 
 func _on_reset_talent_tree() -> void:
 	var refunded := _reset_talent_tree(talent_tree_id)
@@ -3234,7 +3680,7 @@ func _bond_graph_data(faction: String) -> Dictionary:
 			]
 		},
 		"wu":{
-			"faction":["jiangdong_relay", "吴", "Wu", "2 / 5 / 8", "全体吴将最大生命提高2%/5%/8%。8人时，吴将濒死会均摊全体存活吴将的生命比例，并各自恢复5%最大生命（每30秒一次）。", "All Wu heroes gain 2%/5%/8% max HP. At 8, a lethal hit equalizes surviving Wu heroes' health ratios and restores 5% max HP to each (once per 30s)."],
+			"faction":["jiangdong_relay", "吴", "Wu", "2 / 5 / 8", "全体吴将最大生命提高2%/5%/8%。8人时，吴将濒死会均摊全体存活吴将的生命比例，并全体同时恢复3%最大生命（每回合限一次，无归属回复）。", "All Wu heroes gain 2%/5%/8% max HP. At 8, a lethal hit equalizes surviving Wu heroes' health ratios and restores 3% max HP to each at once (once per round)."],
 			"bonds":[
 				["wu_commanders", "四英杰", "Four Heroes", ["zhouyu", "luxun", "lusu", "lvmeng"], "4人", "4 heroes", "周瑜额外点燃2格且灼烧增加30%；陆逊额外弹射并灼烧；鲁肃治疗2人并各提高200%兵略值最大生命；吕蒙使命中后军恐惧9秒。", "Empowers all four heroes' signature skills."],
 				["sun_legacy", "孙氏之志", "Sun Legacy", ["sunjian", "sunce", "sunquan", "sunshangxiang"], "4人", "4 heroes", "孙坚消耗80%当前生命并强化吴将；孙策追加第二段且伤害+50%；孙权生命成长强化；孙尚香连续释放两次并获得2点兵略值。", "Empowers all four Sun-family heroes."],
@@ -3832,7 +4278,7 @@ func _hero_bond_detail(hero_id: String) -> String:
 	var faction_effects: Array = {
 		"shu":["2/5/8人时，本武将承伤降低2%/5%/8%；8人时每次受伤叠加3%减伤，最多3层，每层持续3秒。", "At 2/5/8, this hero takes 2%/5%/8% less damage; at 8, each hit taken adds 3% reduction up to 3 stacks, each lasting 3s."],
 		"wei":["2/5/8人时，本武将控制时长提高2%/5%/8%；8人时，对带有任意控制或减益的目标伤害提高8%。", "At 2/5/8, this hero gains 2%/5%/8% control duration; at 8, damage to any controlled or debuffed target increases by 8%."],
-		"wu":["2/5/8人时，本武将最大生命提高2%/5%/8%；8人时，吴将濒死会触发全体吴将生命均摊并恢复5%最大生命（每30秒一次）。", "At 2/5/8, this hero gains 2%/5%/8% max HP; at 8, a lethal hit equalizes Wu health and restores 5% max HP (once per 30s)."],
+		"wu":["2/5/8人时，本武将最大生命提高2%/5%/8%；8人时，吴将濒死会触发全体吴将生命均摊并全体同时恢复3%最大生命（每回合限一次）。", "At 2/5/8, this hero gains 2%/5%/8% max HP; at 8, a lethal hit equalizes Wu health and restores 3% max HP to each at once (once per round)."],
 		"qun":["2/5/8人时，本武将技能冷却缩短3.6%/9%/14.4%；8人时，每次释放技能有8%概率连续释放两次。", "At 2/5/8, this hero gains 3.6%/9%/14.4% cooldown reduction; at 8, each cast has an 8% chance to cast twice."]
 	}[faction]
 	var peach: Array = ["liubei", "guanyu", "zhangfei"]
@@ -3935,7 +4381,7 @@ func _bond_detail(faction: String) -> String:
 	match faction:
 		"shu": return t("蜀：2/5/8人时承伤降低2%/5%/8%；8人时每次受伤叠加3%减伤，最多3层，每层持续3秒。", "Shu: at 2/5/8, take 2%/5%/8% less damage; at 8, each hit adds 3% reduction up to 3 stacks, each lasting 3s.")
 		"wei": return t("魏：2/5/8人时控制时长提高2%/5%/8%；8人时对受控或带减益目标伤害提高8%。", "Wei: at 2/5/8, control duration gains 2%/5%/8%; at 8, deal 8% more damage to controlled or debuffed targets.")
-		"wu": return t("吴：2/5/8人时最大生命提高2%/5%/8%；8人时濒死触发生命均摊并恢复5%最大生命（每30秒一次）。", "Wu: at 2/5/8, gain 2%/5%/8% max HP; at 8, a lethal hit equalizes health and restores 5% max HP (once per 30s).")
+		"wu": return t("吴：2/5/8人时最大生命提高2%/5%/8%；8人时濒死触发生命均摊并全体同时恢复3%最大生命（每回合限一次）。", "Wu: at 2/5/8, gain 2%/5%/8% max HP; at 8, a lethal hit equalizes health and restores 3% max HP to each at once (once per round).")
 		"qun": return t("群：2/5/8人时冷却缩短3.6%/9%/14.4%；8人时释放技能有8%概率连续释放两次。", "Qun: at 2/5/8, cooldown is reduced by 3.6%/9%/14.4%; at 8, casts have an 8% repeat chance.")
 	return ""
 func _portrait_texture(hero_id: String) -> Texture2D:

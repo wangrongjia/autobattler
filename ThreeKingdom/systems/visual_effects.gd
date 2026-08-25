@@ -49,6 +49,9 @@ func _play_grouped_auxiliary(grouped_events: Array) -> void:
 	if last_tween != null: await last_tween.finished
 
 func _play_single_visual_event(event: Dictionary) -> void:
+	if str(event.get("kind", "")) == "faction_bond":
+		await _play_faction_bond_banner(event)
+		return
 	var actor: Control = unit_cell_refs.get(event.get("source_id", ""))
 	var target: Control = unit_cell_refs.get(event.get("target_id", ""))
 	if not is_instance_valid(target) and event.has("team"):
@@ -799,6 +802,48 @@ func _impact_burst(target: Control, color: Color, profile: Dictionary, is_skill:
 	burst.parallel().tween_property(glyph, "modulate:a", 0.0, 0.26 * speed_scale)
 	burst.tween_callback(ring.queue_free)
 	burst.tween_callback(glyph.queue_free)
+
+func _play_faction_bond_banner(event: Dictionary) -> void:
+	# 阵营 8 人大羁绊发动横幅：全屏阵营色脉冲 + 中央标题缩放浮现(如吴国江东联动)。
+	var speed_scale := 1.0 / game_speed
+	var player_side := str(event.get("team", "player")) == "player"
+	var title := _outlined_label(str(event.get("title", "")), 46, Color("#a8f0c3") if player_side else Color("#f5b8a0"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_constant_override("outline_size", 9)
+	var subtitle := _outlined_label(str(event.get("subtitle", "")), 19, Color("#f2d489"))
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_play_sfx("tianshu", -2.0, 250, 0.04)
+	var layer := CanvasLayer.new()
+	layer.layer = 40
+	add_child(layer)
+	var shade := ColorRect.new()
+	shade.color = Color("#1e6b47") if player_side else Color("#6e3226")
+	shade.modulate.a = 0.0
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(shade)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(center)
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 6)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(title)
+	box.add_child(subtitle)
+	center.add_child(box)
+	box.pivot_offset = box.get_combined_minimum_size() * 0.5
+	var tween := create_tween()
+	tween.tween_property(shade, "modulate:a", 0.18, 0.16 * speed_scale)
+	tween.parallel().tween_property(box, "modulate:a", 1.0, 0.16 * speed_scale).from(0.0)
+	tween.parallel().tween_property(box, "scale", Vector2.ONE, 0.24 * speed_scale).from(Vector2(0.72, 0.72)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_interval(0.55 * speed_scale)
+	tween.tween_property(box, "modulate:a", 0.0, 0.30 * speed_scale)
+	tween.parallel().tween_property(box, "scale", Vector2(1.06, 1.06), 0.30 * speed_scale)
+	tween.parallel().tween_property(shade, "modulate:a", 0.0, 0.30 * speed_scale)
+	tween.tween_callback(layer.queue_free)
+	await tween.finished
 
 func _floating_text(target: Control, value: String, color: Color) -> void:
 	if not is_instance_valid(target): return

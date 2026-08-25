@@ -20,6 +20,14 @@ func _new_game() -> void:
 	battle_speed = game_speed
 	battle_stats = {}
 	last_battle_stats = []
+	stage_replay_curve = []
+	stage_replay_round_marks = []
+	stage_time_offset = 0.0
+	stage_stats_totals = {}
+	last_battle_lineup = []
+	replay_last_sample_t = -1.0
+	stage_damage_player = 0.0
+	stage_damage_enemy = 0.0
 	ground_effects.clear()
 	refresh_charges = 0
 	if tick_timer: tick_timer.stop()
@@ -91,6 +99,15 @@ func _load_game() -> bool:
 		_log(t("存档版本不兼容。", "The save version is incompatible."))
 		return false
 	tick_timer.stop()
+	# 读档后回放曲线与整关累计统计从当前回合重新开始记录(存档不保存回放数据)。
+	stage_replay_curve = []
+	stage_replay_round_marks = []
+	stage_time_offset = 0.0
+	stage_stats_totals = {}
+	last_battle_lineup = []
+	replay_last_sample_t = -1.0
+	stage_damage_player = 0.0
+	stage_damage_enemy = 0.0
 	game_mode = str(data.get("game_mode", "quick"))
 	selected_stage = clampi(int(data.get("selected_stage", selected_stage)), 1, STAGE_NAMES.size())
 	selected_difficulty = clampi(int(data.get("selected_difficulty", selected_difficulty)), 0, DIFFICULTIES.size() - 1)
@@ -512,6 +529,9 @@ func _finish_battle() -> void:
 	battle_paused = false
 	action_in_progress = false
 	_capture_battle_stats()
+	_push_final_replay_sample()
+	_accumulate_stage_stats()
+	_snapshot_battle_lineup()
 	_tianshu_on_round_end()
 	var result: String
 	if player_ruler_hp == enemy_ruler_hp: result = t("本关战斗结束，平局。", "Stage complete — draw.")

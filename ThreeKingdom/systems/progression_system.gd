@@ -174,10 +174,15 @@ func _challenge_stars_for_hp() -> int:
 	return 3 if player_ruler_hp > 80000 else (2 if player_ruler_hp > 50000 else 1)
 
 func _challenge_soul_reward(stars: int) -> int:
-	return 2 * (300 + 50 * (selected_stage - 1) + 50 * selected_difficulty + 100 * (stars - 1))
+	# 闯关将魂基础收益：随关卡与难度递增，星级每高一级 +100；整体已两度翻倍。
+	return 4 * (300 + 50 * (selected_stage - 1) + 50 * selected_difficulty + 100 * (stars - 1))
+
+func _challenge_enemy_damage_ratio() -> float:
+	# 敌方主公战损比例：未通关时按该比例等比发放将魂。
+	return clampf(1.0 - float(enemy_ruler_hp) / float(RULER_MAX_HP), 0.0, 1.0)
 
 func _complete_challenge(victory: bool) -> Dictionary:
-	var result := {"victory":victory, "stage":selected_stage, "difficulty":selected_difficulty, "stars":0, "new_stars":0, "souls":0}
+	var result := {"victory":victory, "stage":selected_stage, "difficulty":selected_difficulty, "stars":0, "new_stars":0, "souls":0, "damage_ratio":0.0}
 	if victory:
 		var stars := _challenge_stars_for_hp()
 		var key := _progression_key(selected_stage, selected_difficulty)
@@ -190,7 +195,17 @@ func _complete_challenge(victory: bool) -> Dictionary:
 		result.stars = stars
 		result.new_stars = gained
 		result.souls = souls
+		result.damage_ratio = _challenge_enemy_damage_ratio()
 		_save_progression()
+	else:
+		# 未通关：按敌方主公损失血量占总血量的百分比，等比例发放将魂（按 1 星满额折算）。
+		var damage_ratio := _challenge_enemy_damage_ratio()
+		var souls := int(round(_challenge_soul_reward(1) * damage_ratio))
+		result.damage_ratio = damage_ratio
+		if souls > 0:
+			general_souls += souls
+			result.souls = souls
+			_save_progression()
 	pending_battle_result = result
 	return result
 
@@ -363,7 +378,7 @@ func _talent_effect_description(tree_id: String, node_name: String) -> String:
 		"wei:中枢令典":"1级：第 1 回合开始时随机获得 1 名魏阵营武将加入备战席；2级：前 2 回合每回合各获得 1 名。",
 		"wei:乘胜追击":"每级使魏阵营 8 人羁绊对减益目标伤害提高 4%，满级由 8%提高到 16%。",
 		"wu:三世基业":"1级：第 1 回合开始时随机获得 1 名吴阵营武将加入备战席；2级：前 2 回合每回合各获得 1 名。",
-		"wu:同舟共济":"1级：8 人羁绊均摊后回复由 5%提高到 7%；2级提高到 9%。",
+		"wu:同舟共济":"1级：8 人羁绊均摊后回复由 3%提高到 5%；2级提高到 6%。",
 		"qun:烽火燎原":"1级：第 1 回合开始时随机获得 1 名群阵营武将加入备战席；2级：前 2 回合每回合各获得 1 名。",
 		"qun:逐鹿中原":"每级使群阵营 8 人羁绊的技能连发概率提高 4%，满级由 8%提高到 16%。"
 	}

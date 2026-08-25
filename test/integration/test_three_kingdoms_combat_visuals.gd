@@ -1,5 +1,7 @@
 extends SceneTree
 
+const WU_VISUAL_IDS := ["zhouyu", "luxun", "lusu", "lvmeng", "sunjian", "sunce", "sunquan", "sunshangxiang"]
+
 func _initialize() -> void:
 	var game = load("res://ThreeKingdom/ThreeKingdom.tscn").instantiate()
 	root.add_child(game)
@@ -185,17 +187,22 @@ func _initialize() -> void:
 	await game._play_visual_events(grouped_row_events)
 
 	# Zhao Yun's single-target sequence uses one rapid spear animation group.
+	# The board is fully occupied so the random tile pick always lands a hit.
 	var visual_zhao: Dictionary = game._make_roster_unit("player", "zhaoyun")
 	visual_zhao.row = 1
 	visual_zhao.col = 2
-	var visual_zhao_target: Dictionary = game._make_roster_unit("enemy", "caocao")
-	visual_zhao_target.row = 0
-	visual_zhao_target.col = 2
-	visual_zhao_target.max_hp = 100000.0
-	visual_zhao_target.hp = visual_zhao_target.max_hp
+	var visual_zhao_targets: Array = []
+	for row in game.BOARD_ROWS:
+		for col in game.BOARD_COLUMNS:
+			var visual_zhao_target: Dictionary = game._make_roster_unit("enemy", "caocao")
+			visual_zhao_target.row = row
+			visual_zhao_target.col = col
+			visual_zhao_target.max_hp = 100000.0
+			visual_zhao_target.hp = 100000.0
+			visual_zhao_targets.append(visual_zhao_target)
 	game.player_units = [visual_zhao]
-	game.enemy_units = [visual_zhao_target]
-	game.combat_units = [visual_zhao, visual_zhao_target]
+	game.enemy_units = visual_zhao_targets
+	game.combat_units = [visual_zhao] + visual_zhao_targets
 	game._render_combat_boards()
 	await process_frame
 	game.visual_events.clear()
@@ -206,18 +213,20 @@ func _initialize() -> void:
 	game.visual_events.clear()
 	await game._play_visual_events(zhao_visual_events)
 
-	# Ma Chao's entire selected column uses the dedicated long-spear thrust.
+	# Ma Chao's entire selected column uses the dedicated long-spear thrust;
+	# every column is occupied so any random pick strikes three heroes.
 	var visual_machao: Dictionary = game._make_roster_unit("player", "machao")
 	visual_machao.row = 1
 	visual_machao.col = 2
 	var visual_machao_targets: Array = []
 	for row in game.BOARD_ROWS:
-		var visual_machao_target: Dictionary = game._make_roster_unit("enemy", "caocao")
-		visual_machao_target.row = row
-		visual_machao_target.col = 2
-		visual_machao_target.max_hp = 100000.0
-		visual_machao_target.hp = visual_machao_target.max_hp - row * 1000.0
-		visual_machao_targets.append(visual_machao_target)
+		for col in game.BOARD_COLUMNS:
+			var visual_machao_target: Dictionary = game._make_roster_unit("enemy", "caocao")
+			visual_machao_target.row = row
+			visual_machao_target.col = col
+			visual_machao_target.max_hp = 100000.0
+			visual_machao_target.hp = 100000.0 - row * 1000.0
+			visual_machao_targets.append(visual_machao_target)
 	game.player_units = [visual_machao]
 	game.enemy_units = visual_machao_targets
 	game.combat_units = [visual_machao] + visual_machao_targets
@@ -252,5 +261,43 @@ func _initialize() -> void:
 	assert(regen_events.size() == 1)
 	assert(regen_events[0].target_id == regen_target.id)
 	assert(regen_events[0].nonblocking)
+
+	# The Wu 8-hero grand bond announces with a screen banner, then every Wu
+	# hero recovers in the same instant via one "simultaneous" visual group.
+	var wu_squad: Array = []
+	for index in WU_VISUAL_IDS.size():
+		var wu_member: Dictionary = game._make_roster_unit("player", WU_VISUAL_IDS[index])
+		wu_member.row = index % game.BOARD_ROWS
+		wu_member.col = index % game.BOARD_COLUMNS
+		wu_squad.append(wu_member)
+	game.player_units = wu_squad
+	game.enemy_units = []
+	game.combat_units = wu_squad.duplicate()
+	game.battle_stats = {}
+	for member in wu_squad:
+		game.battle_stats[member.id] = {"unit_id":member.id, "hero_id":member.hero_id, "team":"player", "level":1, "damage":0.0, "healing":0.0, "taken":0.0, "control":0.0}
+	game._reset_faction_battle_state()
+	game._apply_faction_bonuses(false)
+	for member in wu_squad:
+		member.max_hp = 100000.0
+		member.hp = 30000.0
+	wu_squad[0].hp = 1.0
+	game._render_combat_boards()
+	await process_frame
+	game.visual_events.clear()
+	assert(game._try_wu_equalize_and_recover(wu_squad[0]))
+	var wu_banner_events: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "faction_bond")
+	assert(wu_banner_events.size() == 1)
+	assert(str(wu_banner_events[0].title).contains("江东联动"))
+	var wu_heal_events: Array = game.visual_events.filter(func(event): return event.get("kind", "") == "heal")
+	assert(wu_heal_events.size() == 8)
+	assert(wu_heal_events.all(func(event): return str(event.visual_group) == str(wu_heal_events[0].visual_group) and str(event.group_style) == "simultaneous"))
+	for member in wu_squad:
+		assert(float(game.battle_stats[member.id].healing) == 0.0)
+	var wu_shared := (7.0 * 30000.0 + 1.0) / 800000.0
+	assert(absf(float(wu_squad[1].hp) - 100000.0 * (wu_shared + 0.03)) < 0.01)
+	var wu_bond_events: Array = game.visual_events.duplicate(true)
+	game.visual_events.clear()
+	await game._play_visual_events(wu_bond_events)
 
 	quit()

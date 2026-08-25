@@ -382,6 +382,50 @@ func _capture_battle_stats() -> void:
 	last_battle_stats = []
 	for entry in battle_stats.values(): last_battle_stats.append(entry.duplicate(true))
 
+func _round_damage_totals() -> Vector2:
+	# 本回合内两队的伤害小计(battle_stats 每场战斗开始时会重建，只有本回合数据)。
+	var player_damage := 0.0
+	var enemy_damage := 0.0
+	for entry in battle_stats.values():
+		if str(entry.get("team", "")) == "player": player_damage += float(entry.get("damage", 0.0))
+		else: enemy_damage += float(entry.get("damage", 0.0))
+	return Vector2(player_damage, enemy_damage)
+
+func _record_replay_sample() -> void:
+	# 回放曲线采样：每 ≥0.5 秒战斗时间记一次双方主公生命与两队整关累计伤害，供结算画面绘制曲线。
+	if battle_time - replay_last_sample_t < 0.5: return
+	replay_last_sample_t = battle_time
+	var totals := _round_damage_totals()
+	stage_replay_curve.append({"t": stage_time_offset + battle_time, "pr":player_ruler_hp, "er":enemy_ruler_hp, "pd":stage_damage_player + totals.x, "ed":stage_damage_enemy + totals.y})
+
+func _push_final_replay_sample() -> void:
+	# 回合结束的精确终点采样 + 回合分隔标记，保证曲线收尾与判定瞬间一致。
+	replay_last_sample_t = -1.0
+	var totals := _round_damage_totals()
+	stage_replay_curve.append({"t": stage_time_offset + battle_time, "pr":player_ruler_hp, "er":enemy_ruler_hp, "pd":stage_damage_player + totals.x, "ed":stage_damage_enemy + totals.y})
+	stage_time_offset += battle_time
+	stage_damage_player += totals.x
+	stage_damage_enemy += totals.y
+	stage_replay_round_marks.append(stage_time_offset)
+
+func _accumulate_stage_stats() -> void:
+	# 把本场 battle_stats 累加进整关统计，供结算画面评选整关 MVP 与数据王。
+	for entry in battle_stats.values():
+		var uid := str(entry.get("unit_id", ""))
+		if uid == "": continue
+		if not stage_stats_totals.has(uid):
+			stage_stats_totals[uid] = {"unit_id":uid, "hero_id":str(entry.get("hero_id", "")), "team":str(entry.get("team", "")), "level":int(entry.get("level", 1)), "damage":0.0, "healing":0.0, "taken":0.0, "control":0.0}
+		var total: Dictionary = stage_stats_totals[uid]
+		for key in ["damage", "healing", "taken", "control"]:
+			total[key] = float(total.get(key, 0.0)) + float(entry.get(key, 0.0))
+
+func _snapshot_battle_lineup() -> void:
+	# 最终一场双方阵容快照：结算画面延迟显示，避免依赖战斗对象存活。
+	last_battle_lineup = []
+	for unit in combat_units:
+		if int(unit.row) < 0: continue
+		last_battle_lineup.append({"hero_id":str(unit.hero_id), "team":str(unit.team), "level":int(unit.get("level", 1)), "hp":float(unit.hp), "max_hp":float(unit.max_hp), "alive":bool(unit.alive)})
+
 func _unit_action_gain_multiplier(unit: Dictionary) -> float:
 	var result := float(unit.get("action_gain_mult", 1.0))
 	result *= 1.0 + float(unit.get("timed_action_bonus", 0.0))
@@ -440,6 +484,7 @@ func _battle_tick() -> void:
 		return
 	var delta := TICK * battle_speed
 	battle_time += delta
+	_record_replay_sample()
 	_process_statuses(delta)
 	var ambient_events: Array = visual_events.filter(func(event): return bool(event.get("nonblocking", false)))
 	if not ambient_events.is_empty():
@@ -508,11 +553,6 @@ func _resolve_effect_pause() -> void:
 
 func _process_statuses(delta: float = TICK) -> void:
 	var status_tick_id := str(floori(battle_time + 0.001))
-	for team in ["player", "enemy"]:
-		if faction_battle_state.has(team):
-			var st: Dictionary = faction_battle_state[team]
-			st.wu_equalize_cooldown = maxf(0.0, float(st.get("wu_equalize_cooldown", 0.0)) - delta)
-			faction_battle_state[team] = st
 	for unit in combat_units:
 		if not unit.alive: continue
 		_ensure_unit_fields(unit)
@@ -2542,15 +2582,15 @@ func _try_wu_equalize_and_recover(target: Dictionary) -> bool:
 	if heroes[target.hero_id].f != "wu" or int(target.get("faction_tier", 0)) < 3:
 		return false
 	if not faction_battle_state.has(target.team):
-		faction_battle_state[target.team] = {"wu_equalize_cooldown":0.0}
+		faction_battle_state[target.team] = {"wu_equalize_used":false}
 	var state: Dictionary = faction_battle_state[target.team]
-	if float(state.get("wu_equalize_cooldown", 0.0)) > 0.0:
+	if bool(state.get("wu_equalize_used", false)):
 		return false
 	var wu_allies := _team_units(target.team).filter(func(ally): return ally.alive and heroes[ally.hero_id].f == "wu")
 	if wu_allies.size() < FACTION_BOND_TIERS[2]:
 		return false
 	var wu_talent_level := _talent_level("wu", "同舟共济") if target.team == "player" else 0
-	state.wu_equalize_cooldown = 30.0
+	state.wu_equalize_used = true
 	faction_battle_state[target.team] = state
 	var total_hp := 0.0
 	var total_max_hp := 0.0
@@ -2558,13 +2598,22 @@ func _try_wu_equalize_and_recover(target: Dictionary) -> bool:
 		total_hp += maxf(0.0, float(ally.hp))
 		total_max_hp += maxf(1.0, float(ally.max_hp))
 	var shared_ratio := clampf(total_hp / maxf(1.0, total_max_hp), 0.0, 1.0)
-	for ally in wu_allies:
-		var recovery_ratio := 0.05 + 0.02 * wu_talent_level
-		ally.hp = float(ally.max_hp) * shared_ratio
-		_heal_with_overflow(target, ally, float(ally.max_hp) * recovery_ratio, "heal", true)
-	var recovery_percent := roundi((0.05 + 0.02 * wu_talent_level) * 100.0)
+	# 基础回复 3% 最大生命；天赋「同舟共济」1级 +2%、2级 +3%（满级共 6%）。
+	var recovery_ratio := 0.03 + (0.02 if wu_talent_level == 1 else 0.03 if wu_talent_level >= 2 else 0.0)
+	var recovery_percent := roundi(recovery_ratio * 100.0)
 	var trigger_text := "生命低于 %d%%" % roundi(_tianshu_wu_equalize_threshold(target) * 100.0) if _tianshu_wu_equalize_threshold(target) > 0.0 else "濒死"
-	_log("[color=#e58f78]【江东联动】%s触发：吴将均摊生命并恢复 %d%% 最大生命（每30秒一次）！[/color]" % [trigger_text, recovery_percent])
+	# 8 人大羁绊发动横幅：全屏脉冲 + 中央飘字，随后全体吴将在同一时刻同时恢复。
+	visual_events.append({"kind":"faction_bond", "team":target.team, "title":t("江东联动", "Jiangdong Bond"), "subtitle":t("吴国八人羁绊 · 全体回复 %d%% 最大生命" % recovery_percent, "Wu 8-Hero Bond · all recover %d%% max HP" % recovery_percent)})
+	var bond_group: String = "wu_bond_" + str(target.team) + "_" + str(target.id)
+	for ally in wu_allies:
+		ally.hp = float(ally.max_hp) * shared_ratio
+		# 羁绊回复为无归属治疗：不进入任何武将的治疗统计；重伤减疗仍按目标结算。
+		var amount := float(ally.max_hp) * recovery_ratio * (1.0 - clampf(float(ally.get("grievous", 0.0)), 0.0, 0.95))
+		var restored: float = minf(maxf(0.0, float(ally.max_hp) - float(ally.hp)), amount)
+		ally.hp += restored
+		if restored > 0.0:
+			visual_events.append({"kind":"heal", "source_id":target.id, "target_id":ally.id, "amount":roundi(restored), "style":"heal", "nonblocking":true, "visual_group":bond_group, "group_style":"simultaneous"})
+	_log("[color=#e58f78]【江东联动】%s触发：吴将均摊生命并各自恢复 %d%% 最大生命（每回合限一次）！[/color]" % [trigger_text, recovery_percent])
 	return target.hp > 0.0
 
 func _damage(source, target: Dictionary, amount: float, damage_type: String, label: String, visual_group := "", group_style := "", scales_with_skill := false, propagate_links := true, ignore_shield := false) -> float:

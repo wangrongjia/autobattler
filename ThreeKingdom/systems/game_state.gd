@@ -117,6 +117,14 @@ var visual_events: Array = []      # 待播放的视觉事件队列(伤害、治
 var ground_effects: Array = []     # 空格上的持续地面效果；伤害按格转移给对应主公
 var battle_stats := {}             # 本场战斗统计:单位 ID → {damage, healing, taken, control}
 var last_battle_stats: Array = []  # 上一场战斗的统计(用于战斗间隙展示)
+var stage_replay_curve: Array = [] # 整关回放曲线采样 {t, pr, er, pd, ed}(结算画面伤害曲线/主公生命线)
+var stage_replay_round_marks: Array = [] # 每回合结束的时间点(曲线上画回合分隔线)
+var stage_time_offset := 0.0       # 已结束回合累计的战斗时长(整关曲线的 x 轴偏移)
+var stage_stats_totals := {}       # 整关累计统计:单位 ID → 累计 {damage, healing, taken, control}
+var last_battle_lineup: Array = [] # 最终一场双方阵容快照 {hero_id, team, level, hp, max_hp, alive}
+var replay_last_sample_t := -1.0   # 上次曲线采样的战斗时刻(≥0.5 秒节流采样)
+var stage_damage_player := 0.0     # 已结束回合的我方整关累计伤害(曲线采样跨回合连续，battle_stats 每回合会清空)
+var stage_damage_enemy := 0.0      # 已结束回合的敌方整关累计伤害
 var skill_voice_player: AudioStreamPlayer # 武将技能台词共用声道；忙碌时跳过新台词，避免多人同时说话
 var peace_bgm_player: AudioStreamPlayer   # 非战斗场景循环 BGM；与战斗 BGM 交叉淡入淡出切换
 var battle_bgm_player: AudioStreamPlayer  # 战斗场景循环 BGM；与和平 BGM 交叉淡入淡出切换
@@ -254,6 +262,15 @@ func _apply_combo_bonds(_opening := true, _announce := true) -> void:
 	pass
 
 func _capture_battle_stats() -> void:
+	pass
+
+func _push_final_replay_sample() -> void:
+	pass
+
+func _accumulate_stage_stats() -> void:
+	pass
+
+func _snapshot_battle_lineup() -> void:
 	pass
 
 func _load_balance_overrides() -> void:
