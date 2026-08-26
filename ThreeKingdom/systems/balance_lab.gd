@@ -1,4 +1,4 @@
-extends "res://ThreeKingdom/systems/game_ui.gd"
+extends "res://ThreeKingdom/systems/tutorial_system.gd"
 
 const BALANCE_PROJECT_PATH := "res://ThreeKingdom/data/hero_balance_overrides.json"
 const BALANCE_USER_PATH := "user://hero_balance_overrides.json"

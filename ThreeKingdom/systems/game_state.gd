@@ -72,6 +72,9 @@ var faction_battle_state := {
 	"enemy":{"wu_equalize_used":false}
 } # 每场战斗独立的阵营特殊效果次数
 var rng := RandomNumberGenerator.new()  # 随机数生成器
+var tutorial_active := false      # 新手引导演练进行中(步骤清单与高亮提示可见)
+var tutorial_done := false        # 是否完成过新手引导(将魂奖励仅首次发放)
+var tutorial_page_index := 0      # 新手引导讲解分页的当前页码
 
 var title_label: Label             # 顶部大标题
 var round_label: Label             # 关卡数显示(如"关卡 3 / 15")
@@ -116,7 +119,7 @@ var action_bar_refs := {}          # 单位 ID → 行动条进度条数组的�
 var health_bar_refs := {}          # 单位 ID → 生命条映射(持续回血时不重建棋盘也能即时刷新)
 var visual_events: Array = []      # 待播放的视觉事件队列(伤害、治疗、特效)
 var ground_effects: Array = []     # 空格上的持续地面效果；伤害按格转移给对应主公
-var battle_stats := {}             # 本场战斗统计:单位 ID → {damage, healing, taken, control}
+var battle_stats := {}             # 本场战斗统计:单位 ID → {damage, healing, taken, control, shield, buff}
 var last_battle_stats: Array = []  # 上一场战斗的统计(用于战斗间隙展示)
 var stage_replay_curve: Array = [] # 整关回放曲线采样 {t, pr, er, pd, ed}(结算画面伤害曲线/主公生命线)
 var stage_replay_round_marks: Array = [] # 每回合结束的时间点(曲线上画回合分隔线)
@@ -200,6 +203,8 @@ var theme_toggle_button: Button     # 主界面右上角的昼/夜(绢纸/玄墨
 var enemy_strategy_setting_options: OptionButton # 敌方兵略值加成
 var draft_faction_filter := ""     # 我方选将阵营过滤(空=全部, 或 shu/wei/wu/qun)
 var enemy_faction_filter := ""     # 敌方随机武将阵营过滤
+var hell_faction := ""            # 地狱难度:开局随机锁定的敌方阵营(整局只刷该阵营,随存档保存)
+var hell_theme_name := ""         # 地狱难度:本局阵营主题名(战报展示用)
 var board_side := "left"           # 棋盘位置:left=居左,right=居右
 var enemy_strategy_bonus := 0      # 敌方兵略值加成(0~100, 实际兵略值=100+此值)
 var tianshu_infinite_refresh := false  # 天书无限刷新(调试用, 开启后三选一可无限刷新)

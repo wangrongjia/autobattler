@@ -72,7 +72,8 @@ var tianshu_draw_reason := ""
 var tianshu_generate_draft_on_finish := false
 
 func _tianshu_enabled() -> bool:
-	return game_mode == "tianshu" or game_mode == "challenge"
+	# 新手引导也启用天书：演练关第 1 回合免费三选一，现场教学选书。
+	return game_mode == "tianshu" or game_mode == "challenge" or game_mode == "tutorial"
 
 func _reset_tianshu_run() -> void:
 	tianshu_levels.clear()
@@ -121,6 +122,27 @@ func _tianshu_lord_requirement_met(book_id: String, book: Dictionary) -> bool:
 		owned += 1
 		if _tianshu_level(str(raw_book_id)) >= 2: owned_max += 1
 	return owned_max >= 2 if _tianshu_level(book_id) >= 1 else owned >= 2
+
+func _tianshu_group_tag(book: Dictionary) -> String:
+	# 天书抬头：阵营书 / 君主书在阵营名后追加类型标识；通用与武将池沿用原分组名。
+	var group := str(book.get("group", ""))
+	if book.has("lord"): return group + " · 君主"
+	if book.has("faction"): return group + " · 阵营"
+	return group
+
+func _tianshu_lord_requirement_note(book: Dictionary) -> String:
+	# 君主天书限制说明：图鉴、选书三选一与持有列表共用（非君主书返回空）。
+	if not book.has("lord"): return ""
+	var faction := str(book.get("group", ""))
+	var lord_name := _hero_name(str(book.lord))
+	var lines := [
+		"⚠ 君主天书 · 限制条件",
+		"· 需已选 2 本%s阵营天书，才会在三选一出现" % faction,
+		"· 需已选 2 本 2级%s阵营天书，才会出现升至 2 级" % faction,
+		"· 每局仅可持有 1 本君主天书：选定后不再刷出其他阵营的君主天书",
+		"· %s 上场后场上仅保留一名（生命最高），备战席可存多名" % lord_name,
+	]
+	return "\n".join(lines)
 
 func _tianshu_candidates_for_slot(index: int, excluded: Array) -> Array:
 	return TIANSHU_BOOKS.keys().filter(func(raw_book_id):

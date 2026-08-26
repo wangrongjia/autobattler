@@ -1371,7 +1371,7 @@ func _render_tianshu_overlay() -> void:
 			option.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			option.add_theme_constant_override("separation", 10)
 			var card_accent: Color = _tianshu_group_color(book)
-			var scope := _label("◆　" + str(book.group) + "天书　◆", 16, card_accent)
+			var scope := _label("◆　" + _tianshu_group_tag(book) + "天书　◆", 16, card_accent)
 			scope.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			option.add_child(scope)
 			var card := Button.new()
@@ -1401,6 +1401,11 @@ func _render_tianshu_overlay() -> void:
 			card.add_theme_stylebox_override("hover", hover)
 			card.add_child(_tianshu_border_overlay(book))
 			option.add_child(card)
+			var lord_note := _tianshu_lord_requirement_note(book)
+			if not lord_note.is_empty():
+				var note_label := _label(lord_note, 14, Color("#cfb4ea"))
+				note_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				option.add_child(note_label)
 			var acquire := _button(t("获取《%s》" % _tianshu_name(book_id), "ACQUIRE %s" % _tianshu_name(book_id)))
 			acquire.custom_minimum_size = Vector2(0, 62)
 			acquire.add_theme_font_size_override("font_size", 19)
@@ -1440,13 +1445,19 @@ func _render_tianshu_overlay() -> void:
 		var item_box := VBoxContainer.new()
 		var item_box_inner := VBoxContainer.new()
 		item_box_inner.add_theme_constant_override("separation", 4)
-		var title_row := _label("【%s】%s　%s" % ["2级" if level == 2 else "1级", str(TIANSHU_BOOKS[book_id].group), _tianshu_name(book_id)], 18, owned_accent.lightened(0.3))
+		var title_row := _label("【%s】%s　%s" % ["2级" if level == 2 else "1级", _tianshu_group_tag(TIANSHU_BOOKS[book_id]), _tianshu_name(book_id)], 18, owned_accent.lightened(0.3))
 		title_row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		item_box_inner.add_child(title_row)
 		var effect_line := _label(_tianshu_effect_text(book_id, level), 15, Color("#c9c0b1"))
 		effect_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		effect_line.tooltip_text = _tianshu_effect_text(book_id, level)
 		item_box_inner.add_child(effect_line)
+		var owned_lord_note := _tianshu_lord_requirement_note(TIANSHU_BOOKS[book_id])
+		if not owned_lord_note.is_empty():
+			var owned_note_line := _label(owned_lord_note, 13, Color("#cfb4ea"))
+			owned_note_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			owned_note_line.tooltip_text = owned_lord_note
+			item_box_inner.add_child(owned_note_line)
 		item_box.add_child(item_box_inner)
 		var replace := _button(("替换2级 · %d 金（可得两次三选一）" if level == 2 else "替换1级 · %d 金") % _tianshu_replace_cost())
 		replace.custom_minimum_size.y = 40
@@ -1746,22 +1757,22 @@ func _build_battle_menu() -> void:
 	quick_box.add_child(quick_buttons)
 	quick_panel.add_child(quick_box)
 	mode_row.add_child(quick_panel)
-	var tianshu_panel := PanelContainer.new()
-	tianshu_panel.custom_minimum_size = Vector2(390, 142)
-	tianshu_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_style(tianshu_panel, Color("#211628e8"), 5, Color("#9c63c3"), 2)
-	var tianshu_box := VBoxContainer.new()
-	tianshu_box.add_theme_constant_override("separation", 6)
-	tianshu_box.add_child(_label("卷　天书演武", 24, Color("#e5a8ff")))
-	var tianshu_help := _label("每回合先天书三选一，再进行三轮选将；天书仅本局生效。", 14, Color("#d6c3df"))
-	tianshu_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tianshu_box.add_child(tianshu_help)
-	var tianshu_start := _button("开始天书演武")
-	_accent_button(tianshu_start, Color("#955cc0"), true)
-	tianshu_start.pressed.connect(_start_tianshu_from_menu)
-	tianshu_box.add_child(tianshu_start)
-	tianshu_panel.add_child(tianshu_box)
-	mode_row.add_child(tianshu_panel)
+	var tutorial_panel := PanelContainer.new()
+	tutorial_panel.custom_minimum_size = Vector2(390, 142)
+	tutorial_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style(tutorial_panel, Color("#18231cd8"), 5, Color("#6fae82"), 2)
+	var tutorial_box := VBoxContainer.new()
+	tutorial_box.add_theme_constant_override("separation", 6)
+	tutorial_box.add_child(_label("引　新手引导", 24, Color("#9fe0ae")))
+	var tutorial_help := _label(t("分页讲解 + 完整演练一关：棋盘、选将、布阵、天书、金币、羁绊一次学会。首次完成得将魂+1200，之后可随时重玩。", "Guided pages plus one full practice stage. First clear grants 1200 souls."), 14, Color("#c6d6c8"))
+	tutorial_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tutorial_box.add_child(tutorial_help)
+	var tutorial_start := _button("开始新手引导")
+	_accent_button(tutorial_start, Color("#5f9a72"), true)
+	tutorial_start.pressed.connect(Callable(self, "_start_tutorial_from_menu"))
+	tutorial_box.add_child(tutorial_start)
+	tutorial_panel.add_child(tutorial_box)
+	mode_row.add_child(tutorial_panel)
 	var challenge_panel := PanelContainer.new()
 	challenge_panel.custom_minimum_size = Vector2(390, 142)
 	challenge_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2020,12 +2031,6 @@ func _launch_challenge(stage: int, difficulty: int) -> void:
 		return
 	_render()
 
-func _start_tianshu_from_menu() -> void:
-	battle_menu_overlay.hide()
-	menu_overlay.hide()
-	_start_tianshu_game()
-	_render()
-
 func _build_result_overlay() -> void:
 	result_overlay = _full_overlay(1600, PremiumUIArt.Variant.HOME, Color("#b88a50"))
 	var compact := _is_mobile_ui()
@@ -2226,41 +2231,55 @@ func _display_stars_for_hp() -> int:
 	var ratio := float(player_ruler_hp) / max_hp
 	return 3 if ratio >= 0.8 else (2 if ratio >= 0.5 else (1 if ratio > 0.0 else 0))
 
+const MVP_HEAL_ZONE := 1.0 / 0.6   # 治疗/护盾乘区:数值约为输出的60%,除以0.6拉到同一伤害量纲
+
+func _mvp_score(row: Dictionary, control_rate: float) -> float:
+	# 综合评分(伤害当量) = 输出 + 承伤 + (治疗+护盾)×1.67 + 控制秒×折算率 + 增益贡献。
+	# 增益贡献在战斗内已按伤害当量折算(伤害加成反事实归因/行动·冷却·兵略增益实时估算)。
+	return (
+		float(row.get("damage", 0.0))
+		+ float(row.get("taken", 0.0))
+		+ (float(row.get("healing", 0.0)) + float(row.get("shield", 0.0))) / 0.6
+		+ float(row.get("control", 0.0)) * control_rate
+		+ float(row.get("buff", 0.0))
+	)
+
+func _mvp_control_conversion() -> float:
+	# 控制折算率:每控 1 秒≈剥夺一名敌方单位的输出,用"敌方单位场均每秒输出"折价。
+	var source_rows: Array = stage_stats_totals.values()
+	if source_rows.is_empty(): source_rows = last_battle_stats
+	var enemy_rows: Array = source_rows.filter(func(row): return str(row.get("team", "")) == "enemy")
+	var total_time := stage_time_offset if stage_time_offset > 0.0 else battle_time
+	if enemy_rows.is_empty() or total_time <= 0.0: return 0.0
+	var enemy_damage := 0.0
+	for row in enemy_rows: enemy_damage += float(row.get("damage", 0.0))
+	return enemy_damage / (total_time * float(enemy_rows.size()))
+
 func _compute_battle_mvp() -> Dictionary:
-	# 整关累计统计评选我方 MVP 与三项数据王；读档等无累计数据时回退上一场战斗统计。
+	# 整关累计统计评选我方 MVP 与数据王；读档等无累计数据时回退上一场战斗统计。
 	var rows: Array = []
 	for row in stage_stats_totals.values():
 		if str(row.get("team", "")) == "player": rows.append(row)
 	if rows.is_empty():
 		for row in last_battle_stats:
 			if str(row.get("team", "")) == "player": rows.append(row)
-	if rows.is_empty(): return {"mvp": null, "kings": {}}
-	var maxes := {"damage": 0.0, "healing": 0.0, "control": 0.0}
-	for row in rows:
-		for key in maxes: maxes[key] = maxf(maxes[key], float(row.get(key, 0.0)))
+	if rows.is_empty(): return {"mvp": null, "kings": {}, "control_rate": 0.0}
+	var control_rate := _mvp_control_conversion()
+	var keys := ["damage", "taken", "healing", "shield", "control", "buff"]
 	var kings := {}
-	for key in maxes:
+	for key in keys:
 		var leader = null
 		for row in rows:
 			if leader == null or float(row.get(key, 0.0)) > float(leader.get(key, 0.0)): leader = row
 		if leader != null and float(leader.get(key, 0.0)) > 0.0: kings[key] = leader
-	# 加权评分：伤害 0.5 / 治疗 0.3 / 控制 0.2，全零类别自动剔除并重新归一。
-	var weights := {"damage": 0.5, "healing": 0.3, "control": 0.2}
-	var weight_sum := 0.0
-	for key in weights:
-		if maxes[key] > 0.0: weight_sum += weights[key]
-	if weight_sum <= 0.0: return {"mvp": null, "kings": kings}
 	var mvp = null
 	var best := -1.0
 	for row in rows:
-		var score := 0.0
-		for key in weights:
-			if maxes[key] <= 0.0: continue
-			score += weights[key] / weight_sum * (float(row.get(key, 0.0)) / maxes[key])
+		var score := _mvp_score(row, control_rate)
 		if score > best:
 			best = score
 			mvp = row
-	return {"mvp": mvp, "kings": kings}
+	return {"mvp": mvp, "kings": kings, "control_rate": control_rate}
 
 func _populate_result_mvp() -> void:
 	var data := _compute_battle_mvp()
@@ -2273,15 +2292,25 @@ func _populate_result_mvp() -> void:
 		return
 	result_mvp_portrait.texture = _portrait_texture(str(mvp.hero_id))
 	result_mvp_name_label.text = _hero_name(str(mvp.hero_id))
-	result_mvp_stats_label.text = "%s %s\n%s %s\n%s %s" % [
-		t("伤害", "Damage"), str(int(round(float(mvp.get("damage", 0.0))))),
+	var control_rate := float(data.get("control_rate", 0.0))
+	var control_value := float(mvp.get("control", 0.0)) * control_rate
+	result_mvp_stats_label.text = "%s %s\n%s %s · %s %s\n%s %s · %s %s（×1.67）\n%s %s%s · %s %s" % [
+		t("评分", "Score"), str(int(round(_mvp_score(mvp, control_rate)))),
+		t("输出", "Damage"), str(int(round(float(mvp.get("damage", 0.0))))),
+		t("承伤", "Taken"), str(int(round(float(mvp.get("taken", 0.0))))),
 		t("治疗", "Healing"), str(int(round(float(mvp.get("healing", 0.0))))),
-		t("控制", "Control"), "%.1fs" % float(mvp.get("control", 0.0))]
+		t("护盾", "Shield"), str(int(round(float(mvp.get("shield", 0.0))))),
+		t("控制", "Control"), "%.1fs" % float(mvp.get("control", 0.0)),
+		("" if control_value <= 0.5 else "→" + str(int(round(control_value)))), t("增益", "Support"),
+		str(int(round(float(mvp.get("buff", 0.0)))))]
 	var kings: Dictionary = data.kings
 	var king_meta := [
-		{"key":"damage", "icon":"⚔", "label":t("伤害最高", "Top damage")},
+		{"key":"damage", "icon":"⚔", "label":t("输出最高", "Top damage")},
+		{"key":"taken", "icon":"⛨", "label":t("承伤最高", "Top tank")},
 		{"key":"healing", "icon":"✚", "label":t("治疗最高", "Top healing")},
+		{"key":"shield", "icon":"◈", "label":t("护盾最高", "Top shield")},
 		{"key":"control", "icon":"✦", "label":t("控制最高", "Top control")},
+		{"key":"buff", "icon":"✧", "label":t("增益最高", "Top support")},
 	]
 	for meta in king_meta:
 		var line := HBoxContainer.new()
@@ -2289,7 +2318,7 @@ func _populate_result_mvp() -> void:
 		var king = kings.get(meta.key)
 		var text := "%s %s：—" % [str(meta.icon), str(meta.label)]
 		if king != null:
-			var value := float(king.get(meta.key, 0.0))
+			var value := float(king.get(str(meta.key), 0.0))
 			var value_text := "%.1fs" % value if str(meta.key) == "control" else str(int(round(value)))
 			text = "%s %s：%s %s" % [str(meta.icon), str(meta.label), _hero_name(str(king.hero_id)), value_text]
 		line.add_child(_label(text, 12, Color("#d8cfbd")))
@@ -2515,9 +2544,19 @@ func _build_rune_overlay() -> void:
 	rune_hero_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	rune_hero_portrait.mouse_filter = Control.MOUSE_FILTER_STOP
 	rune_hero_portrait.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	rune_hero_portrait.tooltip_text = "点击查看武将属性详情"
+	rune_hero_portrait.tooltip_text = "点击立绘：查看佩戴符文前后的属性差异"
 	rune_hero_portrait.gui_input.connect(_on_rune_hero_card_input)
 	hero_box.add_child(rune_hero_portrait)
+	var portrait_hint_left := _label("点击立绘 ▸", 15, Color("#c9b98c", 0.92))
+	portrait_hint_left.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT)
+	portrait_hint_left.offset_left = 12
+	portrait_hint_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rune_hero_portrait.add_child(portrait_hint_left)
+	var portrait_hint_right := _label("◂ 佩戴符文\n前后的属性差异", 15, Color("#c9b98c", 0.92))
+	portrait_hint_right.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
+	portrait_hint_right.offset_right = -12
+	portrait_hint_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rune_hero_portrait.add_child(portrait_hint_right)
 	var equipped_scroll := ScrollContainer.new()
 	equipped_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	equipped_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -3564,6 +3603,13 @@ func _build_encyclopedia() -> void:
 	encyclopedia_bond_graph.show_arrange_button = false
 	encyclopedia_bond_graph.connection_lines_curvature = 0.42
 	encyclopedia_bond_graph.connection_lines_thickness = 2.0
+	if _light_mode():
+		# 绢纸主题：羁绊图画布转纸色，网格与缩放标签转墨色，避免黑底配黑字。
+		var canvas := StyleBoxFlat.new()
+		canvas.bg_color = Color("#eee4cc")
+		encyclopedia_bond_graph.add_theme_stylebox_override("panel", canvas)
+		encyclopedia_bond_graph.add_theme_color_override("grid_color", Color(0.42, 0.35, 0.20, 0.26))
+		encyclopedia_bond_graph.add_theme_color_override("zoom_label_color", Color("#6b5a34"))
 	encyclopedia_bond_graph.gui_input.connect(_on_bond_graph_touch)
 	if mobile: encyclopedia_bond_graph.set_meta("touch_pan_enabled", true)
 	encyclopedia_bond_graph.node_selected.connect(_on_encyclopedia_bond_node_selected)
@@ -4035,9 +4081,11 @@ func _on_encyclopedia_bond_node_selected(node: Node) -> void:
 		for child in encyclopedia_bond_graph.get_children():
 			if child is GraphNode:
 				related[str(child.name)] = true
+	# 绢纸底更亮，未聚焦节点降透明度需要抬高下限，否则淡到看不见。
+	var dim_color := Color(0.42, 0.42, 0.42, 0.28) if not _light_mode() else Color(0.46, 0.42, 0.36, 0.55)
 	for child in encyclopedia_bond_graph.get_children():
 		if child is GraphNode:
-			child.modulate = Color.WHITE if related.has(str(child.name)) else Color(0.42, 0.42, 0.42, 0.28)
+			child.modulate = Color.WHITE if related.has(str(child.name)) else dim_color
 	encyclopedia_bond_label.text = str(node.get_meta("focus_text", node.title))
 
 func _on_encyclopedia_bond_node_deselected(_node: Node) -> void:
@@ -4088,12 +4136,17 @@ func _add_bond_graph_node(node_name: String, title: String, body: String, positi
 	var color: Color = Color("#3b2d18") if is_bond else Color("#18232b")
 	var border: Color = Color("#d3a850") if is_bond else FACTION_COLORS[encyclopedia_faction]
 	_bond_graph_node_style(node, color, border)
-	var label := _label(body, 14, Color("#f2ddaf") if is_bond else Color("#dce5e9"))
+	# 节点正文：暗色用浅字，绢纸直接指定深墨色(v<0.52 不会被 _text_color 再转换)，保证纸面对比。
+	var label_color := Color("#f2ddaf") if is_bond else Color("#dce5e9")
+	if _light_mode():
+		label_color = Color("#5a4423") if is_bond else Color("#2c3a44")
+	var label := _label(body, 14, label_color)
 	label.custom_minimum_size.x = 190 if is_bond else 120
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	node.add_child(label)
-	var port_color: Color = Color("#d3a850", 0.38) if is_bond else Color(FACTION_COLORS[encyclopedia_faction], 0.38)
+	var port_alpha := 0.38 if not _light_mode() else 0.66
+	var port_color: Color = Color("#d3a850", port_alpha) if is_bond else Color(FACTION_COLORS[encyclopedia_faction], port_alpha)
 	node.set_slot(0, true, 0, port_color, true, 0, port_color)
 	node.set_meta("focus_text", title + "\n" + body)
 	node.set_meta("is_bond", is_bond)
@@ -4397,7 +4450,7 @@ func _render_tianshu_encyclopedia() -> void:
 		card_box.mouse_filter = Control.MOUSE_FILTER_PASS
 		card_box.add_theme_constant_override("separation", 10)
 		card.add_child(card_box)
-		var group_label := _label("◆ " + str(book.group) + " ◆", 16, accent.lightened(0.25))
+		var group_label := _label("◆ " + _tianshu_group_tag(book) + " ◆", 16, accent.lightened(0.25))
 		group_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		group_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_box.add_child(group_label)
@@ -4416,6 +4469,13 @@ func _render_tianshu_encyclopedia() -> void:
 		level_two.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		level_two.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card_box.add_child(level_two)
+		var codex_lord_note := _tianshu_lord_requirement_note(book)
+		if not codex_lord_note.is_empty():
+			var codex_note := _label(codex_lord_note, 14, Color("#cfb4ea"))
+			codex_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			codex_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			codex_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			card_box.add_child(codex_note)
 
 func _render_weapon_encyclopedia() -> void:
 	for weapon in SHU_WEAPON_CODEX:
@@ -4758,9 +4818,11 @@ func _render() -> void:
 		battle_info_tabs.set_tab_title(2, t("统计图表", "STATISTICS"))
 	if game_mode == "challenge": title_label.text = STAGE_NAMES[selected_stage - 1] + " · " + str(DIFFICULTIES[selected_difficulty].name)
 	elif game_mode == "tianshu": title_label.text = t("战三国 · 弈定九州 · 天书演武", "THREE KINGDOMS · CODEX TRIAL")
+	elif game_mode == "tutorial": title_label.text = t("战三国 · 弈定九州 · 新手引导", "THREE KINGDOMS · TUTORIAL")
 	else: title_label.text = t("战三国 · 弈定九州 · 快速战斗", "THREE KINGDOMS · QUICK BATTLE")
 	if game_mode == "challenge": round_label.text = "闯关 %d / 20 · 回合 %d / 15" % [selected_stage, round_number]
 	elif game_mode == "tianshu": round_label.text = t("天书演武 ", "CODEX TRIAL ") + str(round_number) + " / " + str(ROUND_LIMIT)
+	elif game_mode == "tutorial": round_label.text = t("新手引导 · 演练回合", "TUTORIAL · PRACTICE")
 	else: round_label.text = t("最终决战", "FINAL BATTLE") if final_battle else t("关卡 ", "STAGE ") + str(round_number) + " / " + str(ROUND_LIMIT)
 	phase_label.text = "◆ " + _phase_name()
 	language_button.text = "English" if language == "zh" else "简体中文"
@@ -4836,6 +4898,8 @@ func _render() -> void:
 	battle_button.disabled = not _can_start_battle() or battle_running
 	battle_pause_button.text = t("继续", "RESUME") if battle_paused else t("暂停", "PAUSE")
 	battle_pause_button.visible = phase == "combat" and battle_running
+	if has_method("_tutorial_refresh"):
+		call("_tutorial_refresh")
 
 func _tianshu_pavilion_button_text() -> String:
 	var interest := mini(floori(float(gold) / 10.0), _gold_interest_cap())

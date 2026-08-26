@@ -77,7 +77,8 @@ func _spend_gold(amount: int, reason := "") -> bool:
 	return true
 
 func _is_free_tianshu_round() -> bool:
-	return round_number in FREE_TIANSHU_ROUNDS
+	# 新手引导第 1 回合固定免费选一次天书，用于现场教学。
+	return round_number in FREE_TIANSHU_ROUNDS or (game_mode == "tutorial" and round_number == 1)
 
 func _can_use_tianshu_pavilion() -> bool:
 	return _tianshu_enabled() and not battle_running and phase in ["draft", "placement"]

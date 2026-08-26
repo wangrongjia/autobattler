@@ -112,6 +112,7 @@ func _load_progression() -> void:
 		general_stars += refunded_removed_talent
 	home_hero_id = str(data.get("home_hero_id", "sunshangxiang"))
 	if not heroes.has(home_hero_id): home_hero_id = "sunshangxiang"
+	tutorial_done = data.get("tutorial_done", false) == true
 	next_rune_id = maxi(1, int(data.get("next_rune_id", 1)))
 	_sanitize_progression()
 	if refunded_removed_talent > 0:
@@ -124,7 +125,8 @@ func _save_progression() -> bool:
 		"version":1, "general_souls":general_souls, "general_stars":general_stars,
 		"stage_star_records":stage_star_records, "rune_inventory":rune_inventory,
 		"rune_loadouts":rune_loadouts, "talent_levels":talent_levels,
-		"home_hero_id":home_hero_id, "next_rune_id":next_rune_id
+		"home_hero_id":home_hero_id, "next_rune_id":next_rune_id,
+		"tutorial_done":tutorial_done
 	}))
 	file.close()
 	return true
