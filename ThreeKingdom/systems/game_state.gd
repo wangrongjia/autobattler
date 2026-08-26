@@ -41,6 +41,7 @@ const SHU_WEAPON_CODEX := [
 ]
 
 var language := "zh"               # 当前语言:"zh"中文 / "en"英文
+var ui_theme := "dark"             # 界面主题:"dark"玄墨暗色 / "light"绢纸亮色
 var round_number := 1              # 当前关卡数(1~15)
 var phase := "draft"               # 当前阶段:tianshu天书 / draft选将 / placement布阵 / combat战斗 / finished结算
 var player_ruler_hp := RULER_MAX_HP  # 我方主公当前血量
@@ -195,6 +196,7 @@ var hero_codex_images_setting_button: Button # 武将图鉴图片显示开关
 var faction_setting_options: OptionButton  # 我方选将阵营过滤
 var enemy_faction_setting_options: OptionButton # 敌方随机阵营过滤
 var board_side_setting_options: OptionButton # 棋盘居左/居右
+var theme_toggle_button: Button     # 主界面右上角的昼/夜(绢纸/玄墨)主题切换按钮
 var enemy_strategy_setting_options: OptionButton # 敌方兵略值加成
 var draft_faction_filter := ""     # 我方选将阵营过滤(空=全部, 或 shu/wei/wu/qun)
 var enemy_faction_filter := ""     # 敌方随机武将阵营过滤

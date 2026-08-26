@@ -7,6 +7,11 @@ func _initialize() -> void:
 	if mode == "english": game.language = "en"
 	root.add_child(game)
 	await process_frame
+	if OS.get_environment("CAPTURE_THEME") == "light":
+		# 绢纸亮色主题预览：重建界面层后按原流程截图。
+		game.ui_theme = "light"
+		game._rebuild_ui()
+		await process_frame
 	if mode not in ["initial", "codex", "bond_codex", "settings", "balance_lab", "quick_battle"]:
 		game.menu_overlay.hide()
 		game._render()

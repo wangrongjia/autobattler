@@ -4,6 +4,8 @@ const PremiumUIArt = preload("res://ThreeKingdom/ui/premium_ui_art.gd")
 const BattleReportChart = preload("res://ThreeKingdom/ui/battle_report_chart.gd")
 
 var _encyclopedia_touch_origins := {}
+var _button_gloss_texture: ImageTexture   # 共用的玉面按钮底纹(各状态用 modulate 调色)
+var _bbc_regex: RegEx                     # 绢纸主题富文本颜色替换(惰性编译)
 const CARD_BORDER_ROOT := "res://ThreeKingdom/animations/border/"
 const UI_GOLD := Color("#b98a4f")
 const UI_GOLD_LIGHT := Color("#f0c77a")
@@ -153,91 +155,308 @@ func _on_bond_graph_touch(event: InputEvent) -> void:
 		encyclopedia_bond_graph.zoom = clampf(encyclopedia_bond_graph.zoom * event.factor, 0.25, 2.0)
 		encyclopedia_bond_graph.accept_event()
 
+func _light_mode() -> bool:
+	return ui_theme == "light"
+
+func _text_color(color: Color) -> Color:
+	# 绢纸主题：为深底设计的浅色文字统一转为深墨色(保留原色相倾向)，深色文字原样保留。
+	if not _light_mode() or color.a <= 0.01: return color
+	if color.v < 0.52: return color
+	var ink_value := clampf(0.46 - (color.v - 0.52) * 0.55, 0.16, 0.46)
+	return Color.from_hsv(color.h, clampf(color.s * 0.75 + 0.18, 0.0, 0.62), ink_value, color.a)
+
+func _panel_color(color: Color) -> Color:
+	# 绢纸主题：深色底转为偏黄纸色，保留少量原色倾向与透明度；本来就亮的底色不动。
+	# 绿青系底色(符文页的玉色面板等)在纸面上显得刺眼，转向近中性纸色只留一丝冷调。
+	if not _light_mode() or color.a <= 0.01: return color
+	if color.v >= 0.62: return color
+	var sat_scale := 0.22 if color.h > 0.28 and color.h < 0.64 else 0.55
+	var paper := Color.from_hsv(color.h, clampf(color.s * sat_scale, 0.0, 0.30), 0.955)
+	return Color(paper.r, paper.g, paper.b, color.a)
+
+func _overlay_color(dark: Color) -> Color:
+	# 全屏覆盖层底色：玄墨暗色 / 绢纸亮色，保留原本透明度。
+	if not _light_mode(): return dark
+	return Color(0.955, 0.932, 0.862, dark.a)
+
+func _bbc(text_value: String) -> String:
+	# 绢纸主题下把富文本里的浅色 [color=#...] 一并转成深墨色，保证纸面可读。
+	if not _light_mode(): return text_value
+	if _bbc_regex == null:
+		_bbc_regex = RegEx.new()
+		_bbc_regex.compile("\\[color=(#[0-9a-fA-F]{6,8})\\]")
+	var result := text_value
+	for found in _bbc_regex.search_all(text_value):
+		var hex := str(found.get_string(1))
+		result = result.replace("[color=" + hex + "]", "[color=" + _text_color(Color(hex)).to_html(hex.length() > 7) + "]")
+	return result
+
 func _style(control: Control, color: Color, radius := 10, border := Color.TRANSPARENT, width := 0) -> void:
 	var box := StyleBoxFlat.new()
-	box.bg_color = color
+	box.bg_color = _panel_color(color)
 	box.corner_radius_top_left = radius
 	box.corner_radius_top_right = radius
 	box.corner_radius_bottom_left = radius
 	box.corner_radius_bottom_right = radius
 	box.border_color = border
+	# 顶边稍宽 + 描边向内晕染：纯色面板立刻有了玉面受光的厚度感。
 	box.border_width_left = width
 	box.border_width_right = width
-	box.border_width_top = width
+	box.border_width_top = width + (1 if width > 0 else 0)
 	box.border_width_bottom = width
+	if width > 0:
+		box.border_blend = true
+		box.corner_detail = 12
 	box.content_margin_left = 13
 	box.content_margin_right = 13
 	box.content_margin_top = 10
 	box.content_margin_bottom = 10
-	box.shadow_color = Color(0, 0, 0, 0.48)
-	box.shadow_size = 7
-	box.shadow_offset = Vector2(0, 3)
+	box.shadow_color = Color(0.34, 0.26, 0.13, 0.28) if _light_mode() else Color(0, 0, 0, 0.52)
+	box.shadow_size = 10
+	box.shadow_offset = Vector2(0, 4)
 	control.add_theme_stylebox_override("panel", box)
+
+func _get_button_gloss_texture() -> ImageTexture:
+	# 玉面按钮底纹：中性暖调渐变 + 顶部高光 + 上下内描边 + 外沿亮边，
+	# 各状态/强调色通过 StyleBoxTexture.modulate_color 统一调色。
+	if _button_gloss_texture != null: return _button_gloss_texture
+	var width := 96
+	var height := 64
+	var radius := 15
+	var image := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	var mask := PackedByteArray()
+	mask.resize(width * height)
+	for y in height:
+		for x in width:
+			var dx := maxf(maxf(radius - x, x - float(width - 1 - radius)), 0.0)
+			var dy := maxf(maxf(radius - y, y - float(height - 1 - radius)), 0.0)
+			mask[y * width + x] = 0 if dx * dx + dy * dy > float(radius * radius) else 1
+	var opaque_at := func(x: int, y: int) -> bool:
+		return x >= 0 and y >= 0 and x < width and y < height and mask[y * width + x] == 1
+	var near_edge := func(x: int, y: int, ring: int) -> bool:
+		for oy in range(-ring, ring + 1):
+			for ox in range(-ring, ring + 1):
+				if not opaque_at.call(x + ox, y + oy): return true
+		return false
+	for y in height:
+		for x in width:
+			if mask[y * width + x] == 0:
+				image.set_pixel(x, y, Color.TRANSPARENT)
+				continue
+			var t := float(y) / float(height - 1)
+			var pixel: Color
+			if _light_mode():
+				# 绢纸主题：纸面按钮底纹——米白渐变 + 更亮的顶部釉光 + 赭金描边。
+				pixel = Color("#fbf5e6").lerp(Color("#e2d4b4"), t)
+				pixel = pixel.lerp(Color.WHITE, 0.30 * maxf(0.0, 1.0 - t / 0.45))
+				if near_edge.call(x, y, 1):
+					pixel = Color("#8a6a3f")
+				elif near_edge.call(x, y, 3):
+					if t < 0.5: pixel = pixel.lerp(Color.WHITE, 0.45)
+					else: pixel = pixel.lerp(Color.BLACK, 0.10)
+			else:
+				pixel = Color("#39352e").lerp(Color("#1c1a16"), t)
+				pixel = pixel.lerp(Color.WHITE, 0.09 * maxf(0.0, 1.0 - t / 0.40))
+				if near_edge.call(x, y, 1):
+					pixel = Color("#d9d2c3")            # 外沿亮边(随调色变成金边/色边)
+				elif near_edge.call(x, y, 3):
+					if t < 0.5: pixel = pixel.lerp(Color.WHITE, 0.14)
+					else: pixel = pixel.lerp(Color.BLACK, 0.26)
+			image.set_pixel(x, y, pixel)
+	_button_gloss_texture = ImageTexture.create_from_image(image)
+	return _button_gloss_texture
+
+func _gloss_button_box(tint: Color, expand := 0.0) -> StyleBoxTexture:
+	var box := StyleBoxTexture.new()
+	box.texture = _get_button_gloss_texture()
+	box.modulate_color = tint
+	box.texture_margin_left = 17
+	box.texture_margin_right = 17
+	box.texture_margin_top = 13
+	box.texture_margin_bottom = 13
+	box.content_margin_left = 16
+	box.content_margin_right = 16
+	box.content_margin_top = 9
+	box.content_margin_bottom = 9
+	if expand > 0.0:
+		box.expand_margin_left = expand
+		box.expand_margin_right = expand
+		box.expand_margin_top = expand
+		box.expand_margin_bottom = expand
+	return box
 
 func _button(text_value: String) -> Button:
 	var button := Button.new()
 	button.text = text_value
 	button.custom_minimum_size = Vector2(0, 42)
 	button.add_theme_font_size_override("font_size", 16)
-	button.add_theme_color_override("font_color", Color("#ead9b5"))
-	button.add_theme_color_override("font_hover_color", Color("#fff0c9"))
-	button.add_theme_color_override("font_pressed_color", Color("#fff4cf"))
-	button.add_theme_color_override("font_disabled_color", Color("#746b60"))
-	button.add_theme_color_override("font_focus_color", Color("#fff0c9"))
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color("#171716")
-	normal.border_color = Color("#755b38")
-	normal.set_border_width_all(1)
-	normal.set_corner_radius_all(5)
-	normal.content_margin_left = 15
-	normal.content_margin_right = 15
-	normal.content_margin_top = 8
-	normal.content_margin_bottom = 8
-	normal.shadow_color = Color(0, 0, 0, 0.42)
-	normal.shadow_size = 4
-	normal.shadow_offset = Vector2(0, 2)
-	var hover := normal.duplicate()
-	hover.bg_color = Color("#2b241a")
-	hover.border_color = Color("#d4a85f")
-	hover.set_border_width_all(2)
-	var pressed := normal.duplicate()
-	pressed.bg_color = Color("#3a2b18")
-	pressed.border_color = Color("#f0c77a")
-	pressed.set_border_width_all(2)
-	var disabled := normal.duplicate()
-	disabled.bg_color = Color("#111211")
-	disabled.border_color = Color("#38342e")
-	var focus := hover.duplicate()
-	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("hover", hover)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_stylebox_override("disabled", disabled)
-	button.add_theme_stylebox_override("focus", focus)
+	if _light_mode():
+		button.add_theme_color_override("font_color", Color("#4a3d26"))
+		button.add_theme_color_override("font_hover_color", Color("#2e2210"))
+		button.add_theme_color_override("font_pressed_color", Color("#241a0c"))
+		button.add_theme_color_override("font_disabled_color", Color("#9b8f79"))
+		button.add_theme_color_override("font_focus_color", Color("#2e2210"))
+	else:
+		button.add_theme_color_override("font_color", Color("#ead9b5"))
+		button.add_theme_color_override("font_hover_color", Color("#fff0c9"))
+		button.add_theme_color_override("font_pressed_color", Color("#fff4cf"))
+		button.add_theme_color_override("font_disabled_color", Color("#746b60"))
+		button.add_theme_color_override("font_focus_color", Color("#fff0c9"))
+	button.add_theme_stylebox_override("normal", _gloss_button_box(Color("#c8b08a")))
+	button.add_theme_stylebox_override("hover", _gloss_button_box(Color("#efe0bd")))
+	button.add_theme_stylebox_override("pressed", _gloss_button_box(Color("#9d8f74")))
+	button.add_theme_stylebox_override("disabled", _gloss_button_box(Color("#655f52")))
+	button.add_theme_stylebox_override("focus", _gloss_button_box(Color("#e8d6ae"), 2.0))
 	return button
 
 func _accent_button(button: Button, accent: Color, filled := false) -> void:
-	var normal: StyleBoxFlat = button.get_theme_stylebox("normal").duplicate()
-	normal.border_color = accent.darkened(0.15)
-	normal.bg_color = accent.darkened(0.66) if filled else Color("#171716")
-	button.add_theme_stylebox_override("normal", normal)
-	var hover: StyleBoxFlat = normal.duplicate()
-	hover.bg_color = accent.darkened(0.48)
-	hover.border_color = accent.lightened(0.25)
-	hover.set_border_width_all(2)
-	button.add_theme_stylebox_override("hover", hover)
-	var pressed: StyleBoxFlat = hover.duplicate()
-	pressed.bg_color = accent.darkened(0.35)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_color_override("font_color", accent.lightened(0.45))
-	button.add_theme_color_override("font_hover_color", Color("#fff3d1"))
+	# 强调色按钮：同一玉面底纹按界面强调色统一染色(filled 为实心版)。
+	var tints := {
+		"normal": accent.lerp(Color.WHITE, 0.20 if filled else 0.46),
+		"hover": accent.lerp(Color.WHITE, 0.68),
+		"pressed": accent.lerp(Color.WHITE, 0.34),
+		"focus": accent.lerp(Color.WHITE, 0.72)
+	}
+	for state in tints:
+		var box := button.get_theme_stylebox(state).duplicate()
+		if box is StyleBoxTexture:
+			box.modulate_color = tints[state]
+			if state == "focus":
+				box.expand_margin_left = 2.0
+				box.expand_margin_right = 2.0
+				box.expand_margin_top = 2.0
+				box.expand_margin_bottom = 2.0
+			button.add_theme_stylebox_override(state, box)
+		elif box is StyleBoxFlat:
+			# 兜底：非玉面按钮沿用旧的描边调色逻辑。
+			box.border_color = accent.darkened(0.15)
+			box.bg_color = accent.darkened(0.66) if filled else Color("#171716")
+			button.add_theme_stylebox_override(state, box)
+	button.add_theme_color_override("font_color", accent.darkened(0.32) if _light_mode() else accent.lightened(0.45))
+	button.add_theme_color_override("font_hover_color", Color("#2a1f0e") if _light_mode() else Color("#fff3d1"))
 
 func _add_premium_art(parent: Control, variant: int, accent := UI_GOLD) -> Control:
 	var art := PremiumUIArt.new()
 	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	art.configure(variant, accent)
+	art.configure(variant, accent, _light_mode())
 	parent.add_child(art)
 	parent.move_child(art, 0)
 	return art
+
+func _build_root_theme() -> Theme:
+	# 根主题：统一收编提示框/滚动条/页签/分隔线/裸按钮/下拉菜单的默认观感，
+	# 填补 Godot 原生灰白控件与全局玉面金边风格之间的空隙；按玄墨/绢纸双主题配色。
+	var light := _light_mode()
+	var ui := Theme.new()
+	var tip_panel := StyleBoxFlat.new()
+	tip_panel.bg_color = Color("#f6efdbf2") if light else Color("#161209f2")
+	tip_panel.border_color = Color("#8a6a3f")
+	tip_panel.set_border_width_all(1)
+	tip_panel.set_corner_radius_all(6)
+	tip_panel.content_margin_left = 10
+	tip_panel.content_margin_right = 10
+	tip_panel.content_margin_top = 6
+	tip_panel.content_margin_bottom = 6
+	tip_panel.shadow_color = Color(0.34, 0.26, 0.13, 0.30) if light else Color(0, 0, 0, 0.5)
+	tip_panel.shadow_size = 8
+	ui.set_stylebox("panel", "TooltipPanel", tip_panel)
+	ui.set_color("font_color", "TooltipLabel", Color("#42351f") if light else Color("#e9dcbc"))
+	ui.set_font_size("font_size", "TooltipLabel", 14)
+	var grabber := StyleBoxFlat.new()
+	grabber.bg_color = Color("#c2a06a") if light else Color("#6f5c3f")
+	grabber.set_corner_radius_all(4)
+	grabber.content_margin_left = 2
+	grabber.content_margin_right = 2
+	var grabber_hover := grabber.duplicate()
+	grabber_hover.bg_color = Color("#9c7440") if light else Color("#a8854f")
+	var grabber_pressed := grabber.duplicate()
+	grabber_pressed.bg_color = Color("#7a5827") if light else Color("#d8b26a")
+	var trough := StyleBoxFlat.new()
+	trough.bg_color = Color(0.42, 0.33, 0.17, 0.14) if light else Color(0, 0, 0, 0.22)
+	trough.set_corner_radius_all(4)
+	trough.content_margin_left = 3
+	trough.content_margin_right = 3
+	for bar_type in ["VScrollBar", "HScrollBar"]:
+		ui.set_stylebox("scroll", bar_type, trough)
+		ui.set_stylebox("scroll_focus", bar_type, trough)
+		ui.set_stylebox("grabber", bar_type, grabber)
+		ui.set_stylebox("grabber_highlight", bar_type, grabber_hover)
+		ui.set_stylebox("grabber_pressed", bar_type, grabber_pressed)
+	var tab_panel := StyleBoxFlat.new()
+	tab_panel.bg_color = Color(0.95, 0.91, 0.80, 0.55) if light else Color(0, 0, 0, 0.28)
+	tab_panel.corner_radius_bottom_left = 8
+	tab_panel.corner_radius_bottom_right = 8
+	tab_panel.border_color = Color("#c9ad78") if light else Color("#4a3c27")
+	tab_panel.border_width_bottom = 1
+	tab_panel.content_margin_left = 10
+	tab_panel.content_margin_right = 10
+	tab_panel.content_margin_top = 6
+	tab_panel.content_margin_bottom = 8
+	ui.set_stylebox("panel", "TabContainer", tab_panel)
+	var tabbar := StyleBoxFlat.new()
+	tabbar.bg_color = Color(0.95, 0.91, 0.80, 0.45) if light else Color(0, 0, 0, 0.25)
+	ui.set_stylebox("tabbar_background", "TabContainer", tabbar)
+	var tab_selected := StyleBoxFlat.new()
+	tab_selected.bg_color = Color("#fdf7e8") if light else Color("#262014")
+	tab_selected.corner_radius_top_left = 7
+	tab_selected.corner_radius_top_right = 7
+	tab_selected.border_color = Color("#a06c22") if light else Color("#d4a85f")
+	tab_selected.border_width_bottom = 2
+	tab_selected.content_margin_left = 14
+	tab_selected.content_margin_right = 14
+	tab_selected.content_margin_top = 6
+	tab_selected.content_margin_bottom = 6
+	var tab_unselected := tab_selected.duplicate()
+	tab_unselected.bg_color = Color(0.60, 0.52, 0.34, 0.12) if light else Color(0, 0, 0, 0.16)
+	tab_unselected.border_color = Color("#c3b590") if light else Color("#453a26")
+	var tab_hovered := tab_unselected.duplicate()
+	tab_hovered.bg_color = Color("#f6edd6") if light else Color("#1d1810")
+	ui.set_stylebox("tab_selected", "TabContainer", tab_selected)
+	ui.set_stylebox("tab_unselected", "TabContainer", tab_unselected)
+	ui.set_stylebox("tab_hovered", "TabContainer", tab_hovered)
+	ui.set_color("font_selected_color", "TabContainer", Color("#6b4a17") if light else Color("#f0c77a"))
+	ui.set_color("font_unselected_color", "TabContainer", Color("#8a7a58") if light else Color("#9c8f77"))
+	ui.set_color("font_hovered_color", "TabContainer", Color("#5d4014") if light else Color("#d8c9a4"))
+	ui.set_font_size("font_size", "TabContainer", 15)
+	ui.set_stylebox("normal", "Button", _gloss_button_box(Color("#b6a284")))
+	ui.set_stylebox("hover", "Button", _gloss_button_box(Color("#e6d6b4")))
+	ui.set_stylebox("pressed", "Button", _gloss_button_box(Color("#93866e")))
+	ui.set_stylebox("disabled", "Button", _gloss_button_box(Color("#5f594d")))
+	ui.set_stylebox("focus", "Button", _gloss_button_box(Color("#e0cfa8"), 2.0))
+	ui.set_color("font_color", "Button", Color("#4a3d26") if light else Color("#ead9b5"))
+	ui.set_color("font_hover_color", "Button", Color("#2e2210") if light else Color("#fff0c9"))
+	ui.set_color("font_pressed_color", "Button", Color("#241a0c") if light else Color("#fff4cf"))
+	ui.set_color("font_disabled_color", "Button", Color("#9b8f79") if light else Color("#746b60"))
+	ui.set_font_size("font_size", "Button", 15)
+	# 下拉菜单(OptionButton/MenuButton 弹出层)：与面板同一套底色与墨/金字色。
+	var popup := StyleBoxFlat.new()
+	popup.bg_color = Color("#f6efdbfa") if light else Color("#161209f2")
+	popup.border_color = Color("#8a6a3f")
+	popup.set_border_width_all(1)
+	popup.set_corner_radius_all(6)
+	popup.content_margin_left = 8
+	popup.content_margin_right = 8
+	popup.content_margin_top = 6
+	popup.content_margin_bottom = 6
+	ui.set_stylebox("panel", "PopupMenu", popup)
+	var popup_hover := StyleBoxFlat.new()
+	popup_hover.bg_color = Color("#eadfbf") if light else Color("#2b2416")
+	popup_hover.set_corner_radius_all(4)
+	ui.set_stylebox("hover", "PopupMenu", popup_hover)
+	ui.set_color("font_color", "PopupMenu", Color("#42351f") if light else Color("#e9dcbc"))
+	ui.set_color("font_hover_color", "PopupMenu", Color("#2e2210") if light else Color("#f0c77a"))
+	ui.set_font_size("font_size", "PopupMenu", 15)
+	var separator := StyleBoxFlat.new()
+	separator.bg_color = Color("#d9cbab") if light else Color("#2c251a")
+	separator.content_margin_top = 1
+	separator.content_margin_bottom = 1
+	ui.set_stylebox("separator", "HSeparator", separator)
+	var separator_v := StyleBoxFlat.new()
+	separator_v.bg_color = Color("#d9cbab") if light else Color("#2c251a")
+	separator_v.content_margin_left = 1
+	separator_v.content_margin_right = 1
+	ui.set_stylebox("separator", "VSeparator", separator_v)
+	return ui
 
 func _section_title(value: String, subtitle := "") -> VBoxContainer:
 	var box := VBoxContainer.new()
@@ -256,10 +475,11 @@ func _label(value: String, size := 16, color := Color("#e8e2cf")) -> Label:
 	var label := Label.new()
 	label.text = value
 	label.add_theme_font_size_override("font_size", size)
-	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_color", _text_color(color))
 	return label
 
 func _build_ui() -> void:
+	theme = _build_root_theme()
 	skill_voice_player = AudioStreamPlayer.new()
 	skill_voice_player.name = "SkillVoicePlayer"
 	skill_voice_player.volume_db = -1.5
@@ -296,7 +516,8 @@ func _build_ui() -> void:
 	_update_bgm()
 	var bg := TextureRect.new()
 	var gradient := Gradient.new()
-	gradient.colors = PackedColorArray([Color("#090b0f"), Color("#20130f"), Color("#080b10")])
+	# 玄墨：冷调夜色渐变；绢纸：米黄纸面渐变(偏黄的白)。
+	gradient.colors = PackedColorArray([Color("#f7f0dc"), Color("#eee2c4"), Color("#f4ecd6")]) if _light_mode() else PackedColorArray([Color("#090b0f"), Color("#20130f"), Color("#080b10")])
 	gradient.offsets = PackedFloat32Array([0.0, 0.48, 1.0])
 	var gradient_texture := GradientTexture2D.new()
 	gradient_texture.gradient = gradient
@@ -309,12 +530,13 @@ func _build_ui() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var glow := ColorRect.new()
-	glow.color = Color(0.55, 0.16, 0.08, 0.08)
+	glow.color = Color(0.75, 0.60, 0.34, 0.10) if _light_mode() else Color(0.55, 0.16, 0.08, 0.08)
 	glow.position = Vector2(-160, -220)
 	glow.size = Vector2(960, 580)
 	glow.rotation = -0.14
 	add_child(glow)
-	_add_premium_art(self, PremiumUIArt.Variant.COMBAT, Color("#85663e"))
+	var combat_art := _add_premium_art(self, PremiumUIArt.Variant.COMBAT, Color("#85663e"))
+	move_child(combat_art, 2) # 装饰层压在背景渐变/暖光之上、界面内容之下
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var compact_mobile := _is_mobile_ui()
@@ -492,7 +714,7 @@ func _build_ui() -> void:
 	bonds_label.scroll_active = true
 	bonds_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bonds_label.add_theme_font_size_override("normal_font_size", 14 if compact_mobile else 13)
-	bonds_label.add_theme_color_override("default_color", Color("#d8cfbd"))
+	bonds_label.add_theme_color_override("default_color", _text_color(Color("#d8cfbd")))
 	_enable_touch_value_scroll(bonds_label)
 	bonds_page.add_child(bonds_label)
 	var log_page := VBoxContainer.new()
@@ -506,7 +728,7 @@ func _build_ui() -> void:
 	log_box.scroll_active = true
 	log_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	log_box.add_theme_font_size_override("normal_font_size", 14 if compact_mobile else 12)
-	log_box.add_theme_color_override("default_color", Color("#bcb5a9"))
+	log_box.add_theme_color_override("default_color", _text_color(Color("#bcb5a9")))
 	_enable_touch_value_scroll(log_box)
 	log_page.add_child(log_box)
 	var stats_page := VBoxContainer.new()
@@ -676,7 +898,7 @@ func _drop_sell(_at_position: Vector2, data) -> void:
 
 func _build_unit_inspector() -> void:
 	unit_inspector_overlay = ColorRect.new()
-	unit_inspector_overlay.color = Color(0.015, 0.02, 0.025, 0.86)
+	unit_inspector_overlay.color = _overlay_color(Color(0.015, 0.02, 0.025, 0.86))
 	unit_inspector_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	unit_inspector_overlay.z_index = 1400
 	unit_inspector_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -719,6 +941,7 @@ func _build_unit_inspector() -> void:
 	unit_inspector_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	unit_inspector_detail.add_theme_font_size_override("normal_font_size", 17 if _is_mobile_ui() else 15)
 	unit_inspector_detail.add_theme_constant_override("line_separation", 5)
+	unit_inspector_detail.add_theme_color_override("default_color", _text_color(Color("#d8cfbd")))
 	unit_inspector_detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	unit_inspector_scroll.add_child(unit_inspector_detail)
 	unit_inspector_overlay.hide()
@@ -869,7 +1092,7 @@ func _refresh_unit_inspector() -> void:
 	body += "[color=#ef8a79][font_size=20][b]" + t("当前减益", "CURRENT DEBUFFS") + "[/b][/font_size][/color]\n" + _inspector_debuffs(unit)
 	body += "\n\n[color=#f0c77a][font_size=20][b]" + t("羁绊状态", "BOND STATUS") + "[/b][/font_size][/color]\n" + _inspector_bond_state(unit) + "\n\n"
 	body += "[b]" + t("本武将羁绊具体效果", "Hero-specific bond effects") + "[/b]\n" + _hero_bond_detail(str(unit.hero_id))
-	unit_inspector_detail.text = body
+	unit_inspector_detail.text = _bbc(body)
 
 func _ruler_card(is_player: bool) -> PanelContainer:
 	var panel := PanelContainer.new()
@@ -906,7 +1129,7 @@ func _ruler_rail(is_player: bool) -> PanelContainer:
 	gauge.custom_minimum_size = Vector2(42, 150)
 	gauge.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var well := ColorRect.new()
-	well.color = Color("#211a17")
+	well.color = _panel_color(Color("#211a17"))
 	well.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	gauge.add_child(well)
 	var fill := ColorRect.new()
@@ -958,7 +1181,7 @@ func _build_draft_layer() -> void:
 	draft_layer.layer = 20
 	add_child(draft_layer)
 	draft_overlay = ColorRect.new()
-	draft_overlay.color = Color("#080907")
+	draft_overlay.color = _overlay_color(Color("#080907"))
 	draft_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	draft_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	draft_layer.add_child(draft_overlay)
@@ -1015,7 +1238,7 @@ func _toggle_draft_layer() -> void:
 
 func _build_tianshu_overlay() -> void:
 	tianshu_overlay = ColorRect.new()
-	tianshu_overlay.color = Color("#090711")
+	tianshu_overlay.color = _overlay_color(Color("#090711"))
 	tianshu_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	tianshu_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	tianshu_overlay.z_index = 1550
@@ -1245,7 +1468,7 @@ func _set_stats_metric(metric: String) -> void:
 func _build_main_menu() -> void:
 	var mobile := _is_mobile_ui()
 	menu_overlay = ColorRect.new()
-	menu_overlay.color = Color("#080907")
+	menu_overlay.color = _overlay_color(Color("#080907"))
 	menu_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	menu_overlay.z_index = 1000
 	add_child(menu_overlay)
@@ -1263,6 +1486,7 @@ func _build_main_menu() -> void:
 	margin.add_child(box)
 	var header := HBoxContainer.new()
 	header.custom_minimum_size.y = 65
+	header.add_theme_constant_override("separation", 14)
 	var title_box := VBoxContainer.new()
 	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_box.add_theme_constant_override("separation", -3)
@@ -1272,6 +1496,13 @@ func _build_main_menu() -> void:
 	home_title.add_theme_color_override("font_outline_color", Color("#1b1007"))
 	title_box.add_child(home_title)
 	header.add_child(title_box)
+	# 昼/夜主题切换：将魂将星资源栏左侧的日·月按钮(绢纸亮色 / 玄墨暗色)。
+	theme_toggle_button = _button("")
+	theme_toggle_button.custom_minimum_size = Vector2(62, 62)
+	theme_toggle_button.add_theme_font_size_override("font_size", 26)
+	_accent_button(theme_toggle_button, Color("#c8a35a"), false)
+	theme_toggle_button.pressed.connect(_toggle_ui_theme)
+	header.add_child(theme_toggle_button)
 	var resource_panel := PanelContainer.new()
 	_style(resource_panel, Color("#11120ff0"), 5, Color("#82643e"), 1)
 	home_resource_label = _label("", 18, Color("#e8c96e"))
@@ -1379,6 +1610,7 @@ func _build_main_menu() -> void:
 	_build_talent_overlay()
 	_build_result_overlay()
 	_build_intro_popup()
+	_refresh_theme_toggle()
 	_refresh_home()
 	draft_overlay.hide()
 
@@ -1387,7 +1619,7 @@ func _refresh_home() -> void:
 	home_portrait.texture = _portrait_source_texture(home_hero_id)
 	var faction := str(heroes[home_hero_id].f)
 	home_hero_name_label.text = _hero_name(home_hero_id) + " · " + _faction_name(faction)
-	home_hero_name_label.add_theme_color_override("font_color", FACTION_COLORS[faction].lightened(0.32))
+	home_hero_name_label.add_theme_color_override("font_color", _text_color(FACTION_COLORS[faction].lightened(0.32)))
 	home_resource_label.text = "将魂  %d　　将星  %d / 300" % [general_souls, general_stars]
 
 func _show_intro_popup() -> void:
@@ -1402,12 +1634,13 @@ func _intro_rich_page(tab_title: String, content: String) -> RichTextLabel:
 	page.custom_minimum_size = Vector2(880, 520)
 	page.add_theme_font_size_override("normal_font_size", 18)
 	page.add_theme_font_size_override("bold_font_size", 19)
-	page.text = content
+	page.add_theme_color_override("default_color", _text_color(Color("#d8cfbd")))
+	page.text = _bbc(content)
 	return page
 
 func _build_intro_popup() -> void:
 	intro_popup = ColorRect.new()
-	intro_popup.color = Color("#050608e6")
+	intro_popup.color = _overlay_color(Color("#050608e6"))
 	intro_popup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	intro_popup.mouse_filter = Control.MOUSE_FILTER_STOP
 	intro_popup.z_index = 1200
@@ -1447,7 +1680,7 @@ func _build_intro_popup() -> void:
 
 func _full_overlay(z: int = 1150, art_variant: int = PremiumUIArt.Variant.BACKDROP, accent := UI_GOLD) -> ColorRect:
 	var overlay := ColorRect.new()
-	overlay.color = UI_INK
+	overlay.color = _overlay_color(UI_INK)
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.z_index = z
 	overlay.hide()
@@ -1964,7 +2197,7 @@ func _show_battle_result(result: Dictionary) -> void:
 	var victory := bool(result.get("victory", false))
 	_play_sfx("bell", -4.0, 1000, 0.0)
 	result_title_label.text = "胜利" if victory else "失败"
-	result_title_label.add_theme_color_override("font_color", Color("#f0c77a") if victory else Color("#e07070"))
+	result_title_label.add_theme_color_override("font_color", _text_color(Color("#f0c77a") if victory else Color("#e07070")))
 	var difficulty := int(result.get("difficulty", -1))
 	var stars := 0
 	if difficulty >= 0:
@@ -2340,7 +2573,7 @@ func _on_rune_hero_card_input(event: InputEvent) -> void:
 
 func _build_rune_hero_detail_overlay() -> void:
 	rune_hero_detail_overlay = ColorRect.new()
-	rune_hero_detail_overlay.color = Color("#050608e0")
+	rune_hero_detail_overlay.color = _overlay_color(Color("#050608e0"))
 	rune_hero_detail_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	rune_hero_detail_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	rune_hero_detail_overlay.z_index = 1200
@@ -2373,6 +2606,7 @@ func _build_rune_hero_detail_overlay() -> void:
 	rune_hero_detail_text.custom_minimum_size = Vector2(880, 300)
 	rune_hero_detail_text.add_theme_font_size_override("normal_font_size", 17)
 	rune_hero_detail_text.add_theme_font_size_override("bold_font_size", 18)
+	rune_hero_detail_text.add_theme_color_override("default_color", _text_color(Color("#d8cfbd")))
 	box.add_child(rune_hero_detail_text)
 	rune_hero_detail_overlay.hide()
 
@@ -2436,7 +2670,7 @@ func _show_rune_hero_detail() -> void:
 	rune_hero_detail_columns.add_child(_rune_stat_panel("初始属性", Color("#7a9b6a"), roundi(base_hp), roundi(base_strategy), base_cooldown))
 	rune_hero_detail_columns.add_child(_rune_stat_panel("天赋加成", Color("#b98a4f"), roundi(talent_hp), roundi(talent_strategy), talent_cooldown, roundi(talent.hp), roundi(talent.strategy), -minf(float(talent.cooldown), progression_cap)))
 	rune_hero_detail_columns.add_child(_rune_stat_panel("天赋 + 符文", Color("#c56a5a"), roundi(final_hp), roundi(final_strategy), final_cooldown, roundi(float(talent.hp) + rune_hp), roundi(float(talent.strategy) + float(runes.strategy)), -minf(float(talent.cooldown) + float(runes.cooldown), progression_cap)))
-	rune_hero_detail_text.text = _rune_hero_detail_content(hero_id, final_strategy)
+	rune_hero_detail_text.text = _bbc(_rune_hero_detail_content(hero_id, final_strategy))
 	rune_hero_detail_overlay.show()
 
 func _resolve_strategy_numbers(text: String, strategy: float) -> String:
@@ -2773,7 +3007,7 @@ func _build_talent_overlay() -> void:
 	tree_panel.add_child(tree_host)
 	talent_tree_canvas = PremiumUIArt.new()
 	talent_tree_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	talent_tree_canvas.configure(PremiumUIArt.Variant.TALENT, Color("#c0903e"))
+	talent_tree_canvas.configure(PremiumUIArt.Variant.TALENT, Color("#c0903e"), _light_mode())
 	tree_host.add_child(talent_tree_canvas)
 	talent_content_box = Control.new()
 	talent_content_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -2866,7 +3100,7 @@ func _render_talents(message := "") -> void:
 			detail.custom_minimum_size.y = 30
 			detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			detail.add_theme_font_size_override("font_size", 19)
-			detail.add_theme_color_override("font_color", Color("#fff0c9") if unlocked else Color("#7b7770"))
+			detail.add_theme_color_override("font_color", _text_color(Color("#fff0c9") if unlocked else Color("#7b7770")))
 			detail.tooltip_text = _talent_effect_description(talent_tree_id, node_name)
 			detail.pressed.connect(_select_talent_node.bind(talent_tree_id, node_name))
 			node_box.add_child(detail)
@@ -2939,7 +3173,7 @@ func _on_reset_talent_tree() -> void:
 
 func _build_settings_overlay() -> void:
 	settings_overlay = ColorRect.new()
-	settings_overlay.color = UI_INK
+	settings_overlay.color = _overlay_color(UI_INK)
 	settings_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	settings_overlay.z_index = 1200
 	settings_overlay.hide()
@@ -3065,6 +3299,46 @@ func _close_settings() -> void:
 	_save_settings()
 	settings_overlay.hide()
 
+func _toggle_ui_theme() -> void:
+	# 主界面日·月按钮：昼(绢纸亮色) / 夜(玄墨暗色) 热切换，保存后整体重建立即生效。
+	ui_theme = "light" if ui_theme == "dark" else "dark"
+	_save_settings()
+	_rebuild_ui()
+
+func _refresh_theme_toggle() -> void:
+	if not is_instance_valid(theme_toggle_button): return
+	if _light_mode():
+		theme_toggle_button.text = "日"
+		theme_toggle_button.tooltip_text = t("当前：绢纸·昼间模式　点击切换为玄墨·夜间", "Now: Paper (day). Click for Ink (night)")
+	else:
+		theme_toggle_button.text = "月"
+		theme_toggle_button.tooltip_text = t("当前：玄墨·夜间模式　点击切换为绢纸·昼间", "Now: Ink (night). Click for Paper (day)")
+
+func _rebuild_ui() -> void:
+	# 主题切换时整体重建界面层(音频节点随 _build_ui 重建)，再按当前阶段重绘；
+	# 战斗计时器按运行状态恢复，原本可见的设置页重新打开。
+	var settings_was_visible := is_instance_valid(settings_overlay) and settings_overlay.visible
+	var menu_was_visible := is_instance_valid(menu_overlay) and menu_overlay.visible
+	for child in get_children():
+		child.queue_free()
+	sfx_players.clear()
+	# 清空按住 UI 引用的集合，避免重建后仍向已释放的旧控件写状态。
+	stats_tab_buttons.clear()
+	encyclopedia_star_filter_buttons.clear()
+	encyclopedia_tianshu_filter_buttons.clear()
+	challenge_difficulty_buttons.clear()
+	rune_filter_buttons.clear()
+	rune_class_filter_buttons.clear()
+	result_star_labels.clear()
+	_button_gloss_texture = null
+	_bbc_regex = null
+	_build_ui()
+	_build_main_menu()
+	_render()
+	if battle_running and not battle_paused: tick_timer.start()
+	if not menu_was_visible and is_instance_valid(menu_overlay): menu_overlay.hide()
+	if settings_was_visible: _show_settings()
+
 func _toggle_pause_setting() -> void:
 	pause_during_actions = not pause_during_actions
 	_refresh_settings_ui()
@@ -3153,10 +3427,12 @@ func _load_settings() -> void:
 		enemy_faction_filter = str(config.get_value("battle", "enemy_faction_filter", ""))
 		show_hero_codex_images = bool(config.get_value("interface", "show_hero_codex_images", false))
 		board_side = str(config.get_value("interface", "board_side", "left"))
+		ui_theme = str(config.get_value("interface", "theme", "dark"))
 		if game_speed not in [1.0, 2.0, 4.0]: game_speed = 1.0
 		if draft_faction_filter not in ["", "shu", "wei", "wu", "qun"]: draft_faction_filter = ""
 		if enemy_faction_filter not in ["", "shu", "wei", "wu", "qun"]: enemy_faction_filter = ""
 		if board_side not in ["left", "right"]: board_side = "left"
+		if ui_theme not in ["dark", "light"]: ui_theme = "dark"
 		enemy_strategy_bonus = clampi(int(config.get_value("battle", "enemy_strategy_bonus", 0)), 0, 100)
 		tianshu_infinite_refresh = bool(config.get_value("debug", "tianshu_infinite_refresh", false))
 		limit_challenges = bool(config.get_value("battle", "limit_challenges", true))
@@ -3170,6 +3446,7 @@ func _save_settings() -> void:
 	config.set_value("battle", "enemy_faction_filter", enemy_faction_filter)
 	config.set_value("interface", "show_hero_codex_images", show_hero_codex_images)
 	config.set_value("interface", "board_side", board_side)
+	config.set_value("interface", "theme", ui_theme)
 	config.set_value("battle", "enemy_strategy_bonus", enemy_strategy_bonus)
 	config.set_value("debug", "tianshu_infinite_refresh", tianshu_infinite_refresh)
 	config.set_value("battle", "limit_challenges", limit_challenges)
@@ -3178,7 +3455,7 @@ func _save_settings() -> void:
 func _build_encyclopedia() -> void:
 	var mobile := _is_mobile_ui()
 	encyclopedia_overlay = ColorRect.new()
-	encyclopedia_overlay.color = UI_INK
+	encyclopedia_overlay.color = _overlay_color(UI_INK)
 	encyclopedia_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	encyclopedia_overlay.z_index = 1100
 	encyclopedia_overlay.hide()
@@ -3323,7 +3600,7 @@ func _set_encyclopedia_star(level: int) -> void:
 func _build_encyclopedia_preview() -> void:
 	var mobile := _is_mobile_ui()
 	encyclopedia_preview_overlay = ColorRect.new()
-	encyclopedia_preview_overlay.color = Color("#020304e8")
+	encyclopedia_preview_overlay.color = _overlay_color(Color("#020304e8"))
 	encyclopedia_preview_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	encyclopedia_preview_overlay.z_index = 20
 	encyclopedia_preview_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -3479,7 +3756,7 @@ func _refresh_encyclopedia_preview() -> void:
 		encyclopedia_preview_portrait.texture = load(str(weapon.path))
 		encyclopedia_preview_portrait.material = _weapon_cutout_material()
 		encyclopedia_preview_name.text = _weapon_codex_name(weapon)
-		encyclopedia_preview_name.add_theme_color_override("font_color", FACTION_COLORS.shu.lightened(0.32))
+		encyclopedia_preview_name.add_theme_color_override("font_color", _text_color(FACTION_COLORS.shu.lightened(0.32)))
 		encyclopedia_preview_detail.text = (
 			t("武器名称：", "Weapon: ") + _weapon_codex_name(weapon) + "\n\n"
 			+ t("归属武将：", "Owner: ") + _weapon_codex_owner(weapon) + "\n\n"
@@ -3494,7 +3771,7 @@ func _refresh_encyclopedia_preview() -> void:
 	encyclopedia_preview_portrait.texture = _portrait_source_texture(hero_id) if show_hero_codex_images else null
 	encyclopedia_preview_portrait.material = null
 	encyclopedia_preview_name.text = _hero_name(hero_id)
-	encyclopedia_preview_name.add_theme_color_override("font_color", FACTION_COLORS[hero.f].lightened(0.32))
+	encyclopedia_preview_name.add_theme_color_override("font_color", _text_color(FACTION_COLORS[hero.f].lightened(0.32)))
 	var stat_mult := _star_stat_multiplier(encyclopedia_star_level)
 	encyclopedia_preview_detail.text = (
 		t("阵营：", "Faction: ") + _faction_name(hero.f) + "\n"
@@ -3618,7 +3895,7 @@ func _render_encyclopedia() -> void:
 		stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_box.add_child(stats)
 		var detail := _label("", 13, Color("#c9c0b1"))
-		detail.text = _skill_detail(hero_id) + "\n\n" + _hero_bond_detail(hero_id)
+		detail.text = _bbc(_skill_detail(hero_id) + "\n\n" + _hero_bond_detail(hero_id))
 		detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -3775,7 +4052,8 @@ func _on_encyclopedia_bond_node_deselected(_node: Node) -> void:
 
 func _bond_graph_node_style(node: GraphNode, color: Color, border: Color) -> void:
 	var panel := StyleBoxFlat.new()
-	panel.bg_color = color
+	# 绢纸主题下节点底同步转纸色，标题栏用略深纸色 + 墨字，保证羁绊图文字对比清晰。
+	panel.bg_color = _panel_color(color)
 	panel.border_color = border
 	panel.set_border_width_all(2)
 	panel.set_corner_radius_all(10)
@@ -3788,6 +4066,17 @@ func _bond_graph_node_style(node: GraphNode, color: Color, border: Color) -> voi
 	selected.border_color = border.lightened(0.35)
 	selected.set_border_width_all(3)
 	node.add_theme_stylebox_override("panel_selected", selected)
+	if _light_mode():
+		var titlebar := panel.duplicate()
+		titlebar.bg_color = _panel_color(color).darkened(0.07)
+		node.add_theme_stylebox_override("titlebar", titlebar)
+		var titlebar_selected := titlebar.duplicate()
+		titlebar_selected.border_color = border.lightened(0.35)
+		titlebar_selected.set_border_width_all(3)
+		node.add_theme_stylebox_override("titlebar_selected", titlebar_selected)
+		node.add_theme_color_override("title_color", Color("#4a3d26"))
+		node.add_theme_color_override("close_color", Color("#4a3d26"))
+		node.add_theme_color_override("resizable_color", Color("#4a3d26"))
 
 func _add_bond_graph_node(node_name: String, title: String, body: String, position: Vector2, is_bond: bool) -> GraphNode:
 	var node := GraphNode.new()
@@ -4512,7 +4801,7 @@ func _render() -> void:
 		stats_tab_buttons[metric].modulate = Color("#f0c77a") if metric == stats_metric else Color.WHITE
 	_render_battle_stats()
 	phase_caption_label.text = t("两军对垒  ·  ", "BATTLE LINE  ·  ") + _phase_name()
-	bonds_label.text = _bond_text(player_units.filter(func(unit): return unit.alive and unit.row >= 0))
+	bonds_label.text = _bbc(_bond_text(player_units.filter(func(unit): return unit.alive and unit.row >= 0)))
 	reserve_title_label.text = t("备战区 ", "RESERVE ") + str(_reserve_units().size()) + " / " + str(RESERVE_LIMIT)
 	_hint()
 	unit_cell_refs.clear()
@@ -4608,7 +4897,7 @@ func _render_board(board: GridContainer, units: Array, is_player: bool) -> void:
 			cell.tooltip_text = _hero_name(unit.hero_id) + "\n" + (hero.zh_skill if language == "zh" else hero.skill) + "\n" + _skill_detail(str(unit.hero_id))
 			if is_player and selected_unit == unit.id: border = Color("#f0c77a")
 		var normal := StyleBoxFlat.new()
-		normal.bg_color = Color("#101311")
+		normal.bg_color = _panel_color(Color("#101311"))
 		normal.border_color = Color("#453d31")
 		normal.border_width_left = 1
 		normal.border_width_right = 1
@@ -4621,10 +4910,10 @@ func _render_board(board: GridContainer, units: Array, is_player: bool) -> void:
 		cell.add_theme_stylebox_override("normal", normal)
 		cell.add_theme_stylebox_override("disabled", normal)
 		var hover: StyleBoxFlat = normal.duplicate()
-		hover.bg_color = Color("#171d21")
+		hover.bg_color = _panel_color(Color("#171d21"))
 		hover.border_color = Color("#f0c77a")
 		cell.add_theme_stylebox_override("hover", hover)
-		cell.add_theme_color_override("font_disabled_color", Color("#e7ddca"))
+		cell.add_theme_color_override("font_disabled_color", _text_color(Color("#e7ddca")))
 		var team_key := "player" if is_player else "enemy"
 		tile_cell_refs[team_key + ":" + str(row) + ":" + str(col)] = cell
 		if unit:
@@ -4650,13 +4939,13 @@ func _render_board(board: GridContainer, units: Array, is_player: bool) -> void:
 			shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			card_layer.add_child(shade)
 			card_layer.add_child(_faction_border_overlay(str(hero.f), true, 0.92))
-			var badge := _cell_text(_faction_name(hero.f), 11, faction_color.lightened(0.25))
+			var badge := _art_text(_faction_name(hero.f), 11, faction_color.lightened(0.25))
 			badge.position = Vector2(8, 6)
 			badge.size = Vector2(45, 17)
 			badge.add_theme_constant_override("outline_size", 4)
 			badge.add_theme_color_override("font_outline_color", Color.BLACK)
 			card_layer.add_child(badge)
-			var state := _cell_text(_status_text(unit), 10, Color("#f0c77a"))
+			var state := _art_text(_status_text(unit), 10, Color("#f0c77a"))
 			state.set_anchors_preset(Control.PRESET_TOP_WIDE)
 			state.offset_left = 54
 			state.offset_right = -8
@@ -4673,7 +4962,7 @@ func _render_board(board: GridContainer, units: Array, is_player: bool) -> void:
 			status_icons.offset_top = 24
 			status_icons.offset_bottom = 43
 			card_layer.add_child(status_icons)
-			var name_label := _outlined_label(_hero_name(unit.hero_id), 22, faction_color.lightened(0.34))
+			var name_label := _art_outlined_label(_hero_name(unit.hero_id), 22, faction_color.lightened(0.34))
 			name_label.anchor_left = 0.0
 			name_label.anchor_right = 1.0
 			name_label.anchor_top = 0.5
@@ -4683,7 +4972,7 @@ func _render_board(board: GridContainer, units: Array, is_player: bool) -> void:
 			name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			card_layer.add_child(name_label)
-			var meta := _outlined_label("HP " + str(health) + "  ·  R" + str(hero.range), 10, Color("#eee5d5"))
+			var meta := _art_outlined_label("HP " + str(health) + "  ·  R" + str(hero.range), 10, Color("#eee5d5"))
 			meta.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 			meta.offset_left = 8
 			meta.offset_right = -8
@@ -4796,6 +5085,27 @@ func _cell_text(value: String, size: int, color: Color) -> Label:
 
 func _outlined_label(value: String, size: int, color: Color) -> Label:
 	var label := _cell_text(value, size, color)
+	if _light_mode():
+		# 纸面上的墨字用细淡描边即可：黑粗边会把小字号糊成一团。
+		label.add_theme_constant_override("outline_size", 2)
+		label.add_theme_color_override("font_outline_color", Color(0.24, 0.18, 0.08, 0.5))
+	else:
+		label.add_theme_constant_override("outline_size", 5)
+		label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
+	return label
+
+func _art_text(value: String, size: int, color: Color) -> Label:
+	# 立绘之上的文字：立绘自带暗色蒙层，两套主题下都保持浅字+黑描边，不走墨色转换。
+	var label := Label.new()
+	label.text = value
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", color)
+	label.clip_text = true
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label
+
+func _art_outlined_label(value: String, size: int, color: Color) -> Label:
+	var label := _art_text(value, size, color)
 	label.add_theme_constant_override("outline_size", 5)
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
 	return label
@@ -4865,7 +5175,7 @@ func _render_draft() -> void:
 		shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		card.add_child(shade)
 		card.add_child(_faction_border_overlay(str(hero.f), false, 0.96))
-		var name_label := _outlined_label(_hero_name(id), 27, FACTION_COLORS[hero.f].lightened(0.32))
+		var name_label := _art_outlined_label(_hero_name(id), 27, FACTION_COLORS[hero.f].lightened(0.32))
 		name_label.anchor_left = 0.0
 		name_label.anchor_right = 1.0
 		name_label.anchor_top = 0.5
@@ -4875,7 +5185,7 @@ func _render_draft() -> void:
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		card.add_child(name_label)
-		var skill := _outlined_label("◆ " + (hero.zh_skill if language == "zh" else hero.skill), 12, Color("#f4d991"))
+		var skill := _art_outlined_label("◆ " + (hero.zh_skill if language == "zh" else hero.skill), 12, Color("#f4d991"))
 		skill.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 		skill.offset_left = 10
 		skill.offset_right = -10
@@ -4883,7 +5193,7 @@ func _render_draft() -> void:
 		skill.offset_bottom = -46
 		skill.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(skill)
-		var detail := _outlined_label(_skill_detail(id), 11, Color("#f2eee6"))
+		var detail := _art_outlined_label(_skill_detail(id), 11, Color("#f2eee6"))
 		detail.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 		detail.offset_left = 12
 		detail.offset_right = -12
@@ -4892,7 +5202,7 @@ func _render_draft() -> void:
 		detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 		card.add_child(detail)
-		var stats := _outlined_label("HP " + str(hero.hp) + "  ·  " + _hero_army_name(id) + "  ·  " + str(hero.cooldown) + t("秒读条", "s cast"), 10, Color("#f2eee6"))
+		var stats := _art_outlined_label("HP " + str(hero.hp) + "  ·  " + _hero_army_name(id) + "  ·  " + str(hero.cooldown) + t("秒读条", "s cast"), 10, Color("#f2eee6"))
 		stats.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 		stats.offset_left = 10
 		stats.offset_right = -10
@@ -5233,7 +5543,7 @@ func _bond_text(units: Array) -> String:
 
 func _refresh_bond_progress(units: Array) -> void:
 	if is_instance_valid(bonds_label):
-		bonds_label.text = _bond_text(units)
+		bonds_label.text = _bbc(_bond_text(units))
 
 func _roster_text(units: Array) -> String:
 	if units.is_empty(): return t("暂无武将", "No generals yet")
@@ -5253,7 +5563,7 @@ func _render_combat_boards() -> void:
 	health_bar_refs.clear()
 	_render_board(player_board, p_preview, true)
 	_render_board(enemy_board, e_preview, false)
-	bonds_label.text = _bond_text(combat_units.filter(func(unit): return unit.team == "player" and unit.alive and unit.row >= 0))
+	bonds_label.text = _bbc(_bond_text(combat_units.filter(func(unit): return unit.team == "player" and unit.alive and unit.row >= 0)))
 	_render_battle_stats()
 	player_hp_label.text = str(player_ruler_hp) + "\n/ " + str(RULER_MAX_HP)
 	enemy_hp_label.text = str(enemy_ruler_hp) + "\n/ " + str(RULER_MAX_HP)
@@ -5283,9 +5593,9 @@ func _update_battle_time_bar() -> void:
 	var remaining: int = maxi(0, int(BATTLE_LIMIT - battle_time))
 	battle_time_label.text = t("剩余 ", "TIME ") + str(remaining) + "s"
 	if remaining <= 10:
-		battle_time_label.add_theme_color_override("font_color", Color("#e85a4f"))
+		battle_time_label.add_theme_color_override("font_color", _text_color(Color("#e85a4f")))
 	else:
-		battle_time_label.add_theme_color_override("font_color", Color("#f0c77a"))
+		battle_time_label.add_theme_color_override("font_color", _text_color(Color("#f0c77a")))
 
 func _status_text(unit: Dictionary) -> String:
 	var statuses: Array[String] = []
@@ -5318,5 +5628,5 @@ func _log(text_value: String) -> void:
 	if phase == "combat":
 		for unit in combat_units:
 			text_value = text_value.replace(_hero_name(unit.hero_id), _combat_name(unit))
-	log_box.append_text(text_value + "\n")
+	log_box.append_text(_bbc(text_value) + "\n")
 	log_box.scroll_to_line(log_box.get_line_count())
