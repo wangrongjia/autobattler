@@ -84,7 +84,7 @@ var stage_star_records := {}
 var rune_inventory: Array = []
 var rune_loadouts := {}
 var talent_levels := {}
-var home_hero_id := "sunshangxiang"
+var home_hero_id := "xiaoqiao"
 var next_rune_id := 1
 var pending_battle_result := {}
 
@@ -110,8 +110,8 @@ func _load_progression() -> void:
 		talent_levels.erase("all:" + removed_name)
 	if refunded_removed_talent > 0:
 		general_stars += refunded_removed_talent
-	home_hero_id = str(data.get("home_hero_id", "sunshangxiang"))
-	if not heroes.has(home_hero_id): home_hero_id = "sunshangxiang"
+	home_hero_id = str(data.get("home_hero_id", "xiaoqiao"))
+	if not heroes.has(home_hero_id): home_hero_id = "xiaoqiao"
 	tutorial_done = data.get("tutorial_done", false) == true
 	next_rune_id = maxi(1, int(data.get("next_rune_id", 1)))
 	_sanitize_progression()

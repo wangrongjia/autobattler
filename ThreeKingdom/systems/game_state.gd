@@ -41,7 +41,7 @@ const SHU_WEAPON_CODEX := [
 ]
 
 var language := "zh"               # 当前语言:"zh"中文 / "en"英文
-var ui_theme := "dark"             # 界面主题:"dark"玄墨暗色 / "light"绢纸亮色
+var ui_theme := "light"            # 界面主题:"dark"玄墨暗色 / "light"绢纸亮色(默认亮色)
 var round_number := 1              # 当前关卡数(1~15)
 var phase := "draft"               # 当前阶段:tianshu天书 / draft选将 / placement布阵 / combat战斗 / finished结算
 var player_ruler_hp := RULER_MAX_HP  # 我方主公当前血量

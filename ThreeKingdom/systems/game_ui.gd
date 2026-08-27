@@ -3491,12 +3491,12 @@ func _load_settings() -> void:
 		enemy_faction_filter = str(config.get_value("battle", "enemy_faction_filter", ""))
 		show_hero_codex_images = bool(config.get_value("interface", "show_hero_codex_images", false))
 		board_side = str(config.get_value("interface", "board_side", "left"))
-		ui_theme = str(config.get_value("interface", "theme", "dark"))
+		ui_theme = str(config.get_value("interface", "theme", "light"))
 		if game_speed not in [1.0, 2.0, 4.0]: game_speed = 1.0
 		if draft_faction_filter not in ["", "shu", "wei", "wu", "qun"]: draft_faction_filter = ""
 		if enemy_faction_filter not in ["", "shu", "wei", "wu", "qun"]: enemy_faction_filter = ""
 		if board_side not in ["left", "right"]: board_side = "left"
-		if ui_theme not in ["dark", "light"]: ui_theme = "dark"
+		if ui_theme not in ["dark", "light"]: ui_theme = "light"
 		enemy_strategy_bonus = clampi(int(config.get_value("battle", "enemy_strategy_bonus", 0)), 0, 100)
 		tianshu_infinite_refresh = bool(config.get_value("debug", "tianshu_infinite_refresh", false))
 		limit_challenges = bool(config.get_value("battle", "limit_challenges", true))
