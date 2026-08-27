@@ -3,6 +3,7 @@ extends "res://ThreeKingdom/systems/economy_system.gd"
 func _new_game() -> void:
 	round_number = 1
 	phase = "draft"
+	if game_mode != "challenge": player_factions.clear() # 出战阵营限制仅闯关模式有效
 	_reset_tianshu_run()
 	_reset_economy_run()
 	_roll_hell_theme()
@@ -36,6 +37,10 @@ func _new_game() -> void:
 	_prepare_round()
 	if game_mode == "challenge":
 		_log("%s · %s：完成三轮选将后迎战守军。" % [STAGE_NAMES[selected_stage - 1], str(DIFFICULTIES[selected_difficulty].name)])
+		if not player_factions.is_empty():
+			var faction_names := []
+			for faction in player_factions: faction_names.append(_faction_name(faction))
+			_log("[color=#e5c97a]本关出战阵营限定：%s。选将与阵营天书只会出现上述阵营。[/color]" % "、".join(faction_names))
 	elif game_mode == "tianshu":
 		_log("[color=#e5a8ff]天书演武开始：第 3/6/9/12/15 回合免费选天书，其他抽取可在天书阁购买。[/color]")
 	elif game_mode == "tutorial":
@@ -68,11 +73,27 @@ func _start_tutorial_game() -> void:
 	_log("[color=#8fd4a0]【引导】演练敌军仅有两名武将，放手体验完整流程。[/color]")
 	_render()
 
-func _start_challenge(stage: int, difficulty: int) -> bool:
+func _challenge_faction_pick_count(difficulty: int) -> int:
+	# 闯关开局需选择的出战阵营数:简单1/一般2/困难3;王者/地狱全阵营上阵(0=不选择)。
+	if difficulty == 0: return 1
+	if difficulty == 1: return 2
+	if difficulty == 2: return 3
+	return 0
+
+func _start_challenge(stage: int, difficulty: int, factions: Array = []) -> bool:
 	if not _is_stage_unlocked(stage, difficulty): return false
 	game_mode = "challenge"
 	selected_stage = clampi(stage, 1, 20)
 	selected_difficulty = clampi(difficulty, 0, DIFFICULTIES.size() - 1)
+	# 本关我方出战阵营:王者/地狱不限制;其余难度取前 N 个合法所选阵营。
+	player_factions.clear()
+	var need := _challenge_faction_pick_count(selected_difficulty)
+	for faction in factions:
+		var fid := str(faction)
+		if fid in ["shu", "wei", "wu", "qun"] and not player_factions.has(fid):
+			player_factions.append(fid)
+	while player_factions.size() > need:
+		player_factions.pop_back()
 	_new_game()
 	return true
 
@@ -84,6 +105,7 @@ func _save_game(silent := false) -> bool:
 		"version":7, "round_number":round_number, "phase":phase, "game_mode":game_mode,
 		"selected_stage":selected_stage, "selected_difficulty":selected_difficulty,
 		"hell_faction":hell_faction, "hell_theme_name":hell_theme_name,
+		"player_factions":player_factions,
 		"player_ruler_hp":player_ruler_hp, "enemy_ruler_hp":enemy_ruler_hp,
 		"player_units":player_units, "enemy_units":enemy_units,
 		"draft_roster_baseline":draft_roster_baseline,
@@ -132,6 +154,13 @@ func _load_game() -> bool:
 	hell_faction = str(data.get("hell_faction", ""))
 	hell_theme_name = str(data.get("hell_theme_name", ""))
 	if hell_faction not in ["shu", "wei", "wu", "qun"]: hell_faction = ""
+	# 本关出战阵营:仅闯关存档携带;王者/地狱无限制,旧存档无此字段则不限制。
+	player_factions.clear()
+	if game_mode == "challenge" and _challenge_faction_pick_count(selected_difficulty) > 0:
+		for faction in data.get("player_factions", []):
+			var fid := str(faction)
+			if fid in ["shu", "wei", "wu", "qun"] and not player_factions.has(fid):
+				player_factions.append(fid)
 	if game_mode == "challenge" and selected_difficulty >= 4 and hell_faction.is_empty():
 		_roll_hell_theme() # 旧存档没有阵营字段:读档时补随机一次
 	round_number = int(data.round_number)
@@ -241,6 +270,8 @@ func _grant_faction_talent_recruits() -> void:
 	# 等级为几，对局前几回合每回合开始时各随机获得 1 名本阵营武将，直接加入备战席(row=-1)。
 	var talent_names := {"shu":"汉室坚壁", "wei":"中枢令典", "wu":"三世基业", "qun":"烽火燎原"}
 	for faction in ["shu", "wei", "wu", "qun"]:
+		# 出战阵营限定:未选该阵营时,该阵营天赋不发放备战武将。
+		if not player_factions.is_empty() and not player_factions.has(faction): continue
 		if round_number > _talent_faction_recruit_rounds(faction): continue
 		var pool: Array = heroes.keys().filter(func(id): return str(heroes[id].f) == faction)
 		if pool.is_empty(): continue
@@ -267,6 +298,8 @@ func _draft_pool_for_range(range_tier: int, faction_filter: String) -> Array:
 	var pool_factions := _active_tianshu_pool_factions()
 	return heroes.keys().filter(func(hero_id):
 		var faction := str(heroes[hero_id].f)
+		# 出战阵营限定:限定时仅所选阵营武将可进入候选/刷新池。
+		if not player_factions.is_empty() and not player_factions.has(faction): return false
 		return int(heroes[hero_id].range) == range_tier and (pool_factions.has(faction) if not pool_factions.is_empty() else (faction_filter.is_empty() or faction == faction_filter))
 	)
 

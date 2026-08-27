@@ -303,7 +303,7 @@ func _convert_rune(uid: int):
 	var old = _rune_by_uid(uid)
 	if old == null: return null
 	var tier := int(old.tier)
-	var discount := 1.0 - 0.10 * float(_talent_level("all", "百炼"))
+	var discount := 1.0 - _bailian_convert_discount()
 	var cost := ceili(float(RUNE_TIERS[tier - 1].convert) * discount)
 	if general_souls < cost: return null
 	general_souls -= cost
@@ -367,6 +367,13 @@ func _talent_key(tree_id: String, node_name: String) -> String:
 func _talent_level(tree_id: String, node_name: String) -> int:
 	return int(talent_levels.get(_talent_key(tree_id, node_name), 0))
 
+func _bailian_convert_discount() -> float:
+	# 天赋·百炼:一级使符文转换消耗降低 20%,二级降低 50%。
+	var level := _talent_level("all", "百炼")
+	if level >= 2: return 0.5
+	if level == 1: return 0.2
+	return 0.0
+
 func _talent_node(tree_id: String, node_name: String) -> Array:
 	if not TALENT_TREES.has(tree_id): return []
 	for node in TALENT_TREES[tree_id].nodes:
@@ -377,7 +384,7 @@ func _talent_effect_description(tree_id: String, node_name: String) -> String:
 	var specials := {
 		"all:明君":"每级使我方主公最大生命值增加 4000，满级增加 8000。",
 		"all:神算":"每场战斗开局随机 3 名友军行动条 +30。",
-		"all:百炼":"每级使符文转换消耗降低 10%，满级降低 20%。",
+		"all:百炼":"一级使符文转换消耗降低 20%，二级降低 50%。",
 		"all:天命":"所有阵营羁绊数值额外提高 20%。",
 		"all:群英":"所有武将生命 +400、兵略 +10、技能冷却减少 0.5 秒。",
 		"all:长治":"我方主公最大生命值增加 10000。",

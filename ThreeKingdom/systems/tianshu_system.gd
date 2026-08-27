@@ -150,7 +150,10 @@ func _tianshu_candidates_for_slot(index: int, excluded: Array) -> Array:
 		if _tianshu_level(book_id) >= 2 or excluded.has(book_id): return false
 		var book: Dictionary = TIANSHU_BOOKS[book_id]
 		if not _tianshu_lord_requirement_met(book_id, book): return false
-		var is_common := _tianshu_book_faction(book).is_empty()
+		# 出战阵营限定:限定时阵营书(含求贤令/君主书)只刷所选阵营,通用书不受影响。
+		var book_faction := _tianshu_book_faction(book)
+		if not player_factions.is_empty() and not book_faction.is_empty() and not player_factions.has(book_faction): return false
+		var is_common := book_faction.is_empty()
 		return is_common if index == 0 else not is_common
 	)
 
@@ -262,7 +265,11 @@ func _recruit_faction_heroes(faction: String, count: int) -> void:
 func _active_tianshu_pool_factions() -> Array:
 	if tianshu_pool_effect.is_empty() or int(tianshu_pool_effect.get("remaining_picks", 0)) <= 0 or round_number > int(tianshu_pool_effect.get("end_round", 0)):
 		return []
-	return Array(tianshu_pool_effect.get("factions", []))
+	var factions := Array(tianshu_pool_effect.get("factions", []))
+	# 出战阵营限定:求贤令阵营需在所选阵营内(防御旧存档,正常情况下非所选阵营求贤令不会出现)。
+	if not player_factions.is_empty():
+		factions = factions.filter(func(faction): return player_factions.has(str(faction)))
+	return factions
 
 func _tianshu_consume_pool_pick() -> void:
 	if _active_tianshu_pool_factions().is_empty(): return

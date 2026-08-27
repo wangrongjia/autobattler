@@ -203,6 +203,7 @@ var theme_toggle_button: Button     # 主界面右上角的昼/夜(绢纸/玄墨
 var enemy_strategy_setting_options: OptionButton # 敌方兵略值加成
 var draft_faction_filter := ""     # 我方选将阵营过滤(空=全部, 或 shu/wei/wu/qun)
 var enemy_faction_filter := ""     # 敌方随机武将阵营过滤
+var player_factions: Array[String] = []  # 闯关简单/一般/困难:本关我方出战阵营限制(空=全阵营,随存档保存)
 var hell_faction := ""            # 地狱难度:开局随机锁定的敌方阵营(整局只刷该阵营,随存档保存)
 var hell_theme_name := ""         # 地狱难度:本局阵营主题名(战报展示用)
 var board_side := "left"           # 棋盘位置:left=居左,right=居右

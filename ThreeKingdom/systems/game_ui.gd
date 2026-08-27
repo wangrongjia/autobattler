@@ -50,6 +50,13 @@ var challenge_detail_stage_label: Label
 var challenge_detail_bonus_label: Label
 var challenge_detail_star_label: Label
 var challenge_start_button: Button
+var faction_pick_overlay: Control         # 出战阵营选择弹窗(简单/一般/困难开局)
+var faction_pick_hint: Label
+var faction_pick_confirm: Button
+var faction_pick_buttons: Array[Button] = []
+var faction_pick_selection: Array[String] = []
+var faction_pick_stage := 1
+var faction_pick_difficulty := 0
 var challenge_restart_button: Button
 var rune_overlay: Control
 var rune_inventory_box: Container
@@ -2016,6 +2023,8 @@ func _render_challenge_detail() -> void:
 		challenge_detail_stage_label.text = "第 %02d 关\n%s · %s\n历史最佳 %s" % [selected_stage, STAGE_NAMES[selected_stage - 1], str(data.name), "★".repeat(best) + "☆".repeat(3 - best)]
 	var total_strategy := _challenge_stage_strategy_bonus() + _challenge_difficulty_strategy_bonus()
 	challenge_detail_bonus_label.text = "当前关卡敌方阵营加成\n  兵略 +%d\n\n当前难度敌方阵营加成\n  初始生命 +%d%%\n  兵略 +%d\n\n最终兵略加成：+%d" % [_challenge_stage_strategy_bonus(), roundi((float(data.hp) - 1.0) * 100.0), _challenge_difficulty_strategy_bonus(), total_strategy]
+	if _challenge_faction_pick_count(difficulty) > 0:
+		challenge_detail_bonus_label.text += "\n\n出战阵营：开局需选择 %d 个阵营，本关仅刷新所选阵营的武将与阵营天书。" % _challenge_faction_pick_count(difficulty)
 	challenge_detail_star_label.text = "★ 战斗胜利\n\n★ 主公结算生命 > 50,000\n\n★ 主公结算生命 > 80,000\n\n将星仅在刷新该难度历史星级时补发。"
 	challenge_start_button.text = ("继续战斗（回合 %d / 15）" % int(run.round)) if run_here else "开始战斗"
 	challenge_start_button.disabled = not _is_stage_unlocked(selected_stage, difficulty)
@@ -2029,20 +2038,114 @@ func _confirm_challenge() -> void:
 		menu_overlay.hide()
 		if not _load_game(): menu_overlay.show()
 		return
-	_launch_challenge(selected_stage, selected_difficulty)
+	_try_faction_pick_then_launch(selected_stage, selected_difficulty)
 
 func _on_challenge_restart() -> void:
 	# 放弃当前关卡的进行中进度，从第 1 回合重新开始。
-	_launch_challenge(selected_stage, selected_difficulty)
+	_try_faction_pick_then_launch(selected_stage, selected_difficulty)
 
-func _launch_challenge(stage: int, difficulty: int) -> void:
+func _try_faction_pick_then_launch(stage: int, difficulty: int) -> void:
+	# 简单/一般/困难开局先选择出战阵营；王者/地狱全阵营上阵，直接开战。
+	if _challenge_faction_pick_count(difficulty) > 0:
+		_open_faction_pick_dialog(stage, difficulty)
+	else:
+		_launch_challenge(stage, difficulty)
+
+func _launch_challenge(stage: int, difficulty: int, factions: Array = []) -> void:
 	battle_menu_overlay.hide()
 	menu_overlay.hide()
-	if not _start_challenge(stage, difficulty):
+	if not _start_challenge(stage, difficulty, factions):
 		menu_overlay.show()
 		battle_menu_overlay.show()
 		return
 	_render()
+
+func _open_faction_pick_dialog(stage: int, difficulty: int) -> void:
+	if faction_pick_overlay == null: _build_faction_pick_dialog()
+	faction_pick_stage = clampi(stage, 1, STAGE_NAMES.size())
+	faction_pick_difficulty = clampi(difficulty, 0, DIFFICULTIES.size() - 1)
+	faction_pick_selection.clear()
+	_update_faction_pick_dialog()
+	faction_pick_overlay.show()
+
+func _toggle_faction_pick(faction: String) -> void:
+	if faction_pick_selection.has(faction):
+		faction_pick_selection.erase(faction)
+	elif faction_pick_selection.size() < _challenge_faction_pick_count(faction_pick_difficulty):
+		faction_pick_selection.append(faction)
+	_update_faction_pick_dialog()
+
+func _update_faction_pick_dialog() -> void:
+	var need := _challenge_faction_pick_count(faction_pick_difficulty)
+	for index in faction_pick_buttons.size():
+		var faction: String = ["shu", "wei", "wu", "qun"][index]
+		var selected: bool = faction_pick_selection.has(faction)
+		_accent_button(faction_pick_buttons[index], FACTION_COLORS[faction], selected)
+		faction_pick_buttons[index].modulate = Color.WHITE if selected or faction_pick_selection.size() < need else Color(0.7, 0.7, 0.7, 0.85)
+	var names := []
+	for faction in faction_pick_selection: names.append(_faction_name(faction))
+	faction_pick_hint.text = "【%s】本关需选择 %d 个出战阵营：选将、阵营天书与阵营天赋招募只会出现所选阵营。\n已选 %d / %d：%s" % [
+		str(DIFFICULTIES[faction_pick_difficulty].name), need, faction_pick_selection.size(), need,
+		("、".join(names)) if not names.is_empty() else "—"]
+	faction_pick_confirm.disabled = faction_pick_selection.size() != need
+
+func _confirm_faction_pick() -> void:
+	var need := _challenge_faction_pick_count(faction_pick_difficulty)
+	if faction_pick_selection.size() != need: return
+	var factions := faction_pick_selection.duplicate()
+	faction_pick_overlay.hide()
+	_launch_challenge(faction_pick_stage, faction_pick_difficulty, factions)
+
+func _build_faction_pick_dialog() -> void:
+	faction_pick_overlay = _full_overlay(1240, PremiumUIArt.Variant.BACKDROP, Color("#a97c42"))
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	faction_pick_overlay.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(600, 0)
+	_style(panel, Color("#15120df2"), 6, Color("#b88a50"), 3)
+	center.add_child(panel)
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 24)
+	panel.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 14)
+	margin.add_child(box)
+	box.add_child(_label("选择出战阵营", 30, Color("#f0c77a")))
+	faction_pick_hint = _label("", 15, Color("#d9c7a1"))
+	faction_pick_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	faction_pick_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(faction_pick_hint)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(row)
+	for faction in ["shu", "wei", "wu", "qun"]:
+		var count: int = heroes.values().filter(func(hero): return str(hero.f) == faction).size()
+		var button := _button(_faction_name(faction) + "\n" + str(count) + " 将")
+		button.custom_minimum_size = Vector2(126, 96)
+		button.add_theme_font_size_override("font_size", 22)
+		button.pressed.connect(_toggle_faction_pick.bind(faction))
+		row.add_child(button)
+		faction_pick_buttons.append(button)
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 12)
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(buttons)
+	var cancel := _button("返 回")
+	cancel.custom_minimum_size = Vector2(140, 50)
+	cancel.add_theme_font_size_override("font_size", 18)
+	_accent_button(cancel, Color("#6f8aa5"))
+	cancel.pressed.connect(func(): faction_pick_overlay.hide())
+	buttons.add_child(cancel)
+	faction_pick_confirm = _button("出 战")
+	faction_pick_confirm.custom_minimum_size = Vector2(180, 50)
+	faction_pick_confirm.add_theme_font_size_override("font_size", 20)
+	_accent_button(faction_pick_confirm, Color("#b17b32"), true)
+	faction_pick_confirm.disabled = true
+	faction_pick_confirm.pressed.connect(_confirm_faction_pick)
+	buttons.add_child(faction_pick_confirm)
 
 func _build_result_overlay() -> void:
 	result_overlay = _full_overlay(1600, PremiumUIArt.Variant.HOME, Color("#b88a50"))
@@ -2945,7 +3048,7 @@ func _render_runes(message := "") -> void:
 			spacer.custom_minimum_size.x = 92
 			actions.add_child(spacer)
 		var convert_cost := int(RUNE_TIERS[int(group.tier) - 1].convert)
-		convert_cost = ceili(convert_cost * (1.0 - 0.10 * _talent_level("all", "百炼")))
+		convert_cost = ceili(convert_cost * (1.0 - _bailian_convert_discount()))
 		var convert := _button("转换 %d" % convert_cost)
 		convert.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		convert.custom_minimum_size.y = 44
@@ -4849,7 +4952,12 @@ func _render() -> void:
 		battle_info_tabs.set_tab_title(0, t("羁绊组成", "BONDS"))
 		battle_info_tabs.set_tab_title(1, t("实时战报", "BATTLE LOG"))
 		battle_info_tabs.set_tab_title(2, t("统计图表", "STATISTICS"))
-	if game_mode == "challenge": title_label.text = STAGE_NAMES[selected_stage - 1] + " · " + str(DIFFICULTIES[selected_difficulty].name)
+	if game_mode == "challenge":
+		title_label.text = STAGE_NAMES[selected_stage - 1] + " · " + str(DIFFICULTIES[selected_difficulty].name)
+		if not player_factions.is_empty():
+			var faction_names := []
+			for faction in player_factions: faction_names.append(_faction_name(faction))
+			title_label.text += " · " + "/".join(faction_names)
 	elif game_mode == "tianshu": title_label.text = t("战三国 · 弈定九州 · 天书演武", "THREE KINGDOMS · CODEX TRIAL")
 	elif game_mode == "tutorial": title_label.text = t("战三国 · 弈定九州 · 新手引导", "THREE KINGDOMS · TUTORIAL")
 	else: title_label.text = t("战三国 · 弈定九州 · 快速战斗", "THREE KINGDOMS · QUICK BATTLE")
