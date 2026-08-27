@@ -292,6 +292,12 @@ func _show_balance_lab() -> void:
 func _ensure_unit_fields(_unit: Dictionary) -> void:
 	pass
 
+func _debug_tools_enabled() -> bool:
+	# 调试工具总开关：仅调试构建(编辑器内运行、勾选"Export With Debug"导出的包)
+	# 或导出预设 Features 里附加了 debug_tools 标签时才启用。
+	# 正式包中设置页会隐藏作弊类调试项，读取配置时也会把这些开关强制回退为默认值。
+	return OS.is_debug_build() or OS.has_feature("debug_tools")
+
 func _reset_faction_battle_state() -> void:
 	faction_battle_state = {
 		"player":{"wu_equalize_used":false},

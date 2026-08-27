@@ -273,9 +273,17 @@ func _synthesize_runes(first_uid: int, second_uid: int):
 	_save_progression()
 	return result
 
+func _rune_is_equipped(uid: int) -> bool:
+	for hero_id in rune_loadouts:
+		if (rune_loadouts[hero_id] as Array).has(uid): return true
+	return false
+
 func _synthesize_all_runes(tier: int) -> Dictionary:
+	# 一键合成只消耗未装备的符文：武将身上戴着的原样保留，不自动拆下参与合成。
 	if tier < 1 or tier >= 6: return {"consumed":0, "created":[]}
-	var candidates: Array = rune_inventory.filter(func(rune): return int(rune.tier) == tier)
+	var candidates: Array = rune_inventory.filter(func(rune):
+		return int(rune.tier) == tier and not _rune_is_equipped(int(rune.uid))
+	)
 	candidates.sort_custom(func(a, b): return int(a.uid) < int(b.uid))
 	var pair_count := int(candidates.size() / 2)
 	if pair_count <= 0: return {"consumed":0, "created":[]}
@@ -283,8 +291,6 @@ func _synthesize_all_runes(tier: int) -> Dictionary:
 	for index in pair_count:
 		var first: Dictionary = candidates[index * 2]
 		var second: Dictionary = candidates[index * 2 + 1]
-		_unequip_rune_everywhere(int(first.uid))
-		_unequip_rune_everywhere(int(second.uid))
 		rune_inventory.erase(first)
 		rune_inventory.erase(second)
 		var result := _new_random_rune(tier + 1)

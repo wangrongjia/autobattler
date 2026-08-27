@@ -91,7 +91,7 @@ var result_mvp_panel: PanelContainer        # 本局 MVP 特写面板
 var result_mvp_portrait: TextureRect        # MVP 立绘
 var result_mvp_name_label: Label
 var result_mvp_stats_label: Label
-var result_kings_box: VBoxContainer         # 伤害/治疗/控制三项数据王徽章行
+var result_kings_box: HFlowContainer         # 各项数据王徽章行(流式排列，省纵向高度)
 var result_chart_panel: PanelContainer      # 战斗回放图表面板
 var result_chart: Control                   # BattleReportChart 折线图实例
 var result_chart_hint: Label                # 无回放数据时的占位提示
@@ -1383,7 +1383,20 @@ func _render_tianshu_overlay() -> void:
 			card.text = ("天　书\n\n✦  %s  ✦\n\n%s\n\n%s" % [_tianshu_name(book_id), "升级至2级" if current == 1 else "获得1级", _tianshu_effect_text(book_id, target_level)])
 			card.tooltip_text = t("点击下方「获取」按钮选定此天书", "Use the ACQUIRE button below to take this codex")
 			var style := StyleBoxFlat.new()
-			style.bg_color = card_accent.darkened(0.72)
+			var card_bg := card_accent.darkened(0.72)
+			var hover_bg := card_accent.darkened(0.56)
+			if _light_mode():
+				# 亮色(绢纸)模式：卡内底不再压黑——通用书衬浅金、阵营书衬浅银(贴合银质框饰)，
+				# 均淡于边框；正文文字改用边框同色压在浅底上，避免白字配暗底的突兀感。
+				var pool_factions: Array = book.get("pool", [])
+				var generic_book := not book.has("faction") and pool_factions.size() != 1
+				card_bg = Color("#efe3c9") if generic_book else Color("#dfe2df")
+				hover_bg = card_bg.darkened(0.06)
+				card.add_theme_color_override("font_color", card_accent)
+				card.add_theme_color_override("font_hover_color", card_accent)
+				card.add_theme_color_override("font_pressed_color", card_accent)
+				card.add_theme_color_override("font_focus_color", card_accent)
+			style.bg_color = card_bg
 			style.border_color = card_accent
 			style.set_border_width_all(4)
 			style.set_corner_radius_all(6)
@@ -1395,7 +1408,7 @@ func _render_tianshu_overlay() -> void:
 			style.shadow_size = 12
 			card.add_theme_stylebox_override("normal", style)
 			var hover: StyleBoxFlat = style.duplicate()
-			hover.bg_color = card_accent.darkened(0.56)
+			hover.bg_color = hover_bg
 			hover.border_color = Color("#f4d06f")
 			hover.shadow_color = Color(card_accent, 0.58)
 			card.add_theme_stylebox_override("hover", hover)
@@ -2038,7 +2051,8 @@ func _build_result_overlay() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	result_overlay.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(848, 624) if compact else Vector2(1024, 680)
+	# 加宽压扁：宽度上调给中部/阵容留横向空间，高度下调配合流式数据王与竖版阵容卡，防止底部返回按钮被挤出屏幕。
+	panel.custom_minimum_size = Vector2(1120, 560) if compact else Vector2(1240, 640)
 	_style(panel, Color("#15120df2"), 6, Color("#b88a50"), 3)
 	center.add_child(panel)
 	var margin := MarginContainer.new()
@@ -2105,7 +2119,7 @@ func _build_result_overlay() -> void:
 
 func _build_result_mvp_panel(parent: Container, compact: bool) -> void:
 	result_mvp_panel = PanelContainer.new()
-	result_mvp_panel.custom_minimum_size = Vector2(252 if compact else 306, 0)
+	result_mvp_panel.custom_minimum_size = Vector2(286 if compact else 306, 0)
 	_style(result_mvp_panel, Color("#101410f0"), 5, Color("#6e5a36"), 2)
 	parent.add_child(result_mvp_panel)
 	var mvp_box := VBoxContainer.new()
@@ -2138,8 +2152,10 @@ func _build_result_mvp_panel(parent: Container, compact: bool) -> void:
 	result_mvp_stats_label = _label("", 12, Color("#cfc6b2"))
 	result_mvp_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info_box.add_child(result_mvp_stats_label)
-	result_kings_box = VBoxContainer.new()
-	result_kings_box.add_theme_constant_override("separation", 3)
+	result_kings_box = HFlowContainer.new()
+	# 流式排列：数据王横向挤排(约每行两枚)，比逐行罗列省近一半纵向高度。
+	result_kings_box.add_theme_constant_override("h_separation", 8)
+	result_kings_box.add_theme_constant_override("v_separation", 2)
 	mvp_box.add_child(result_kings_box)
 
 func _build_result_chart_panel(parent: Container, compact: bool) -> void:
@@ -2193,8 +2209,8 @@ func _build_result_lineup_panel(parent: Container, title_text: String, accent: C
 	var header := _label(title_text, 13, accent.lightened(0.25))
 	panel_box.add_child(header)
 	var flow := HFlowContainer.new()
-	flow.add_theme_constant_override("h_separation", 5)
-	flow.add_theme_constant_override("v_separation", 5)
+	flow.add_theme_constant_override("h_separation", 4)
+	flow.add_theme_constant_override("v_separation", 4)
 	panel_box.add_child(flow)
 	return flow
 
@@ -2313,16 +2329,14 @@ func _populate_result_mvp() -> void:
 		{"key":"buff", "icon":"✧", "label":t("增益最高", "Top support")},
 	]
 	for meta in king_meta:
-		var line := HBoxContainer.new()
-		line.add_theme_constant_override("separation", 5)
 		var king = kings.get(meta.key)
-		var text := "%s %s：—" % [str(meta.icon), str(meta.label)]
-		if king != null:
-			var value := float(king.get(str(meta.key), 0.0))
-			var value_text := "%.1fs" % value if str(meta.key) == "control" else str(int(round(value)))
-			text = "%s %s：%s %s" % [str(meta.icon), str(meta.label), _hero_name(str(king.hero_id)), value_text]
-		line.add_child(_label(text, 12, Color("#d8cfbd")))
-		result_kings_box.add_child(line)
+		# 紧凑徽章：图标+武将名+数值单行排列，完整"输出最高"等说明放 tooltip，配合流式容器压扁面板。
+		var value := float(king.get(str(meta.key), 0.0)) if king != null else 0.0
+		var value_text := ("%.1fs" % value) if str(meta.key) == "control" else str(int(round(value)))
+		var badge_text := ("%s %s %s" % [str(meta.icon), _hero_name(str(king.hero_id)), value_text]) if king != null else ("%s —" % str(meta.icon))
+		var badge := _label(badge_text, 12, Color("#d8cfbd"))
+		badge.tooltip_text = "%s：%s" % [str(meta.label), badge_text]
+		result_kings_box.add_child(badge)
 
 func _populate_result_chart() -> void:
 	var samples: Array = stage_replay_curve
@@ -2391,26 +2405,34 @@ func _make_result_lineup_chip(entry: Dictionary) -> Control:
 	var accent := Color("#5ca873") if str(entry.get("team", "")) == "player" else Color("#c16458")
 	var chip := PanelContainer.new()
 	_style(chip, Color("#0d1010ee"), 4, accent if alive else Color("#3c3a33"), 1)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 5)
-	chip.add_child(row)
-	var portrait := _portrait_rect(str(entry.hero_id))
-	portrait.custom_minimum_size = Vector2(30, 30) if compact else Vector2(36, 36)
-	row.add_child(portrait)
+	# 迷你卡贴边内衬：_style 默认 13/10 内边距对 50px 小卡太占宽，压到 3/2 才能每行排下 8 人。
+	var chip_box: StyleBoxFlat = chip.get_theme_stylebox("panel").duplicate()
+	chip_box.content_margin_left = 3
+	chip_box.content_margin_right = 3
+	chip_box.content_margin_top = 2
+	chip_box.content_margin_bottom = 2
+	chip_box.shadow_size = 0
+	chip.add_theme_stylebox_override("panel", chip_box)
+	# 竖版迷你卡：头像在上、名字与血条在下，窄身保证阵容区每行能排下 8 名武将。
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_theme_constant_override("separation", 1)
-	row.add_child(col)
+	col.add_theme_constant_override("separation", 2)
+	chip.add_child(col)
+	var portrait := _portrait_rect(str(entry.hero_id))
+	portrait.custom_minimum_size = Vector2(26, 26) if compact else Vector2(30, 30)
+	col.add_child(portrait)
 	var name_text := _hero_name(str(entry.hero_id))
 	if not alive: name_text = "† " + name_text
-	col.add_child(_label(name_text, 10, accent.lightened(0.2) if alive else Color("#6e6a5e")))
+	var name_label := _label(name_text, 9, accent.lightened(0.2) if alive else Color("#6e6a5e"))
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(name_label)
 	var max_hp := maxf(1.0, float(entry.get("max_hp", 1.0)))
 	var hp_bar := ProgressBar.new()
 	hp_bar.show_percentage = false
 	hp_bar.min_value = 0.0
 	hp_bar.max_value = 1.0
 	hp_bar.value = clampf(float(entry.get("hp", 0.0)) / max_hp, 0.0, 1.0)
-	hp_bar.custom_minimum_size = Vector2(50 if compact else 58, 5)
+	hp_bar.custom_minimum_size = Vector2(40 if compact else 46, 4)
 	var hp_bg := StyleBoxFlat.new()
 	hp_bg.bg_color = Color("#090b0f")
 	hp_bg.set_corner_radius_all(2)
@@ -2859,10 +2881,10 @@ func _render_runes(message := "") -> void:
 	)
 	var filter_name := "全部" if rune_tier_filter == 0 else str(RUNE_TIERS[rune_tier_filter - 1].name)
 	var type_filter_name := "全部类型" if rune_class_filter.is_empty() else rune_class_filter + "符文"
-	rune_status_label.text = message if not message.is_empty() else "%s · %s：%d 类 · 可用 %d 枚。批量合成会包含并自动卸下已装备的同阶符文。" % [filter_name, type_filter_name, group_list.size(), available_total]
+	rune_status_label.text = message if not message.is_empty() else "%s · %s：%d 类 · 可用 %d 枚。批量合成只使用未装备的符文，武将已佩戴的不参与。" % [filter_name, type_filter_name, group_list.size(), available_total]
 	rune_batch_synthesize_button.visible = rune_tier_filter in [1, 2, 3, 4, 5]
 	if rune_batch_synthesize_button.visible:
-		var tier_count := rune_inventory.filter(func(rune): return int(rune.tier) == rune_tier_filter).size()
+		var tier_count := rune_inventory.filter(func(rune): return int(rune.tier) == rune_tier_filter and not _rune_is_equipped(int(rune.uid))).size()
 		rune_batch_synthesize_button.text = "全部合成（%d → %d）" % [tier_count, int(tier_count / 2)]
 		rune_batch_synthesize_button.disabled = tier_count < 2
 	for index in rune_filter_buttons.size():
@@ -3254,61 +3276,64 @@ func _build_settings_overlay() -> void:
 	hero_codex_images_setting_button.custom_minimum_size = Vector2(360, 54)
 	hero_codex_images_setting_button.pressed.connect(_toggle_hero_codex_images_setting)
 	box.add_child(hero_codex_images_setting_button)
-	var faction_help := _label(t("测试招募阵营：关闭时可刷出全部阵营；开启后商店只会出现指定阵营武将。", "Test draft faction: Off allows all factions; a selected faction restricts shop rolls."), 14, Color("#c9c0b1"))
-	faction_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	faction_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(faction_help)
-	faction_setting_options = OptionButton.new()
-	faction_setting_options.custom_minimum_size = Vector2(360, 48)
-	faction_setting_options.add_item(t("指定阵营：关闭", "Draft faction: Off"), 0)
-	for faction in ["shu", "wei", "wu", "qun"]:
-		faction_setting_options.add_item(_faction_name(faction), faction_setting_options.get_item_count())
-	faction_setting_options.item_selected.connect(_set_draft_faction_filter)
-	box.add_child(faction_setting_options)
-	enemy_faction_setting_options = OptionButton.new()
-	enemy_faction_setting_options.custom_minimum_size = Vector2(360, 48)
-	enemy_faction_setting_options.add_item(t("敌方阵营：全部", "Enemy faction: All"), 0)
-	for faction in ["shu", "wei", "wu", "qun"]:
-		enemy_faction_setting_options.add_item(_faction_name(faction), enemy_faction_setting_options.get_item_count())
-	enemy_faction_setting_options.item_selected.connect(_set_enemy_faction_filter)
-	box.add_child(enemy_faction_setting_options)
+	# ---- 调试工具区：仅调试包/编辑器运行可见，正式包整段隐藏 ----
+	if _debug_tools_enabled():
+		var faction_help := _label(t("测试招募阵营：关闭时可刷出全部阵营；开启后商店只会出现指定阵营武将。", "Test draft faction: Off allows all factions; a selected faction restricts shop rolls."), 14, Color("#c9c0b1"))
+		faction_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		faction_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(faction_help)
+		faction_setting_options = OptionButton.new()
+		faction_setting_options.custom_minimum_size = Vector2(360, 48)
+		faction_setting_options.add_item(t("指定阵营：关闭", "Draft faction: Off"), 0)
+		for faction in ["shu", "wei", "wu", "qun"]:
+			faction_setting_options.add_item(_faction_name(faction), faction_setting_options.get_item_count())
+		faction_setting_options.item_selected.connect(_set_draft_faction_filter)
+		box.add_child(faction_setting_options)
+		enemy_faction_setting_options = OptionButton.new()
+		enemy_faction_setting_options.custom_minimum_size = Vector2(360, 48)
+		enemy_faction_setting_options.add_item(t("敌方阵营：全部", "Enemy faction: All"), 0)
+		for faction in ["shu", "wei", "wu", "qun"]:
+			enemy_faction_setting_options.add_item(_faction_name(faction), enemy_faction_setting_options.get_item_count())
+		enemy_faction_setting_options.item_selected.connect(_set_enemy_faction_filter)
+		box.add_child(enemy_faction_setting_options)
+		enemy_strategy_setting_options = OptionButton.new()
+		enemy_strategy_setting_options.custom_minimum_size = Vector2(360, 48)
+		for i in range(21):
+			enemy_strategy_setting_options.add_item(t("敌方兵略值：", "Enemy Strategy: ") + str(100 + i * 5), i)
+		enemy_strategy_setting_options.item_selected.connect(_set_enemy_strategy)
+		box.add_child(enemy_strategy_setting_options)
+		tianshu_refresh_setting_button = _button("")
+		tianshu_refresh_setting_button.custom_minimum_size = Vector2(360, 48)
+		tianshu_refresh_setting_button.pressed.connect(_toggle_tianshu_refresh_setting)
+		box.add_child(tianshu_refresh_setting_button)
+		challenge_limit_setting_button = _button("")
+		challenge_limit_setting_button.custom_minimum_size = Vector2(360, 48)
+		challenge_limit_setting_button.pressed.connect(_toggle_challenge_limit_setting)
+		box.add_child(challenge_limit_setting_button)
+		var resource_row := HBoxContainer.new()
+		resource_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		resource_row.add_theme_constant_override("separation", 10)
+		var add_souls := _button("增加将魂 +10000")
+		_accent_button(add_souls, Color("#4c8b66"))
+		add_souls.pressed.connect(_on_add_debug_souls)
+		resource_row.add_child(add_souls)
+		var add_stars := _button("增加将星 +100")
+		_accent_button(add_stars, Color("#b78a43"))
+		add_stars.pressed.connect(_on_add_debug_stars)
+		resource_row.add_child(add_stars)
+		box.add_child(resource_row)
+		var lab_button := _button("平衡实验室")
+		_accent_button(lab_button, Color("#705f8f"))
+		lab_button.custom_minimum_size = Vector2(360, 46)
+		lab_button.pressed.connect(func(): settings_overlay.hide(); _show_balance_lab())
+		box.add_child(lab_button)
+	# 棋盘居左/居右属玩家设置，正式包保持可见。
 	board_side_setting_options = OptionButton.new()
 	board_side_setting_options.custom_minimum_size = Vector2(360, 48)
 	board_side_setting_options.add_item(t("棋盘居左", "Board on left"), 0)
 	board_side_setting_options.add_item(t("棋盘居右", "Board on right"), 1)
 	board_side_setting_options.item_selected.connect(_set_board_side)
 	box.add_child(board_side_setting_options)
-	enemy_strategy_setting_options = OptionButton.new()
-	enemy_strategy_setting_options.custom_minimum_size = Vector2(360, 48)
-	for i in range(21):
-		enemy_strategy_setting_options.add_item(t("敌方兵略值：", "Enemy Strategy: ") + str(100 + i * 5), i)
-	enemy_strategy_setting_options.item_selected.connect(_set_enemy_strategy)
-	box.add_child(enemy_strategy_setting_options)
-	tianshu_refresh_setting_button = _button("")
-	tianshu_refresh_setting_button.custom_minimum_size = Vector2(360, 48)
-	tianshu_refresh_setting_button.pressed.connect(_toggle_tianshu_refresh_setting)
-	box.add_child(tianshu_refresh_setting_button)
-	challenge_limit_setting_button = _button("")
-	challenge_limit_setting_button.custom_minimum_size = Vector2(360, 48)
-	challenge_limit_setting_button.pressed.connect(_toggle_challenge_limit_setting)
-	box.add_child(challenge_limit_setting_button)
-	var resource_row := HBoxContainer.new()
-	resource_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	resource_row.add_theme_constant_override("separation", 10)
-	var add_souls := _button("增加将魂 +10000")
-	_accent_button(add_souls, Color("#4c8b66"))
-	add_souls.pressed.connect(_on_add_debug_souls)
-	resource_row.add_child(add_souls)
-	var add_stars := _button("增加将星 +100")
-	_accent_button(add_stars, Color("#b78a43"))
-	add_stars.pressed.connect(_on_add_debug_stars)
-	resource_row.add_child(add_stars)
-	box.add_child(resource_row)
-	var lab_button := _button("平衡实验室")
-	_accent_button(lab_button, Color("#705f8f"))
-	lab_button.custom_minimum_size = Vector2(360, 46)
-	lab_button.pressed.connect(func(): settings_overlay.hide(); _show_balance_lab())
-	box.add_child(lab_button)
 	var close := _button(t("保存并返回", "SAVE & BACK"))
 	_accent_button(close, Color("#b98a4f"), true)
 	close.custom_minimum_size = Vector2(240, 48)
@@ -3475,6 +3500,13 @@ func _load_settings() -> void:
 		enemy_strategy_bonus = clampi(int(config.get_value("battle", "enemy_strategy_bonus", 0)), 0, 100)
 		tianshu_infinite_refresh = bool(config.get_value("debug", "tianshu_infinite_refresh", false))
 		limit_challenges = bool(config.get_value("battle", "limit_challenges", true))
+	if not _debug_tools_enabled():
+		# 正式包强制回退调试开关：即使配置里残留调试包写下的值(或被手动改配置)也不生效。
+		draft_faction_filter = ""
+		enemy_faction_filter = ""
+		enemy_strategy_bonus = 0
+		tianshu_infinite_refresh = false
+		limit_challenges = true
 	battle_speed = game_speed
 
 func _save_settings() -> void:
@@ -4122,7 +4154,6 @@ func _bond_graph_node_style(node: GraphNode, color: Color, border: Color) -> voi
 		titlebar_selected.border_color = border.lightened(0.35)
 		titlebar_selected.set_border_width_all(3)
 		node.add_theme_stylebox_override("titlebar_selected", titlebar_selected)
-		node.add_theme_color_override("title_color", Color("#4a3d26"))
 		node.add_theme_color_override("close_color", Color("#4a3d26"))
 		node.add_theme_color_override("resizable_color", Color("#4a3d26"))
 
@@ -4140,6 +4171,8 @@ func _add_bond_graph_node(node_name: String, title: String, body: String, positi
 	var label_color := Color("#f2ddaf") if is_bond else Color("#dce5e9")
 	if _light_mode():
 		label_color = Color("#5a4423") if is_bond else Color("#2c3a44")
+		# 标题(武将名/羁绊名)与正文统一用同款墨色：暖棕标题在部分阵营的纸色标题栏上发灰，武将名直接复用定位文字的颜色。
+		node.add_theme_color_override("title_color", label_color)
 	var label := _label(body, 14, label_color)
 	label.custom_minimum_size.x = 190 if is_bond else 120
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

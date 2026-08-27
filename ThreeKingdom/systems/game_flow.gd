@@ -547,6 +547,9 @@ func _on_player_cell(row: int, col: int) -> void:
 			pending.col = col
 			pending_unit_ids.pop_front()
 			_log(_hero_name(pending.hero_id) + t(" 已上阵。", " deployed."))
+			_play_sfx("deploy", -10.0, 100, 0.08)
+			if not is_instance_valid(skill_voice_player) or not skill_voice_player.playing:
+				_play_hero_voice(str(pending.hero_id))
 	elif occupant != null:
 		var selected: Variant = _find_by_id(player_units, selected_unit)
 		if selected != null and selected.row < 0:
@@ -557,9 +560,14 @@ func _on_player_cell(row: int, col: int) -> void:
 		var selected: Variant = _find_by_id(player_units, selected_unit)
 		if selected:
 			if not _can_unit_use_row(selected, row): return
+			var first_deploy := int(selected.row) < 0
 			selected.row = row
 			selected.col = col
-			_log(_hero_name(selected.hero_id) + t(" 已调整站位。", " repositioned."))
+			_log(_hero_name(selected.hero_id) + (t(" 已上阵。", " deployed.") if first_deploy else t(" 已调整站位。", " repositioned.")))
+			if first_deploy:
+				# 备战武将点选上阵：与拖拽上阵同款拔刀音 + 台词；场上换位保持安静。
+				_play_sfx("deploy", -10.0, 100, 0.08)
+				_play_hero_voice(str(selected.hero_id), true)
 		selected_unit = ""
 	_render()
 
