@@ -8,7 +8,7 @@ from docx.shared import Cm, Pt, RGBColor
 
 
 SOURCE = Path(r"C:\Users\admin\Downloads\privacy-policy-template.docx")
-OUTPUT = Path(r"D:\github\autobattler\TapTapAssets\战三国·弈定九州-隐私政策-待补全.docx")
+OUTPUT = Path(r"D:\github\autobattler\TapTapAssets\战三国·弈定九州-隐私政策.docx")
 
 
 def set_run_font(run, name="Microsoft YaHei", size=10.5, bold=False, color=None):
@@ -244,7 +244,7 @@ def build():
     status = doc.add_paragraph()
     status.alignment = WD_ALIGN_PARAGRAPH.CENTER
     status.paragraph_format.space_after = Pt(14)
-    run = status.add_run("待补全运营者信息版")
+    run = status.add_run("正式发布版")
     set_run_font(run, size=11, bold=True, color=(180, 105, 35))
 
     add_para(doc, "更新日期：2026年8月27日", align=WD_ALIGN_PARAGRAPH.RIGHT, after=2)
@@ -252,7 +252,7 @@ def build():
 
     p = add_para(
         doc,
-        "待补充后再公开：运营者法定名称（个人开发者填写真实姓名）、联系地址、联系邮箱。请勿仅填写工作室昵称。",
+        "本政策适用于《战三国·弈定九州》当前发布版本。",
         after=12,
     )
     for r in p.runs:
@@ -262,25 +262,20 @@ def build():
 
     add_para(
         doc,
-        "【请填写运营者法定名称】（品牌名称：序言工作室，以下简称“我们”）是游戏《战三国·弈定九州》的运营者。我们重视用户隐私，并依据实际功能说明本游戏如何处理信息。",
+        "王荣佳（品牌名称：序言工作室，以下简称“我们”）是游戏《战三国·弈定九州》的运营者。我们重视用户隐私，并依据实际功能说明本游戏如何处理信息。",
     )
     add_para(
         doc,
-        "本游戏目前为单机游戏，不提供账号注册、实名认证、充值、广告投放、社交聊天或 AI 合成服务。除玩家主动使用“GitHub 私有 Gist 手动同步”功能外，游戏不会将本地存档或个人信息上传至我们的服务器。",
+        "本游戏目前为纯本地单机游戏，不提供账号注册、实名认证、充值、广告投放、社交聊天、AI 合成或其他联网服务。游戏不会将本地存档或个人信息上传至我们的服务器。",
     )
 
     add_heading(doc, "一、我们如何收集和使用信息")
     add_para(doc, "1. 本地游戏数据", bold_prefix="1. 本地游戏数据")
     add_para(
         doc,
-        "为提供保存进度、读取进度、设置、天赋与符文成长、阵容和平衡实验室等功能，游戏会在您的设备本地保存游戏进度、设置项和您主动创建的配置数据。这些数据默认仅保存在设备本地，我们不会自动上传。",
+        "为提供保存进度、读取进度、设置、天赋与符文成长、阵容等单机功能，游戏会在您的设备本地保存游戏进度、设置项和阵容数据。这些数据仅保存在设备本地，我们不会上传。",
     )
-    add_para(doc, "2. 可选的 GitHub 私有 Gist 同步", bold_prefix="2. 可选的 GitHub 私有 Gist 同步")
-    add_para(
-        doc,
-        "平衡实验室提供可选的 GitHub 私有 Gist 手动同步功能。仅当您主动填写 GitHub Classic Token、Gist ID 并点击上传或下载时，游戏才会连接 GitHub API。Token 与 Gist ID 保存在您的设备本地；阵容数值覆盖文件会按照您的操作直接传输至您自己的 GitHub 私有 Gist。该功能由 GitHub 提供，我们不会接收或保存您的 GitHub Token、Gist ID 或同步内容。",
-    )
-    add_para(doc, "3. 我们不收集的信息", bold_prefix="3. 我们不收集的信息")
+    add_para(doc, "2. 我们不收集的信息", bold_prefix="2. 我们不收集的信息")
     for item in [
         "手机号、登录密码、真实姓名、身份证件号码或人脸信息；",
         "设备唯一标识符、通讯录、短信、通话记录、精确位置、相册、相机或麦克风内容；",
@@ -290,11 +285,11 @@ def build():
         add_bullet(doc, item, bullet_num_id)
 
     add_heading(doc, "二、设备权限与网络访问")
-    add_para(doc, "本游戏 APK 仅声明网络访问能力。该能力主要用于您主动选择的 GitHub 私有 Gist 同步；不使用该功能时，核心单机玩法、存档和设置无需联网。Android 的网络访问能力通常不会弹出运行时授权窗口。")
+    add_para(doc, "本游戏 APK 当前声明基础网络访问能力，但正式版本未启用任何联网业务，不会主动通过网络收集或上传您的信息。核心玩法、存档和设置均无需联网。Android 的网络访问能力通常不会弹出运行时授权窗口。")
     table = doc.add_table(rows=2, cols=4)
     configure_table(table, [1700, 3000, 2500, 2160])
     headers = ["能力/权限", "使用目的", "是否主动触发", "能否避免"]
-    values = ["网络访问", "可选的 GitHub 私有 Gist 上传与下载", "是，仅在用户点击同步时", "可以；不使用同步功能即可"]
+    values = ["网络访问", "正式版未启用联网业务，不用于收集或上传信息", "否", "正式版无需联网"]
     for i, text in enumerate(headers):
         set_cell_text(table.rows[0].cells[i], text, bold=True, color=(255, 255, 255))
         shade_cell(table.rows[0].cells[i], "8E3E2A")
@@ -304,27 +299,24 @@ def build():
 
     add_heading(doc, "三、信息的保存与删除")
     add_para(doc, "本地游戏数据保存在您的设备应用数据目录中，保存期限由您决定。您可通过游戏内的新游戏/重置功能、Android 系统的“清除存储数据”功能或卸载游戏删除本地数据。")
-    add_para(doc, "如您使用 GitHub 私有 Gist 同步，相关数据的保存期限、删除方式和账号管理由您在 GitHub 中控制。您可以在 GitHub 删除对应 Gist、撤销 Token 或删除 GitHub 账号。")
 
     add_heading(doc, "四、Cookies 和同类技术")
     add_para(doc, "本游戏不使用 Cookies、网页跟踪像素或广告跟踪技术。")
 
     add_heading(doc, "五、共享、转让与公开披露")
-    add_para(doc, "我们不会出售、出租、共享、转让或公开披露您的个人信息。只有在法律法规明确要求或有权机关依法提出要求时，我们才可能依法履行相应义务。可选 GitHub 同步是您与 GitHub 之间的直接传输，不属于我们向第三方共享您的信息。")
+    add_para(doc, "我们不会出售、出租、共享、转让或公开披露您的个人信息。只有在法律法规明确要求或有权机关依法提出要求时，我们才可能依法履行相应义务。")
 
     add_heading(doc, "六、第三方服务")
-    add_para(doc, "本游戏不接入广告、统计、支付或账号登录 SDK。可选同步功能使用 GitHub API。GitHub 对信息的处理适用其隐私声明：")
-    add_para(doc, "GitHub Privacy Statement：https://docs.github.com/zh/site-policy/privacy-policies/github-general-privacy-statement")
+    add_para(doc, "本游戏不接入广告、统计、支付、账号登录或其他处理个人信息的第三方 SDK 或服务。")
     add_para(doc, "玩家通过 TapTap 下载或浏览游戏页面时，TapTap 可能按照其自身隐私政策处理相关信息；该处理由 TapTap 独立负责。")
 
     add_heading(doc, "七、我们如何保护信息")
-    add_para(doc, "我们遵循数据最小化原则，尽可能让游戏数据仅保存在您的设备本地。请您妥善保管自行填写的 GitHub Token，不要向他人泄露，并建议只授予完成同步所需的最小权限。任何互联网传输都无法保证绝对安全，请您在使用可选同步功能前充分了解相关风险。")
+    add_para(doc, "我们遵循数据最小化原则，让游戏数据仅保存在您的设备本地。请您妥善保管设备并使用系统提供的安全保护措施，避免本地游戏数据因设备丢失、损坏或被他人使用而泄露或丢失。")
 
     add_heading(doc, "八、您的权利")
     for item in [
         "访问和更正：您可以在游戏内查看并修改设置、进度和自定义配置；",
-        "删除：您可以清除本地应用数据或卸载游戏；使用 GitHub 同步时，可在 GitHub 删除对应 Gist；",
-        "撤回同意：不使用 GitHub 同步功能，或删除本地保存的 Token/Gist ID 并撤销 GitHub Token；",
+        "删除：您可以通过 Android 系统清除本地应用数据或卸载游戏；",
         "投诉与咨询：您可以通过本政策末尾的联系方式联系我们。",
     ]:
         add_bullet(doc, item, bullet_num_id)
@@ -337,10 +329,10 @@ def build():
 
     add_heading(doc, "十一、如何联系我们")
     contact_rows = [
-        ("运营者法定名称", "【请填写；个人开发者填写真实姓名】"),
+        ("运营者法定名称", "王荣佳"),
         ("品牌名称", "序言工作室"),
-        ("联系地址", "【请填写可接收联系的地址】"),
-        ("联系邮箱", "【请填写长期有效的客服邮箱】"),
+        ("联系地址", "江苏省苏州市虎丘区"),
+        ("联系邮箱", "2738890457@qq.com"),
     ]
     contact = doc.add_table(rows=len(contact_rows), cols=2)
     configure_table(contact, [2600, 6760])
@@ -353,7 +345,7 @@ def build():
     footer = section.footer
     footer_p = footer.paragraphs[0]
     footer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer_p.text = "《战三国·弈定九州》隐私政策 · 待补全运营者信息后公开"
+    footer_p.text = "《战三国·弈定九州》隐私政策"
     for r in footer_p.runs:
         set_run_font(r, size=8.5, color=(120, 120, 120))
 

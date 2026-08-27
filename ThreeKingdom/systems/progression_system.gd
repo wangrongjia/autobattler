@@ -15,6 +15,7 @@ const DIFFICULTIES := [
 	{"name":"王者", "en":"KING", "hp":1.7, "strategy":70},
 	{"name":"地狱", "en":"HELL", "hp":2.0, "strategy":100}
 ]
+const CHALLENGE_STRATEGY_FLAT_BONUS := 20  # 闯关全局敌方兵略加成:所有关卡在 关卡+难度 基础上再 +20
 const RUNE_TIERS := [
 	{"name":"一阶", "color":"白", "hex":"#dedede", "chance":0.50, "power":4.0, "balanced":2.5, "extreme":5.0, "penalty":1.0, "convert":100},
 	{"name":"二阶", "color":"绿", "hex":"#68bf72", "chance":0.30, "power":6.0, "balanced":3.5, "extreme":7.5, "penalty":1.5, "convert":200},
@@ -161,7 +162,7 @@ func _is_stage_unlocked(stage: int, difficulty: int) -> bool:
 
 func _challenge_strategy_bonus() -> float:
 	if game_mode != "challenge": return float(enemy_strategy_bonus)
-	return float(selected_stage * 10 + int(DIFFICULTIES[selected_difficulty].strategy))
+	return float(selected_stage * 10 + int(DIFFICULTIES[selected_difficulty].strategy) + CHALLENGE_STRATEGY_FLAT_BONUS)
 
 func _challenge_stage_strategy_bonus(stage := selected_stage) -> int:
 	return clampi(int(stage), 1, STAGE_NAMES.size()) * 10

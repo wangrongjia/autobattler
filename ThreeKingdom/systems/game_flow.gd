@@ -7,6 +7,7 @@ func _new_game() -> void:
 	_reset_tianshu_run()
 	_reset_economy_run()
 	_roll_hell_theme()
+	_roll_enemy_factions()
 	player_ruler_hp = _player_ruler_max_hp()
 	enemy_ruler_hp = RULER_MAX_HP
 	ruler_regen = {"player":{"amount":0.0, "time":0.0, "clock":0.0}, "enemy":{"amount":0.0, "time":0.0, "clock":0.0}}
@@ -41,6 +42,10 @@ func _new_game() -> void:
 			var faction_names := []
 			for faction in player_factions: faction_names.append(_faction_name(faction))
 			_log("[color=#e5c97a]本关出战阵营限定：%s。选将与阵营天书只会出现上述阵营。[/color]" % "、".join(faction_names))
+		if enemy_factions.size() > 0 and enemy_factions.size() < 4:
+			var enemy_names := []
+			for faction in enemy_factions: enemy_names.append(_faction_name(faction))
+			_log("[color=#e8916d]本关敌军出没阵营：%s。敌方增援只会从上述阵营中刷新。[/color]" % "、".join(enemy_names))
 	elif game_mode == "tianshu":
 		_log("[color=#e5a8ff]天书演武开始：第 3/6/9/12/15 回合免费选天书，其他抽取可在天书阁购买。[/color]")
 	elif game_mode == "tutorial":
@@ -105,7 +110,7 @@ func _save_game(silent := false) -> bool:
 		"version":7, "round_number":round_number, "phase":phase, "game_mode":game_mode,
 		"selected_stage":selected_stage, "selected_difficulty":selected_difficulty,
 		"hell_faction":hell_faction, "hell_theme_name":hell_theme_name,
-		"player_factions":player_factions,
+		"player_factions":player_factions, "enemy_factions":enemy_factions,
 		"player_ruler_hp":player_ruler_hp, "enemy_ruler_hp":enemy_ruler_hp,
 		"player_units":player_units, "enemy_units":enemy_units,
 		"draft_roster_baseline":draft_roster_baseline,
@@ -163,6 +168,15 @@ func _load_game() -> bool:
 				player_factions.append(fid)
 	if game_mode == "challenge" and selected_difficulty >= 4 and hell_faction.is_empty():
 		_roll_hell_theme() # 旧存档没有阵营字段:读档时补随机一次
+	# 敌方出没阵营:仅简单/一般/困难存档携带;旧存档无此字段则补随机一次。
+	enemy_factions.clear()
+	if game_mode == "challenge" and selected_difficulty < 3:
+		for faction in data.get("enemy_factions", []):
+			var enemy_fid := str(faction)
+			if enemy_fid in ["shu", "wei", "wu", "qun"] and not enemy_factions.has(enemy_fid):
+				enemy_factions.append(enemy_fid)
+		if enemy_factions.is_empty():
+			_roll_enemy_factions()
 	round_number = int(data.round_number)
 	phase = str(data.phase)
 	player_ruler_hp = int(data.player_ruler_hp)
@@ -370,6 +384,16 @@ func _roll_hell_theme() -> void:
 	var themes: Array = HELL_THEMES.filter(func(theme): return str(theme.faction) == hell_faction)
 	hell_theme_name = str(themes[rng.randi_range(0, themes.size() - 1)].name) if not themes.is_empty() else "地狱·全面压制"
 
+func _roll_enemy_factions() -> void:
+	# 简单/一般/困难:开局随机锁定敌方出没阵营,简单2个/一般3个/困难4个(全阵营)。
+	# 王者走羁绊三人组、地狱另有整局阵营锁,均不在此时限制;非闯关对局清空。
+	enemy_factions.clear()
+	if game_mode != "challenge" or selected_difficulty >= 3: return
+	var factions := ["shu", "wei", "wu", "qun"]
+	factions.shuffle()
+	for index in range(2 + selected_difficulty):
+		enemy_factions.append(str(factions[index]))
+
 func _add_enemy_wave() -> void:
 	# 通用规则:每回合增援一批敌将;场上15格满员(全为存活敌将)时不增援,阵亡空位后继续补充。
 	# 波次人数:默认3;王者第1~2关4人;地狱第1~2轮5人(压制玩家阵营天赋的开局爆兵),之后恢复3。
@@ -407,7 +431,15 @@ func _add_enemy_wave() -> void:
 		wave = _hell_wave_picks(wave_limit)
 	else:
 		# 简单/一般/困难/其它模式:随机3名(可重复出现同名新单位)
-		var random_pool: Array = heroes.keys().filter(func(hero_id): return enemy_faction_filter.is_empty() or str(heroes[hero_id].f) == enemy_faction_filter)
+		# 简单/一般/困难时先按本局随机锁定的敌方出没阵营过滤,再叠加手动设置的阵营过滤。
+		var random_pool: Array = heroes.keys().filter(func(hero_id):
+			var faction := str(heroes[hero_id].f)
+			if not enemy_factions.is_empty() and not enemy_factions.has(faction): return false
+			return enemy_faction_filter.is_empty() or faction == enemy_faction_filter
+		)
+		if random_pool.is_empty():
+			# 手动阵营过滤与出没阵营无交集时,退回仅按出没阵营刷新,保证增援不缺员。
+			random_pool = heroes.keys().filter(func(hero_id): return enemy_factions.is_empty() or enemy_factions.has(str(heroes[hero_id].f)))
 		random_pool.shuffle()
 		wave = random_pool.slice(0, wave_limit)
 	var wave_names: Array[String] = []

@@ -520,7 +520,10 @@ func _build_ui() -> void:
 				var stream: AudioStream = load(path)
 				if stream != null: streams.append(stream)
 		if not streams.is_empty(): sfx_streams[category] = streams
-	_update_bgm()
+	if _bgm_target.is_empty():
+		_update_bgm()  # 首次构建：按当前模式从静音淡入
+	else:
+		_resume_bgm_after_rebuild()  # 主题切换重建：BGM 节点已是全新实例，需立即接续播放
 	var bg := TextureRect.new()
 	var gradient := Gradient.new()
 	# 玄墨：冷调夜色渐变；绢纸：米黄纸面渐变(偏黄的白)。
@@ -1994,7 +1997,7 @@ func _render_stage_grid() -> void:
 		button.disabled = not unlocked
 		var difficulty_colors := [Color("#c8953e"), Color("#48765e"), Color("#3f688e"), Color("#774694"), Color("#963f37")]
 		_accent_button(button, difficulty_colors[difficulty], stage == selected_stage and unlocked)
-		button.tooltip_text = "关卡兵略 +%d；难度生命 +%d%%、兵略 +%d" % [_challenge_stage_strategy_bonus(stage), roundi((float(DIFFICULTIES[difficulty].hp) - 1.0) * 100.0), _challenge_difficulty_strategy_bonus(difficulty)]
+		button.tooltip_text = "关卡兵略 +%d；全局兵略 +%d；难度生命 +%d%%、兵略 +%d" % [_challenge_stage_strategy_bonus(stage), CHALLENGE_STRATEGY_FLAT_BONUS, roundi((float(DIFFICULTIES[difficulty].hp) - 1.0) * 100.0), _challenge_difficulty_strategy_bonus(difficulty)]
 		button.pressed.connect(_select_challenge_stage.bind(stage, difficulty))
 		challenge_stage_grid.add_child(button)
 	var tab_colors := [Color("#d5a846"), Color("#4e8063"), Color("#426c91"), Color("#8250a0"), Color("#a3483d")]
@@ -2021,10 +2024,11 @@ func _render_challenge_detail() -> void:
 		challenge_detail_stage_label.text = "第 %02d 关\n%s · %s\n进行中：回合 %d / 15\n历史最佳 %s" % [selected_stage, STAGE_NAMES[selected_stage - 1], str(data.name), int(run.round), "★".repeat(best) + "☆".repeat(3 - best)]
 	else:
 		challenge_detail_stage_label.text = "第 %02d 关\n%s · %s\n历史最佳 %s" % [selected_stage, STAGE_NAMES[selected_stage - 1], str(data.name), "★".repeat(best) + "☆".repeat(3 - best)]
-	var total_strategy := _challenge_stage_strategy_bonus() + _challenge_difficulty_strategy_bonus()
-	challenge_detail_bonus_label.text = "当前关卡敌方阵营加成\n  兵略 +%d\n\n当前难度敌方阵营加成\n  初始生命 +%d%%\n  兵略 +%d\n\n最终兵略加成：+%d" % [_challenge_stage_strategy_bonus(), roundi((float(data.hp) - 1.0) * 100.0), _challenge_difficulty_strategy_bonus(), total_strategy]
+	var total_strategy := _challenge_stage_strategy_bonus() + _challenge_difficulty_strategy_bonus() + CHALLENGE_STRATEGY_FLAT_BONUS
+	challenge_detail_bonus_label.text = "当前关卡敌方阵营加成\n  兵略 +%d\n\n全局敌方加成\n  兵略 +%d\n\n当前难度敌方阵营加成\n  初始生命 +%d%%\n  兵略 +%d\n\n最终兵略加成：+%d" % [_challenge_stage_strategy_bonus(), CHALLENGE_STRATEGY_FLAT_BONUS, roundi((float(data.hp) - 1.0) * 100.0), _challenge_difficulty_strategy_bonus(), total_strategy]
 	if _challenge_faction_pick_count(difficulty) > 0:
 		challenge_detail_bonus_label.text += "\n\n出战阵营：开局需选择 %d 个阵营，本关仅刷新所选阵营的武将与阵营天书。" % _challenge_faction_pick_count(difficulty)
+		challenge_detail_bonus_label.text += "\n敌军出没阵营：敌方增援仅从随机 %d 个阵营中刷新。" % (2 + difficulty)
 	challenge_detail_star_label.text = "★ 战斗胜利\n\n★ 主公结算生命 > 50,000\n\n★ 主公结算生命 > 80,000\n\n将星仅在刷新该难度历史星级时补发。"
 	challenge_start_button.text = ("继续战斗（回合 %d / 15）" % int(run.round)) if run_here else "开始战斗"
 	challenge_start_button.disabled = not _is_stage_unlocked(selected_stage, difficulty)
@@ -4235,10 +4239,16 @@ func _on_encyclopedia_bond_node_deselected(_node: Node) -> void:
 
 func _bond_graph_node_style(node: GraphNode, color: Color, border: Color) -> void:
 	var panel := StyleBoxFlat.new()
+	var border_width := 2
+	if _light_mode():
+		# 绢纸主题:纸面画布与节点底都很亮,原阵营色/金色描边被冲淡看不清——
+		# 描边压深、提饱和并加粗一档,让武将框线在纸面上清晰可辨。
+		border = Color.from_hsv(border.h, clampf(border.s * 1.18, 0.0, 1.0), clampf(border.v * 0.60, 0.30, 0.58))
+		border_width = 3
 	# 绢纸主题下节点底同步转纸色，标题栏用略深纸色 + 墨字，保证羁绊图文字对比清晰。
 	panel.bg_color = _panel_color(color)
 	panel.border_color = border
-	panel.set_border_width_all(2)
+	panel.set_border_width_all(border_width)
 	panel.set_corner_radius_all(10)
 	panel.content_margin_left = 10
 	panel.content_margin_right = 10
@@ -4928,6 +4938,16 @@ func _bgm_fade(player: AudioStreamPlayer, fade_in: bool) -> void:
 	else:
 		tween.tween_property(player, "volume_db", BGM_FADE_FLOOR_DB, BGM_FADE_TIME)
 		tween.tween_callback(player.stop)
+
+func _resume_bgm_after_rebuild() -> void:
+	# 主题切换整体重建界面后，BGM 节点全是新实例：旧节点随 queue_free 释放，而 _bgm_target
+	# 仍等于当前模式，直接调 _update_bgm() 会因"目标未变化"提前返回，新节点永远不会 play()，
+	# 表现为切换主题后 BGM 停播。这里让当前模式对应的全新节点立即以常规音量接续播放(不淡入，避免断层)。
+	_bgm_tweens.clear()  # 旧渐变绑定的是已释放节点，一并清掉
+	var player: AudioStreamPlayer = battle_bgm_player if battle_running else peace_bgm_player
+	if not is_instance_valid(player) or player.stream == null: return
+	player.volume_db = BGM_VOLUME_DB
+	player.play()
 
 func _update_bgm() -> void:
 	# 战斗期间播放战斗 BGM，非战斗场景(主菜单/三选一/备战/天书/结算)播放和平 BGM；切换时交叉淡入淡出。
