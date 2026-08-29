@@ -514,7 +514,7 @@ func _hero_army_name(hero_id: String) -> String:
 	return _army_name(int(heroes[hero_id].range))
 
 func _phase_name() -> String:
-	var map := {"tianshu":["天书", "CODEX"], "draft":["选将", "DRAFT"], "placement":["布阵", "FORMATION"], "combat":["战斗", "COMBAT"], "finished":["结算", "RESULT"]}
+	var map := {"tianshu":["天书", "CODEX"], "draft":["选将", "DRAFT"], "placement":["布阵", "FORMATION"], "combat":["战斗", "COMBAT"], "checkpoint":["据点", "CHECKPOINT"], "finished":["结算", "RESULT"]}
 	return map[phase][0 if language == "zh" else 1]
 
 func _action_odds(hero_id: String) -> String:

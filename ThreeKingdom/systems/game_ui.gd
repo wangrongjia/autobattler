@@ -118,6 +118,21 @@ var tianshu_purchase_button: Button
 var tianshu_replace_confirm: ConfirmationDialog
 var tianshu_replace_pending := ""
 var tianshu_view_only := false
+var endless_header_button: Button
+var endless_continue_button: Button
+var endless_overview_overlay: Control
+var endless_player_summary_label: RichTextLabel
+var endless_enemy_summary_label: RichTextLabel
+var checkpoint_overlay: Control
+var checkpoint_strategy_box: HBoxContainer
+var checkpoint_summary_box: HBoxContainer
+var checkpoint_continue_button: Button
+var checkpoint_reward_label: Label
+var imprint_overlay: Control
+var imprint_hero_options: OptionButton
+var imprint_currency_label: Label
+var imprint_tree_box: VBoxContainer
+var imprint_selected_hero := "guanyu"
 var sell_layer: CanvasLayer
 var sell_zone: Control
 var sell_zone_label: Label
@@ -822,6 +837,13 @@ func _build_ui() -> void:
 	tianshu_header_button.pressed.connect(_show_tianshu_collection)
 	tianshu_header_button.hide()
 	reserve_row.add_child(tianshu_header_button)
+	endless_header_button = _button("∞ 军情总览")
+	_accent_button(endless_header_button, Color("#a56c45"), true)
+	endless_header_button.custom_minimum_size = Vector2(170, 96)
+	endless_header_button.add_theme_font_size_override("font_size", 16)
+	endless_header_button.pressed.connect(_show_endless_overview)
+	endless_header_button.hide()
+	reserve_row.add_child(endless_header_button)
 	root.add_child(reserve_panel)
 	tick_timer = Timer.new()
 	tick_timer.wait_time = TICK
@@ -1710,6 +1732,8 @@ func _build_intro_popup() -> void:
 		c + "三大属性" + e + "\n[b]生命[/b]：武将的生存基础。\n[b]兵略值[/b]：全员基准 100，决定技能强度——\"230% 兵略值伤害\"即造成 100×2.3 = 230 点伤害。天赋、符文可提高兵略，从而放大所有技能。\n[b]技能冷却[/b]：行动条攒满一轮所需的时间，冷却越短出手越快。\n\n" + c + "冷却极速规则（重要）" + e + "\n· 实际冷却 = 基础冷却 × 100/(100+极速)；\n· 极速 100 时冷却减半，极速 200 时减少 2/3；\n· 英雄、天赋、符文与天书的极速进入同一池，叠加收益递减；\n· 最终冷却[b]最低 2 秒[/b]。\n\n" + c + "永久养成" + e + "\n[b]将星[/b]：通关按主公剩余血量评 1~3 星，用于点亮天赋树（5 棵：通用+四阵营，2 星=1 点）。\n[b]将魂[/b]：每次通关都给，未通关按敌方主公战损比例等比发放，用于抽符文（单抽 200、十连 2000）。符文分正（单属性）/ 均（双属性）/ 极（一减一增），两枚同阶可合成一枚高阶，每名武将最多装备 6 枚。"))
 	tabs.add_child(_intro_rich_page(t("战场规则", "BATTLE"),
 		c + "前军 / 中军 / 后军" + e + "\n前军[b]只能站前排且只打前排[/b]；中军站前排可打全场、站中排打前中排、站后排只打前排；后军[b]任意站位随机攻击全场[/b]。合理利用站位改变射程是布阵的核心。\n\n" + c + "行动条" + e + "\n武将行动条从 0 涨到 100 即行动一次并施放技能；增速受减速、沉默影响，眩晕/冻结/魅惑/恐惧期间停止。\n\n" + c + "常见战斗效果" + e + "\n眩晕（停止行动）、冻结（停止，受伤提前解冻并追加破冰伤害）、魅惑（停止）、恐惧（停止+持续伤害）、中毒（层数伤害，逐秒衰减）、灼烧（持续伤害）、减速（行动条变慢）、易碎（受到伤害提高）。\n\n" + c + "羁绊" + e + "\n[b]阵营羁绊[/b]：按场上同阵营人数 2/5/8 分三档——蜀承伤降低、魏控制时长提高、吴最大生命提高、群冷却缩短，8 人时各解锁强力终极效果。\n[b]组合羁绊[/b]：特定武将组合触发（桃园结义、五虎上将、四英杰等），完整关系见 图鉴 → 羁绊图。"))
+	tabs.add_child(_intro_rich_page(t("无尽远征", "ENDLESS"),
+		c + "核心节奏" + e + "\n我方通过战策、天书和将印获得[b]可选择的线性成长与特殊机制[/b]；敌军最大生命和兵略按回合[b]指数成长[/b]，最终一定会超过玩家。敌军行动速度最多提高 10%，冷却极速最多 12，因此后期压力主要来自数值而不是无限施法。\n\n" + c + "全军共享养成" + e + "\n所有局内成长都写入全军共享快照：当前上阵武将、备战席武将和之后才招募的武将获得完全相同的加成。最大生命成长以固定值加法为主，不会形成黄盖等生命换伤武将的多层百分比膨胀。\n\n" + c + "据点与情报" + e + "\n每 5 回合进入据点，战策[b]三选一且只能锁定一项[/b]。据点页和备战区的“军情总览”会并列显示我方已有加成、敌方指数倍率、全部公开军势以及下一阶段预告。\n\n" + c + "将印树" + e + "\n第 15 回合起据点掉落通用将印。每名武将拥有固本、砺锋、疾行三路根基，以及守势、破阵、先机三路专精；三路各投入后可点亮名将之印。将印只在无尽模式生效。"))
 	intro_popup.hide()
 
 func _full_overlay(z: int = 1150, art_variant: int = PremiumUIArt.Variant.BACKDROP, accent := UI_GOLD) -> ColorRect:
@@ -1815,6 +1839,17 @@ func _build_battle_menu() -> void:
 	challenge_difficulty_options.hide()
 	var challenge_note := _label("二十城池 · 五档难度 · 每关三星", 14, Color("#ad8355"))
 	challenge_header.add_child(challenge_note)
+	var endless_line := HBoxContainer.new()
+	endless_line.add_theme_constant_override("separation", 6)
+	var endless_start := _button("∞ 开始无尽")
+	_accent_button(endless_start, Color("#9a5f38"), true)
+	endless_start.pressed.connect(_start_endless_from_menu)
+	endless_line.add_child(endless_start)
+	endless_continue_button = _button("继续无尽")
+	_accent_button(endless_continue_button, Color("#76563d"))
+	endless_continue_button.pressed.connect(_continue_endless_from_menu)
+	endless_line.add_child(endless_continue_button)
+	challenge_header.add_child(endless_line)
 	challenge_panel.add_child(challenge_header)
 	mode_row.add_child(challenge_panel)
 	root.add_child(mode_row)
@@ -1929,9 +1964,291 @@ func _build_battle_menu() -> void:
 	challenge_restart_button.pressed.connect(_on_challenge_restart)
 	challenge_restart_button.hide()
 	detail_box.add_child(challenge_restart_button)
+	_build_endless_overlays()
+
+func _build_endless_overlays() -> void:
+	# 军情总览：我方/敌方并列，所有已生效内容在一个页面看全。
+	endless_overview_overlay = _full_overlay(1660, PremiumUIArt.Variant.MAP, Color("#a56c45"))
+	var overview_root := _overlay_panel(endless_overview_overlay, "无尽远征 · 军情总览", func(): endless_overview_overlay.hide())
+	var overview_note := _label("我方采用全阵容共享的线性成长；敌军生命与兵略指数成长，行动和冷却仅小幅提升。", 16, Color("#d9c08a"))
+	overview_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	overview_root.add_child(overview_note)
+	var summaries := HBoxContainer.new()
+	summaries.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	summaries.add_theme_constant_override("separation", 14)
+	overview_root.add_child(summaries)
+	var player_panel := PanelContainer.new()
+	player_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	player_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_style(player_panel, Color("#10231cdc"), 6, Color("#5e9b78"), 2)
+	endless_player_summary_label = RichTextLabel.new()
+	endless_player_summary_label.bbcode_enabled = true
+	endless_player_summary_label.scroll_active = true
+	endless_player_summary_label.add_theme_font_size_override("normal_font_size", 17)
+	endless_player_summary_label.add_theme_color_override("default_color", Color("#dcebdc"))
+	player_panel.add_child(endless_player_summary_label)
+	summaries.add_child(player_panel)
+	var enemy_panel := PanelContainer.new()
+	enemy_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	enemy_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_style(enemy_panel, Color("#2a1514dc"), 6, Color("#a75e52"), 2)
+	endless_enemy_summary_label = RichTextLabel.new()
+	endless_enemy_summary_label.bbcode_enabled = true
+	endless_enemy_summary_label.scroll_active = true
+	endless_enemy_summary_label.add_theme_font_size_override("normal_font_size", 17)
+	endless_enemy_summary_label.add_theme_color_override("default_color", Color("#f0d7d1"))
+	enemy_panel.add_child(endless_enemy_summary_label)
+	summaries.add_child(enemy_panel)
+	var overview_actions := HBoxContainer.new()
+	overview_actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	var imprint_button := _button("将印树 · 永久养成")
+	imprint_button.custom_minimum_size = Vector2(260, 48)
+	_accent_button(imprint_button, Color("#8c6541"), true)
+	imprint_button.pressed.connect(_show_imprint_overlay)
+	overview_actions.add_child(imprint_button)
+	overview_root.add_child(overview_actions)
+
+	# 据点页：奖励、双方汇总、战策三选一、继续远征。
+	checkpoint_overlay = _full_overlay(1780, PremiumUIArt.Variant.MAP, Color("#b4783d"))
+	var checkpoint_root := _overlay_panel(checkpoint_overlay, "无尽远征 · 据点整备", _on_checkpoint_overlay_close)
+	checkpoint_reward_label = _label("", 18, Color("#f0c77a"))
+	checkpoint_reward_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	checkpoint_root.add_child(checkpoint_reward_label)
+	checkpoint_summary_box = HBoxContainer.new()
+	checkpoint_summary_box.custom_minimum_size.y = 230
+	checkpoint_summary_box.add_theme_constant_override("separation", 12)
+	checkpoint_root.add_child(checkpoint_summary_box)
+	var choose_title := _label("战策三选一 · 本据点只能锁定一项", 23, Color("#f0c77a"))
+	choose_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	checkpoint_root.add_child(choose_title)
+	checkpoint_strategy_box = HBoxContainer.new()
+	checkpoint_strategy_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	checkpoint_strategy_box.add_theme_constant_override("separation", 12)
+	checkpoint_root.add_child(checkpoint_strategy_box)
+	var checkpoint_actions := HBoxContainer.new()
+	checkpoint_actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	checkpoint_actions.add_theme_constant_override("separation", 12)
+	var checkpoint_imprint := _button("查看将印树")
+	checkpoint_imprint.custom_minimum_size = Vector2(210, 50)
+	checkpoint_imprint.pressed.connect(_show_imprint_overlay)
+	checkpoint_actions.add_child(checkpoint_imprint)
+	checkpoint_continue_button = _button("继续远征")
+	checkpoint_continue_button.custom_minimum_size = Vector2(260, 50)
+	_accent_button(checkpoint_continue_button, Color("#9b6537"), true)
+	checkpoint_continue_button.pressed.connect(_on_checkpoint_continue)
+	checkpoint_actions.add_child(checkpoint_continue_button)
+	checkpoint_root.add_child(checkpoint_actions)
+
+	# 将印树：英雄筛选 + 三路分层节点，移动端也能顺序阅读。
+	imprint_overlay = _full_overlay(1900, PremiumUIArt.Variant.CODEX, Color("#9b7147"))
+	var imprint_root := _overlay_panel(imprint_overlay, "将印树 · 名将专精", func(): imprint_overlay.hide())
+	var imprint_top := HBoxContainer.new()
+	imprint_top.add_theme_constant_override("separation", 10)
+	imprint_hero_options = OptionButton.new()
+	imprint_hero_options.custom_minimum_size = Vector2(300, 48)
+	var hero_ids: Array = heroes.keys()
+	hero_ids.sort_custom(func(a, b): return _hero_name(str(a)) < _hero_name(str(b)))
+	for hero_id in hero_ids:
+		imprint_hero_options.add_item("%s · %s" % [_faction_name(str(heroes[hero_id].f)), _hero_name(str(hero_id))])
+		imprint_hero_options.set_item_metadata(imprint_hero_options.item_count - 1, str(hero_id))
+	imprint_hero_options.item_selected.connect(_on_imprint_hero_selected)
+	imprint_top.add_child(imprint_hero_options)
+	imprint_currency_label = _label("", 18, Color("#f0c77a"))
+	imprint_currency_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	imprint_currency_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	imprint_top.add_child(imprint_currency_label)
+	var refund := _button("重置当前武将")
+	refund.custom_minimum_size = Vector2(190, 44)
+	refund.pressed.connect(_on_imprint_refund)
+	imprint_top.add_child(refund)
+	imprint_root.add_child(imprint_top)
+	var imprint_hint := _label("三路根基 → 三路专精 → 名将之印。节点效果只在无尽模式生效，点击可升级。", 16, Color("#c9b98f"))
+	imprint_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	imprint_root.add_child(imprint_hint)
+	var imprint_scroll := ScrollContainer.new()
+	imprint_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	imprint_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_enable_touch_scroll(imprint_scroll, false, true)
+	imprint_root.add_child(imprint_scroll)
+	imprint_tree_box = VBoxContainer.new()
+	imprint_tree_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	imprint_tree_box.add_theme_constant_override("separation", 10)
+	imprint_scroll.add_child(imprint_tree_box)
+
+func _start_endless_from_menu() -> void:
+	menu_overlay.hide()
+	battle_menu_overlay.hide()
+	_endless_start_game()
+
+func _continue_endless_from_menu() -> void:
+	menu_overlay.hide()
+	battle_menu_overlay.hide()
+	if not _load_game(EndlessRules.SAVE_PATH):
+		menu_overlay.show()
+
+func _show_endless_overview() -> void:
+	if not _run_is_endless(): return
+	_render_endless_overview()
+	endless_overview_overlay.show()
+
+func _render_endless_overview() -> void:
+	if not is_instance_valid(endless_player_summary_label): return
+	endless_player_summary_label.text = "[font_size=23][color=#8fd4a0]我方养成汇总[/color][/font_size]\n\n" + _endless_player_summary()
+	endless_enemy_summary_label.text = "[font_size=23][color=#e8916d]敌方强化汇总[/color][/font_size]\n\n" + _endless_enemy_summary()
+
+func _summary_card(title_text: String, body: String, friendly: bool) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_style(panel, Color("#10231cdd") if friendly else Color("#2a1514dd"), 5, Color("#5e9b78") if friendly else Color("#a75e52"), 2)
+	var text_box := RichTextLabel.new()
+	text_box.bbcode_enabled = true
+	text_box.scroll_active = true
+	text_box.add_theme_font_size_override("normal_font_size", 15)
+	text_box.add_theme_color_override("default_color", Color("#dcebdc") if friendly else Color("#f0d7d1"))
+	text_box.text = "[font_size=19][b]%s[/b][/font_size]\n%s" % [title_text, body]
+	panel.add_child(text_box)
+	return panel
+
+func _render_checkpoint_overlay() -> void:
+	if not is_instance_valid(checkpoint_overlay): return
+	var payload := _endless_checkpoint_payload()
+	checkpoint_reward_label.text = "据点 %d · 第 %d 回合　将魂 +%d%s" % [int(payload.checkpoint), int(payload.round), int(payload.souls), "　将印 +%d" % int(payload.imprints) if int(payload.imprints) > 0 else ""]
+	_clear_dynamic_children(checkpoint_summary_box)
+	checkpoint_summary_box.add_child(_summary_card("我方已有加成", str(payload.player_summary), true))
+	checkpoint_summary_box.add_child(_summary_card("敌方已有加成", str(payload.enemy_summary), false))
+	_clear_dynamic_children(checkpoint_strategy_box)
+	for candidate in payload.candidates:
+		var id := str(candidate.id)
+		var selected := str(payload.selected) == id
+		var panel := PanelContainer.new()
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_style(panel, Color("#163023ed") if selected else Color("#1b1813ed"), 6, Color("#73b48a") if selected else Color("#8e673d"), 3 if selected else 1)
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 8)
+		panel.add_child(box)
+		var tag := _label("◆ %s ◆" % str(candidate.tag), 15, Color("#b7a178"))
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(tag)
+		var name_label := _label(str(candidate.name), 25, Color("#f0c77a") if not selected else Color("#9fe0ae"))
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(name_label)
+		var level_label := _label("Lv%d → Lv%d / %d" % [int(candidate.current), int(candidate.next), int(candidate.max)], 16, Color("#d5c6a7"))
+		level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(level_label)
+		var desc := _label(str(candidate.desc), 17, Color("#e2d8c3"))
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		desc.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		box.add_child(desc)
+		var pick := _button("已锁定" if selected else "选择此战策")
+		pick.disabled = not bool(payload.pending)
+		_accent_button(pick, Color("#5f9a72") if selected else Color("#9b6537"), true)
+		pick.pressed.connect(_on_checkpoint_strategy.bind(id))
+		box.add_child(pick)
+		checkpoint_strategy_box.add_child(panel)
+	if (payload.candidates as Array).is_empty():
+		checkpoint_strategy_box.add_child(_label("所有战策均已满级，可直接继续远征。", 20, Color("#8fd4a0")))
+	checkpoint_continue_button.disabled = bool(payload.pending)
+	checkpoint_continue_button.text = "请先选择一项战策" if bool(payload.pending) else "继续远征"
+
+func _on_checkpoint_strategy(id: String) -> void:
+	if _endless_pick_strategy(id):
+		_render_checkpoint_overlay()
+		_render_endless_overview()
+
+func _on_checkpoint_continue() -> void:
+	if not _endless_after_checkpoint(): return
+	checkpoint_overlay.hide()
+	_render()
+
+func _on_checkpoint_overlay_close() -> void:
+	# 据点是强制决策阶段，不能通过关闭绕过三选一；只允许回到主菜单后继续存档。
+	_show_main_menu()
+
+func _show_imprint_overlay() -> void:
+	_render_imprint_overlay()
+	imprint_overlay.show()
+
+func _on_imprint_hero_selected(index: int) -> void:
+	if index < 0 or index >= imprint_hero_options.item_count: return
+	imprint_selected_hero = str(imprint_hero_options.get_item_metadata(index))
+	_render_imprint_overlay()
+
+func _render_imprint_overlay() -> void:
+	if not is_instance_valid(imprint_tree_box): return
+	if not heroes.has(imprint_selected_hero): imprint_selected_hero = "guanyu"
+	for index in imprint_hero_options.item_count:
+		if str(imprint_hero_options.get_item_metadata(index)) == imprint_selected_hero:
+			imprint_hero_options.select(index)
+			break
+	imprint_currency_label.text = "当前武将：%s　　通用将印：%d" % [_hero_name(imprint_selected_hero), endless_imprints]
+	_clear_dynamic_children(imprint_tree_box)
+	var row_titles := ["第一层 · 根基", "第二层 · 专精", "第三层 · 终印"]
+	var lane_colors := [Color("#6189a5"), Color("#a66d4e"), Color("#728f62")]
+	for row_index in 3:
+		var title := _label(row_titles[row_index], 18, Color("#d9bd7a"))
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		imprint_tree_box.add_child(title)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 14)
+		for lane in 3:
+			var node: Dictionary = {}
+			for candidate in EndlessRules.IMPRINT_NODES:
+				if int(candidate.row) == row_index and int(candidate.lane) == lane:
+					node = candidate
+					break
+			if node.is_empty():
+				var spacer := Control.new()
+				spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				row.add_child(spacer)
+				continue
+			var node_id := str(node.id)
+			var level := _endless_imprint_level(imprint_selected_hero, node_id)
+			var panel := PanelContainer.new()
+			panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			panel.custom_minimum_size.y = 125
+			_style(panel, Color("#171612ec"), 6, lane_colors[lane], 3 if level > 0 else 1)
+			var box := VBoxContainer.new()
+			box.add_theme_constant_override("separation", 5)
+			panel.add_child(box)
+			var node_name := _label("%s　Lv%d/%d" % [str(node.name), level, int(node.max)], 20, lane_colors[lane].lightened(0.35))
+			node_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(node_name)
+			var node_desc := _label(str(node.desc), 14, Color("#d5cbb8"))
+			node_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			node_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			node_desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			box.add_child(node_desc)
+			var upgrade := _button("已满级" if level >= int(node.max) else "升级 · %d 将印" % int(node.cost))
+			upgrade.disabled = not _endless_imprint_can_upgrade(imprint_selected_hero, node_id)
+			upgrade.tooltip_text = "前置：%s" % ("无" if (node.requires as Array).is_empty() else "、".join(node.requires))
+			upgrade.pressed.connect(_on_imprint_upgrade.bind(node_id))
+			box.add_child(upgrade)
+			row.add_child(panel)
+		imprint_tree_box.add_child(row)
+		if row_index < 2:
+			var arrow := _label("↓　　↓　　↓", 24, Color("#806b4c"))
+			arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			imprint_tree_box.add_child(arrow)
+
+func _on_imprint_upgrade(node_id: String) -> void:
+	if _endless_imprint_upgrade(imprint_selected_hero, node_id):
+		_render_imprint_overlay()
+		_render_endless_overview()
+
+func _on_imprint_refund() -> void:
+	if _endless_imprint_refund(imprint_selected_hero):
+		_render_imprint_overlay()
+		_render_endless_overview()
 
 func _show_battle_menu() -> void:
 	var run := _challenge_run_snapshot()
+	var endless_run := _endless_run_snapshot()
+	endless_continue_button.disabled = endless_run.is_empty()
+	endless_continue_button.text = "继续无尽 · 第%d回合" % int(endless_run.get("round", 1)) if not endless_run.is_empty() else "继续无尽"
 	continue_button.disabled = not FileAccess.file_exists(SAVE_PATH)
 	continue_button.text = "继续闯关" if not run.is_empty() else "继续对局"
 	if not run.is_empty():
@@ -4675,7 +4992,7 @@ func _show_main_menu() -> void:
 	continue_button.disabled = not FileAccess.file_exists(SAVE_PATH)
 	continue_button.text = "继续闯关" if not _challenge_run_snapshot().is_empty() else "继续对局"
 	draft_overlay.hide()
-	for overlay in [battle_menu_overlay, rune_overlay, talent_overlay, settings_overlay, encyclopedia_overlay, tianshu_overlay]:
+	for overlay in [battle_menu_overlay, rune_overlay, talent_overlay, settings_overlay, encyclopedia_overlay, tianshu_overlay, endless_overview_overlay, checkpoint_overlay, imprint_overlay]:
 		if is_instance_valid(overlay): overlay.hide()
 	_refresh_home()
 	menu_overlay.show()
@@ -4980,10 +5297,12 @@ func _render() -> void:
 			for faction in player_factions: faction_names.append(_faction_name(faction))
 			title_label.text += " · " + "/".join(faction_names)
 	elif game_mode == "tianshu": title_label.text = t("战三国 · 弈定九州 · 天书演武", "THREE KINGDOMS · CODEX TRIAL")
+	elif game_mode == "endless": title_label.text = t("战三国 · 弈定九州 · 无尽远征", "THREE KINGDOMS · ENDLESS EXPEDITION")
 	elif game_mode == "tutorial": title_label.text = t("战三国 · 弈定九州 · 新手引导", "THREE KINGDOMS · TUTORIAL")
 	else: title_label.text = t("战三国 · 弈定九州 · 快速战斗", "THREE KINGDOMS · QUICK BATTLE")
 	if game_mode == "challenge": round_label.text = "闯关 %d / 20 · 回合 %d / 15" % [selected_stage, round_number]
 	elif game_mode == "tianshu": round_label.text = t("天书演武 ", "CODEX TRIAL ") + str(round_number) + " / " + str(ROUND_LIMIT)
+	elif game_mode == "endless": round_label.text = "∞ 无尽远征 · 第 %d 回合 · 据点 %d" % [round_number, int(endless_state.get("checkpoint", 0))]
 	elif game_mode == "tutorial": round_label.text = t("新手引导 · 演练回合", "TUTORIAL · PRACTICE")
 	else: round_label.text = t("最终决战", "FINAL BATTLE") if final_battle else t("关卡 ", "STAGE ") + str(round_number) + " / " + str(ROUND_LIMIT)
 	phase_label.text = "◆ " + _phase_name()
@@ -4995,16 +5314,19 @@ func _render() -> void:
 	tianshu_header_button.text = _tianshu_pavilion_button_text()
 	tianshu_header_button.visible = _tianshu_enabled()
 	tianshu_header_button.disabled = battle_running or phase not in ["draft", "placement"]
+	endless_header_button.visible = _run_is_endless()
+	endless_header_button.disabled = battle_running
 	save_button.disabled = battle_running
-	load_button.disabled = battle_running or not FileAccess.file_exists(SAVE_PATH)
+	load_button.disabled = battle_running or not FileAccess.file_exists(_run_save_path())
 	menu_button.disabled = battle_running
 	player_hp_label.get_parent().get_node("Caption").text = t("我方主公", "YOUR RULER")
 	enemy_hp_label.get_parent().get_node("Caption").text = t("敌方主公", "ENEMY RULER")
 	var player_ruler_max := _player_ruler_max_hp()
 	player_hp_label.text = str(player_ruler_hp) + "\n/ " + str(player_ruler_max)
-	enemy_hp_label.text = str(enemy_ruler_hp) + "\n/ " + str(RULER_MAX_HP)
+	var enemy_ruler_max := _run_enemy_ruler_max_hp()
+	enemy_hp_label.text = str(enemy_ruler_hp) + "\n/ " + str(enemy_ruler_max)
 	player_ruler_fill.anchor_top = 1.0 - clampf(float(player_ruler_hp) / player_ruler_max, 0.0, 1.0)
-	enemy_ruler_fill.anchor_top = 1.0 - clampf(float(enemy_ruler_hp) / RULER_MAX_HP, 0.0, 1.0)
+	enemy_ruler_fill.anchor_top = 1.0 - clampf(float(enemy_ruler_hp) / maxf(1.0, float(enemy_ruler_max)), 0.0, 1.0)
 	player_ruler_fill.modulate = Color("#a3ffae") if float(ruler_regen.player.get("time", 0.0)) > 0.0 else Color.WHITE
 	enemy_ruler_fill.modulate = Color("#a3ffae") if float(ruler_regen.enemy.get("time", 0.0)) > 0.0 else Color.WHITE
 	_update_battle_time_bar()
@@ -5013,7 +5335,9 @@ func _render() -> void:
 	enemy_title_label.text = t("敌方阵地  ·  后排在上 / 前排在下", "ENEMY FORMATION  ·  BACK TO FRONT")
 	player_title_label.text = t("我方阵地  ·  前排在上 / 后排在下", "YOUR FORMATION  ·  FRONT TO BACK")
 	if phase == "tianshu": draft_title_label.text = t("天书三选一", "CHOOSE A CODEX")
-	elif phase == "draft": draft_title_label.text = t("三选一 · 第%d/3轮" % (PICKS_PER_ROUND - draft_picks_remaining + 1), "PICK 1 OF 3 · ROUND %d/3" % (PICKS_PER_ROUND - draft_picks_remaining + 1))
+	elif phase == "draft":
+		var pick_total := _run_draft_pick_count()
+		draft_title_label.text = t("三选一 · 第%d/%d轮" % [pick_total - draft_picks_remaining + 1, pick_total], "PICK 1 OF 3 · ROUND %d/%d" % [pick_total - draft_picks_remaining + 1, pick_total])
 	elif phase == "placement": draft_title_label.text = t("布置新武将 · 待放 ", "DEPLOY RECRUITS · LEFT ") + str(pending_unit_ids.size())
 	elif phase == "combat": draft_title_label.text = t("最终无限战斗", "FINAL UNLIMITED BATTLE") if final_battle else t("本关战斗中 · 30 秒", "STAGE BATTLE · 30 SEC")
 	else: draft_title_label.text = t("征战结果", "CAMPAIGN RESULT")
@@ -5026,7 +5350,7 @@ func _render() -> void:
 	_render_battle_stats()
 	phase_caption_label.text = t("两军对垒  ·  ", "BATTLE LINE  ·  ") + _phase_name()
 	bonds_label.text = _bbc(_bond_text(player_units.filter(func(unit): return unit.alive and unit.row >= 0)))
-	reserve_title_label.text = t("备战区 ", "RESERVE ") + str(_reserve_units().size()) + " / " + str(RESERVE_LIMIT)
+	reserve_title_label.text = t("备战区 ", "RESERVE ") + str(_reserve_units().size()) + " / " + str(_run_reserve_limit())
 	_hint()
 	unit_cell_refs.clear()
 	tile_cell_refs.clear()
@@ -5045,6 +5369,12 @@ func _render() -> void:
 		# 选完天书后保持天书阁打开并切换到管理模式，方便继续购买/替换，由玩家手动关闭。
 		tianshu_view_only = true
 		_render_tianshu_overlay()
+	if is_instance_valid(checkpoint_overlay):
+		if phase == "checkpoint" and (not is_instance_valid(menu_overlay) or not menu_overlay.visible) and not imprint_overlay.visible:
+			_render_checkpoint_overlay()
+			checkpoint_overlay.show()
+		elif phase != "checkpoint":
+			checkpoint_overlay.hide()
 	_render_rosters()
 	_render_reserve()
 	draft_toggle_button.text = t("隐藏选将", "HIDE DRAFT") if not draft_user_hidden else t("显示选将", "SHOW DRAFT")
@@ -5526,7 +5856,7 @@ func _render_battle_stats() -> void:
 func _render_reserve() -> void:
 	_clear_dynamic_children(reserve_box)
 	var reserves := _reserve_units()
-	for index in RESERVE_LIMIT:
+	for index in _run_reserve_limit():
 		var slot := Button.new()
 		var compact_mobile := _is_mobile_ui()
 		slot.custom_minimum_size = Vector2(116 if compact_mobile else 106, 100 if compact_mobile else 72)

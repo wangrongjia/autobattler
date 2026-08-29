@@ -457,6 +457,7 @@ func _snapshot_battle_lineup() -> void:
 func _unit_action_gain_multiplier(unit: Dictionary) -> float:
 	var result := float(unit.get("action_gain_mult", 1.0))
 	result *= 1.0 + float(unit.get("timed_action_bonus", 0.0))
+	result *= float(unit.get("endless_enemy_action_gain", 1.0))
 	var cooldown_reduction := clampf(float(unit.get("faction_cooldown_reduction", 0.0)), 0.0, 0.95)
 	if cooldown_reduction > 0.0:
 		result /= 1.0 - cooldown_reduction
@@ -474,6 +475,7 @@ func _unit_cooldown_haste(unit: Dictionary) -> float:
 	return float(unit.get("talent_cooldown_haste", 0.0)) \
 		+ float(unit.get("rune_cooldown_haste", 0.0)) \
 		+ float(unit.get("bond_haste", 0.0)) \
+		+ float(unit.get("endless_cooldown_haste", 0.0)) \
 		+ _tianshu_cooldown_haste(unit)
 
 func _add_bond_cooldown_haste(unit: Dictionary, equivalent_seconds: float) -> void:
@@ -2690,6 +2692,9 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		value *= float(source.get("stat_mult", 1.0))
 		if scales_with_skill: value *= _unit_skill_power_multiplier(source)
 		value *= 1.0 + source.damage_buff + float(source.get("timed_damage_buff", 0.0)) + float(source.get("liushan_aura_damage_bonus", 0.0)) + float(source.get("kill_buff", 0.0))
+		value *= 1.0 + float(source.get("endless_damage_pct", 0.0))
+		if float(source.hp) / maxf(1.0, float(source.max_hp)) < 0.35:
+			value *= 1.0 + float(source.get("endless_low_hp_damage", 0.0))
 		value *= maxf(0.0, 1.0 - float(source.get("skill_debuff", 0.0)))
 		if heroes[source.hero_id].f == "wei" and int(source.get("faction_tier", 0)) >= 3 and _has_any_debuff(target):
 			value *= 1.08 + (0.04 * _talent_level("wei", "乘胜追击") if source.team == "player" else 0.0)
@@ -2724,6 +2729,7 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		var missing_hp_reduction := _missing_hp_damage_multiplier(target, float(params.get("missing_hp_step", 0.10)), float(params.get("missing_hp_reduction_per_step", 0.03))) - 1.0
 		total_reduction += missing_hp_reduction
 	total_reduction += _tianshu_damage_reduction(target, source, direct_tianshu_damage)
+	total_reduction += float(target.get("endless_damage_reduction", 0.0))
 	value *= 1.0 - clampf(total_reduction, 0.0, 0.95)
 	var faction_reduction := float(target.get("faction_damage_reduction", 0.0))
 	if heroes[target.hero_id].f == "shu" and int(target.get("faction_tier", 0)) >= 3:
@@ -2769,6 +2775,8 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	if target.hp > 0.0 and wu_equalize_threshold > 0.0 and float(target.hp) / maxf(1.0, float(target.max_hp)) < wu_equalize_threshold:
 		if _try_wu_equalize_and_recover(target):
 			return actual_damage
+	if target.hp > 0.0:
+		_endless_try_emergency_heal(target)
 	if target.hp <= 0:
 		if _tianshu_try_prevent_death(target):
 			return actual_damage
@@ -2781,6 +2789,8 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		if _try_wu_equalize_and_recover(target):
 			return actual_damage
 		if target.hero_id == "zhangbao" and _resolve_zhangbao_death(target, source, visual_group, group_style):
+			return actual_damage
+		if _endless_try_revive(target):
 			return actual_damage
 		target.alive = false
 		_on_unit_fallen(target, source)
@@ -2852,6 +2862,13 @@ func _hit_ruler(unit: Dictionary, amount: float, tile: Dictionary, label: String
 	if scales_with_skill: value_float *= _unit_skill_power_multiplier(unit)
 	value_float *= maxf(0.0, 1.0 - float(unit.get("skill_debuff", 0.0)))
 	value_float *= _tianshu_ruler_damage_multiplier(unit)
+	value_float *= 1.0 + float(unit.get("endless_damage_pct", 0.0))
+	if float(unit.hp) / maxf(1.0, float(unit.max_hp)) < 0.35:
+		value_float *= 1.0 + float(unit.get("endless_low_hp_damage", 0.0))
+	if _run_is_endless():
+		if unit.team == "enemy":
+			value_float *= 1.0 + _endless_enemy_ruler_damage_bonus()
+			value_float *= 1.0 - _endless_player_ruler_reduction()
 	var target_team := _enemy_team_id(unit.team)
 	var ability := str(heroes[unit.hero_id].get("ability", ""))
 	if ability in ["strike_magic", "row_magic", "multi_magic", "control"]: value_float *= 1.0 - float(ruler_regen[target_team].get("magic_reduction", 0.0))
