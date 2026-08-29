@@ -50,7 +50,7 @@ func _new_game() -> void:
 	elif game_mode == "tianshu":
 		_log("[color=#e5a8ff]天书演武开始：第 3/6/9/12/15 回合免费选天书，其他抽取可在天书阁购买。[/color]")
 	elif game_mode == "endless":
-		_log("[color=#f0c77a]【无尽远征·重铸】我方全军线性养成，敌方生命与兵略指数成长；每 5 回合公开敌军军势并进行一次战策三选一。[/color]")
+		_log("[color=#f0c77a]【无尽远征·重铸】我方全军线性养成，敌方生命与兵略指数成长；每 5 回合公开敌军军势，并进入战策三选一与军府整备。[/color]")
 	elif game_mode == "tutorial":
 		_log("[color=#8fd4a0]新手引导：按提示完成 选天书 → 选将 → 布阵 → 战斗 一次完整流程。[/color]")
 	else:
@@ -211,7 +211,10 @@ func _load_game(from_path := "") -> bool:
 	last_battle_stats = data.get("last_battle_stats", [])
 	_load_tianshu_state(data.get("tianshu", {}))
 	_load_economy_state(data.get("economy", {}))
-	if game_mode == "endless": _endless_sync_player_roster()
+	if game_mode == "endless":
+		_endless_sync_player_roster()
+		# 兼容加入军府前、恰好停在据点页的无尽存档：读档后补生成本据点军备。
+		if phase == "checkpoint" and endless_state.get("armory_offers", []).is_empty(): _endless_roll_armory_offers()
 	if int(data.get("version", 0)) < 6:
 		for index in mini(DRAFT_SIZE, draft_refresh_available.size()):
 			tianshu_draft_refresh_used[index] = 0 if draft_refresh_available[index] else 1
@@ -698,6 +701,7 @@ func _start_battle() -> void:
 	battle_time = 0.0
 	battle_accum = 0.0
 	boards_dirty = false
+	_reset_ambient_visual_queue()
 	action_in_progress = false
 	battle_speed = game_speed
 	selected_unit = ""
@@ -737,6 +741,7 @@ func _finish_battle() -> void:
 	tick_timer.stop()
 	battle_running = false
 	battle_accum = 0.0
+	_reset_ambient_visual_queue()
 	battle_paused = false
 	action_in_progress = false
 	_capture_battle_stats()

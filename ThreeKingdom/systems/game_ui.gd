@@ -124,8 +124,12 @@ var endless_overview_overlay: Control
 var endless_player_summary_label: RichTextLabel
 var endless_enemy_summary_label: RichTextLabel
 var checkpoint_overlay: Control
+var checkpoint_tabs: TabContainer
 var checkpoint_strategy_box: HBoxContainer
 var checkpoint_summary_box: HBoxContainer
+var checkpoint_armory_box: HBoxContainer
+var checkpoint_armory_status_label: Label
+var checkpoint_armory_refresh_button: Button
 var checkpoint_continue_button: Button
 var checkpoint_reward_label: Label
 var imprint_overlay: Control
@@ -857,11 +861,12 @@ func _build_ui() -> void:
 	_build_unit_inspector()
 
 func _process(_delta: float) -> void:
-	# 真实时间固定步长：动画播放时只累计，结束后单帧最多偿还 6 步；后台积压最多保留 5 秒。
+	# 真实时间固定步长：动画期间模拟照常推进，但下一次主动施法会等当前动画结束。
+	# 只有掉帧/切后台造成的欠步需要偿还，单帧最多 6 步、积压最多保留 5 秒。
 	if battle_running and not _battle_clock_paused():
 		battle_accum = minf(5.0, battle_accum + maxf(0.0, _delta))
 		var steps := 0
-		while battle_accum >= TICK and steps < 6 and battle_running and not _battle_clock_paused() and not action_in_progress:
+		while battle_accum >= TICK and steps < 6 and battle_running and not _battle_clock_paused():
 			battle_accum -= TICK
 			steps += 1
 			_battle_tick()
@@ -1746,7 +1751,7 @@ func _build_intro_popup() -> void:
 	tabs.add_child(_intro_rich_page(t("战场规则", "BATTLE"),
 		c + "前军 / 中军 / 后军" + e + "\n前军[b]只能站前排且只打前排[/b]；中军站前排可打全场、站中排打前中排、站后排只打前排；后军[b]任意站位随机攻击全场[/b]。合理利用站位改变射程是布阵的核心。\n\n" + c + "行动条" + e + "\n武将行动条从 0 涨到 100 即行动一次并施放技能；增速受减速、沉默影响，眩晕/冻结/魅惑/恐惧期间停止。\n\n" + c + "常见战斗效果" + e + "\n眩晕（停止行动）、冻结（停止，受伤提前解冻并追加破冰伤害）、魅惑（停止）、恐惧（停止+持续伤害）、中毒（层数伤害，逐秒衰减）、灼烧（持续伤害）、减速（行动条变慢）、易碎（受到伤害提高）。\n\n" + c + "羁绊" + e + "\n[b]阵营羁绊[/b]：按场上同阵营人数 2/5/8 分三档——蜀承伤降低、魏控制时长提高、吴最大生命提高、群冷却缩短，8 人时各解锁强力终极效果。\n[b]组合羁绊[/b]：特定武将组合触发（桃园结义、五虎上将、四英杰等），完整关系见 图鉴 → 羁绊图。"))
 	tabs.add_child(_intro_rich_page(t("无尽远征", "ENDLESS"),
-		c + "核心节奏" + e + "\n我方通过战策、天书和将印获得[b]可选择的线性成长与特殊机制[/b]；敌军最大生命和兵略按回合[b]指数成长[/b]，最终一定会超过玩家。敌军行动速度最多提高 10%，冷却极速最多 12，因此后期压力主要来自数值而不是无限施法。\n\n" + c + "全军共享养成" + e + "\n所有局内成长都写入全军共享快照：当前上阵武将、备战席武将和之后才招募的武将获得完全相同的加成。最大生命成长以固定值加法为主，不会形成黄盖等生命换伤武将的多层百分比膨胀。\n\n" + c + "据点与情报" + e + "\n每 5 回合进入据点，战策[b]三选一且只能锁定一项[/b]。据点页和备战区的“军情总览”会并列显示我方已有加成、敌方指数倍率、全部公开军势以及下一阶段预告。\n\n" + c + "将印树" + e + "\n第 15 回合起据点掉落通用将印。每名武将拥有固本、砺锋、疾行三路根基，以及守势、破阵、先机三路专精；三路各投入后可点亮名将之印。将印只在无尽模式生效。"))
+		c + "核心节奏" + e + "\n我方通过战策、天书、军府和将印获得[b]可选择的线性成长与特殊机制[/b]；敌军最大生命和兵略按回合[b]指数成长[/b]，最终一定会超过玩家。敌军行动速度最多提高 10%，冷却极速最多 12，因此后期压力主要来自数值而不是无限施法。\n\n" + c + "全军共享养成" + e + "\n所有局内成长都写入全军共享快照：当前上阵武将、备战席武将和之后才招募的武将获得完全相同的加成。最大生命成长以固定值加法为主，不会形成黄盖等生命换伤武将的多层百分比膨胀。\n\n" + c + "据点、军府与情报" + e + "\n每 5 回合进入据点，战策[b]三选一且只能锁定一项[/b]；军府会随机给出四项军备，最多购买两项，可围绕选将刷新、持续经济、前中后排或某名核心武将构筑。双方强化会在军情总览中完整公示。\n\n" + c + "将印树" + e + "\n第 15 回合起据点掉落通用将印。每名武将拥有七层专属路线；将印只在无尽模式生效。"))
 	intro_popup.hide()
 
 func _full_overlay(z: int = 1150, art_variant: int = PremiumUIArt.Variant.BACKDROP, accent := UI_GOLD) -> ColorRect:
@@ -2031,13 +2036,36 @@ func _build_endless_overlays() -> void:
 	checkpoint_summary_box.custom_minimum_size.y = 230
 	checkpoint_summary_box.add_theme_constant_override("separation", 12)
 	checkpoint_root.add_child(checkpoint_summary_box)
-	var choose_title := _label("战策三选一 · 本据点只能锁定一项", 23, Color("#f0c77a"))
+	checkpoint_tabs = TabContainer.new()
+	checkpoint_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	checkpoint_tabs.custom_minimum_size.y = 360
+	checkpoint_root.add_child(checkpoint_tabs)
+	var strategy_page := VBoxContainer.new()
+	strategy_page.name = "战策三选一"
+	strategy_page.add_theme_constant_override("separation", 8)
+	checkpoint_tabs.add_child(strategy_page)
+	var choose_title := _label("本据点只能锁定一项战策", 21, Color("#f0c77a"))
 	choose_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	checkpoint_root.add_child(choose_title)
+	strategy_page.add_child(choose_title)
 	checkpoint_strategy_box = HBoxContainer.new()
 	checkpoint_strategy_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	checkpoint_strategy_box.add_theme_constant_override("separation", 12)
-	checkpoint_root.add_child(checkpoint_strategy_box)
+	strategy_page.add_child(checkpoint_strategy_box)
+	var armory_page := VBoxContainer.new()
+	armory_page.name = "军府整备"
+	armory_page.add_theme_constant_override("separation", 8)
+	checkpoint_tabs.add_child(armory_page)
+	checkpoint_armory_status_label = _label("", 17, Color("#e8c96e"))
+	checkpoint_armory_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	armory_page.add_child(checkpoint_armory_status_label)
+	checkpoint_armory_box = HBoxContainer.new()
+	checkpoint_armory_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	checkpoint_armory_box.add_theme_constant_override("separation", 10)
+	armory_page.add_child(checkpoint_armory_box)
+	checkpoint_armory_refresh_button = _button("刷新军备 · 150 金")
+	checkpoint_armory_refresh_button.custom_minimum_size = Vector2(230, 44)
+	checkpoint_armory_refresh_button.pressed.connect(_on_checkpoint_armory_refresh)
+	armory_page.add_child(checkpoint_armory_refresh_button)
 	var checkpoint_actions := HBoxContainer.new()
 	checkpoint_actions.alignment = BoxContainer.ALIGNMENT_CENTER
 	checkpoint_actions.add_theme_constant_override("separation", 12)
@@ -2169,6 +2197,44 @@ func _render_checkpoint_overlay() -> void:
 		checkpoint_strategy_box.add_child(panel)
 	if (payload.candidates as Array).is_empty():
 		checkpoint_strategy_box.add_child(_label("所有战策均已满级，可直接继续远征。", 20, Color("#8fd4a0")))
+	_clear_dynamic_children(checkpoint_armory_box)
+	checkpoint_armory_status_label.text = "金币 %d　·　本据点已购 %d / %d　·　四项随机军备中择优构筑" % [gold, int(payload.armory_bought), EndlessRules.ARMORY_PURCHASE_LIMIT]
+	for offer in payload.armory:
+		var token := str(offer.token)
+		var bought: bool = endless_state.armory_bought.has(token)
+		var card := PanelContainer.new()
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_style(card, Color("#14241ddd") if bought else Color("#1d1912ed"), 6, Color("#69a27d") if bought else Color("#a17a43"), 2)
+		var card_box := VBoxContainer.new()
+		card_box.add_theme_constant_override("separation", 6)
+		card.add_child(card_box)
+		var tag := _label("◆ %s ◆" % str(offer.tag), 14, Color("#b9a578"))
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card_box.add_child(tag)
+		var title := _label(str(offer.name), 21, Color("#f0c77a"))
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card_box.add_child(title)
+		if int(offer.max) < 90:
+			var level := _label("Lv%d → Lv%d / %d" % [int(offer.level), mini(int(offer.level) + 1, int(offer.max)), int(offer.max)], 14, Color("#cfc1a3"))
+			level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			card_box.add_child(level)
+		var desc := _label(str(offer.desc), 15, Color("#ded4bf"))
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		desc.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		card_box.add_child(desc)
+		var buy := _button("已购置" if bought else "购置 · %d 金" % int(offer.price))
+		buy.disabled = bought or int(payload.armory_bought) >= EndlessRules.ARMORY_PURCHASE_LIMIT or gold < int(offer.price)
+		_accent_button(buy, Color("#5f9a72") if bought else Color("#9b6537"), true)
+		buy.pressed.connect(_on_checkpoint_armory_buy.bind(token))
+		card_box.add_child(buy)
+		checkpoint_armory_box.add_child(card)
+	if (payload.armory as Array).is_empty():
+		checkpoint_armory_box.add_child(_label("本据点暂无可购军备。", 20, Color("#c9c0b1")))
+	checkpoint_armory_refresh_button.disabled = bool(payload.armory_refresh_used) or gold < EndlessRules.ARMORY_REFRESH_COST or int(payload.armory_bought) >= EndlessRules.ARMORY_PURCHASE_LIMIT
+	checkpoint_armory_refresh_button.text = "本据点已刷新" if bool(payload.armory_refresh_used) else "刷新四项军备 · %d 金" % EndlessRules.ARMORY_REFRESH_COST
 	checkpoint_continue_button.disabled = bool(payload.pending)
 	checkpoint_continue_button.text = "请先选择一项战策" if bool(payload.pending) else "继续远征"
 
@@ -2176,6 +2242,14 @@ func _on_checkpoint_strategy(id: String) -> void:
 	if _endless_pick_strategy(id):
 		_render_checkpoint_overlay()
 		_render_endless_overview()
+
+func _on_checkpoint_armory_buy(token: String) -> void:
+	if _endless_buy_armory(token):
+		_render_checkpoint_overlay()
+		_render_endless_overview()
+
+func _on_checkpoint_armory_refresh() -> void:
+	if _endless_refresh_armory(): _render_checkpoint_overlay()
 
 func _on_checkpoint_continue() -> void:
 	if not _endless_after_checkpoint(): return

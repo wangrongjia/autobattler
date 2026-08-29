@@ -132,9 +132,30 @@ func _init() -> void:
 	_check(game.endless_state.candidates.size() == 3, "据点应生成三个不同战策候选")
 	_check(game.checkpoint_overlay.visible, "据点汇总与三选一 UI 应显示")
 	_check(game.checkpoint_strategy_box.get_child_count() == 3, "据点 UI 应渲染三张战策卡")
+	_check(game.endless_state.armory_offers.size() == 4, "据点军府应随机给出四项不同军备")
+	_check(game.checkpoint_armory_box.get_child_count() == 4, "军府页应渲染四张可购买军备卡")
+	game.gold = 10000
+	game.endless_state.armory_offers = ["scout_maps", "hero_legacy:huanggai"]
+	_check(game._endless_buy_armory("scout_maps"), "军府应允许用金币购买选将刷新构筑")
+	_check(game._tianshu_draft_refresh_limit() == 2, "游骑舆图一级应让每个候选位额外刷新一次")
+	_check(game._endless_buy_armory("hero_legacy:huanggai"), "军府应允许围绕当前阵容核心武将购买传世兵符")
+	var huanggai_growth: Dictionary = game._endless_shared_growth("huanggai")
+	var guanyu_growth: Dictionary = game._endless_shared_growth("guanyu")
+	_check(float(huanggai_growth.hp_flat) > float(guanyu_growth.hp_flat), "传世兵符应让指定武将随回合获得额外线性生命成长")
+	_check(float(huanggai_growth.strategy_flat) > float(guanyu_growth.strategy_flat), "传世兵符应让指定武将随回合获得额外线性兵略成长")
+	game.endless_state.armory.supply_route = 1
+	game.round_number = 20
+	_check(game._round_base_gold_income() == 80, "辎重商路应在第15回合后继续提供军府经济")
+	var sell_probe: Dictionary = game._make_roster_unit("player", "guanyu")
+	sell_probe.row = -1
+	game.tianshu_levels.huozhi_milu = 1
+	_check(game._unit_sell_price(sell_probe) == game.RESERVE_SELL_PRICE + 30, "货殖秘录一级卖将应额外获得30金币")
+	game.tianshu_levels.huozhi_milu = 2
+	_check(game._unit_sell_price(sell_probe) == game.RESERVE_SELL_PRICE + 80, "货殖秘录二级卖将应额外获得80金币")
+	game.tianshu_levels.erase("huozhi_milu")
 
-	# 战斗循环必须按真实时间累计：动画期间不丢时间，恢复后单帧最多补 6 步，积压封顶 5 秒。
-	var passive_player: Dictionary = game._make_roster_unit("player", "liushan")
+	# 战斗循环必须按真实时间推进：动画期间时钟、状态和行动条继续走；仅掉帧欠步按单帧6步偿还。
+	var passive_player: Dictionary = game._make_roster_unit("player", "lvbu")
 	var passive_enemy: Dictionary = game._make_roster_unit("enemy", "chengong")
 	passive_player.row = 0
 	passive_enemy.row = 0
@@ -147,13 +168,33 @@ func _init() -> void:
 	game.battle_accum = 0.0
 	game.action_in_progress = true
 	game._process(8.0)
-	_near(game.battle_accum, 5.0, "动画期间积压时间应封顶 5 秒")
-	_near(game.battle_time, 0.0, "动画期间模拟步不应被提前执行")
-	game.action_in_progress = false
+	_near(game.battle_time, 1.2, "技能动画期间也应推进6个固定模拟步")
+	_near(game.battle_accum, 3.8, "超出单帧上限的掉帧欠步应留待后续偿还")
+	_check(float(passive_player.action) > 0.0, "技能动画期间我方行动条仍应正常增长")
 	game._process(0.0)
-	_near(game.battle_time, 1.2, "动画结束后单帧最多补偿 6 个固定步")
-	_near(game.battle_accum, 3.8, "未偿还时间应留到后续帧继续补偿")
+	_near(game.battle_time, 2.4, "后续帧应继续偿还至多6个固定步")
+	_near(game.battle_accum, 2.6, "仍未偿还的时间应继续保留")
+
+	# 貂蝉+吕布的魅惑倒戈必须是环境动画，不能饿死我方已经推进的行动条。
+	var charmed_enemy: Dictionary = game._make_roster_unit("enemy", "chengong")
+	var betrayal_victim: Dictionary = game._make_roster_unit("enemy", "dongzhuo")
+	charmed_enemy.row = 0
+	charmed_enemy.col = 0
+	charmed_enemy.charm = 2.0
+	charmed_enemy.charm_forced_attack = true
+	charmed_enemy.charm_attack_clock = float(game.heroes.diaochan.ability_params.forced_attack_interval) - 0.1
+	betrayal_victim.row = 0
+	betrayal_victim.col = 1
+	passive_player.action = 0.0
+	game.combat_units = [passive_player, charmed_enemy, betrayal_victim]
+	game.visual_events.clear()
+	game._reset_ambient_visual_queue()
+	game.battle_accum = 0.0
+	game._battle_tick()
+	_check(float(passive_player.action) > 0.0, "魅惑倒戈发生的同一模拟步仍应推进我方行动条")
+	_check(game.ambient_visual_queue.any(func(event): return str(event.get("group_style", "")) == "charm_forced" and bool(event.get("nonblocking", false))), "魅惑倒戈伤害应进入非阻塞环境动画队列")
 	game.battle_running = false
+	game._reset_ambient_visual_queue()
 	game.unit_cell_refs = {"probe":null}
 	game.boards_dirty = false
 	game._render_combat_boards()

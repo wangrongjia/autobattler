@@ -105,6 +105,9 @@ var language_button: Button        # 中英文切换按钮
 var tick_timer: Timer              # 战斗循环定时器(每 TICK 秒触发一次 _battle_tick)
 var battle_accum := 0.0            # 固定步长累计器：动画期间继续按真实时间计息，结束后限量补步
 var boards_dirty := false          # 棋盘高频刷新合并标记：每帧至多全量重绘一次
+var ambient_visual_queue: Array = [] # 持续伤害/魅惑倒戈等环境动画独立排队，不阻塞战斗模拟
+var ambient_visual_playing := false
+var ambient_visual_generation := 0  # 换场时使上一场尚未结束的异步动画队列失效
 var battle_time_bar: ProgressBar   # 战斗时间进度条(显示剩余战斗时间)
 var battle_time_label: Label       # 战斗时间数字标签(如 "18s" 或 "∞ 无时限")
 var battle_workspace: HBoxContainer # 棋盘与信息侧栏的横向工作区
@@ -252,6 +255,29 @@ func _update_action_bars() -> void:
 
 func _update_battle_time_bar() -> void:
 	pass
+
+func _reset_ambient_visual_queue() -> void:
+	ambient_visual_generation += 1
+	ambient_visual_queue.clear()
+	ambient_visual_playing = false
+
+func _queue_ambient_visual_events(events: Array) -> void:
+	if events.is_empty(): return
+	ambient_visual_queue.append_array(events)
+	# 极端高频 DOT 只裁剪视觉表现，伤害结算与战报仍完整保留。
+	if ambient_visual_queue.size() > 120:
+		ambient_visual_queue = ambient_visual_queue.slice(ambient_visual_queue.size() - 120)
+	if ambient_visual_playing: return
+	ambient_visual_playing = true
+	call_deferred("_drain_ambient_visual_queue", ambient_visual_generation)
+
+func _drain_ambient_visual_queue(generation: int) -> void:
+	while generation == ambient_visual_generation and not ambient_visual_queue.is_empty():
+		var batch := ambient_visual_queue.duplicate(true)
+		ambient_visual_queue.clear()
+		await _play_visual_events(batch)
+	if generation == ambient_visual_generation:
+		ambient_visual_playing = false
 
 func _play_visual_events(_events: Array) -> void:
 	pass

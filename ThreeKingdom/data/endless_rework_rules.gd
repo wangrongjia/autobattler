@@ -26,6 +26,33 @@ const ENEMY_ACTION_CAP := 0.10
 const ENEMY_HASTE_PER_TEN_ROUNDS := 2.0
 const ENEMY_HASTE_CAP := 12.0
 
+# 军府不是固定清单，而是每个据点随机出现 4 项、最多购买 2 项。数值成长保持线性，
+# 重点提供选将、经济、站位与核心武将培养方向，让同一阵容也能走出不同构筑。
+const ARMORY_PURCHASE_LIMIT := 2
+const ARMORY_REFRESH_COST := 150
+const ARMORY_ITEMS := [
+	{"id":"scout_maps", "name":"游骑舆图", "tag":"选将", "max":2, "base_cost":650, "increment":350,
+		"levels":["每个选将候选位每轮额外刷新 1 次", "每个候选位每轮累计额外刷新 2 次"],
+		"values":{"refresh_bonus":[1.0,2.0]}},
+	{"id":"veteran_roll", "name":"百战名册", "tag":"线性成长", "max":3, "base_cost":700, "increment":300,
+		"levels":["每经过 1 回合，全阵容额外生命 +220、兵略 +2", "每回合累计生命 +440、兵略 +4", "每回合累计生命 +660、兵略 +6"],
+		"values":{"hp_per_round":[220.0,440.0,660.0], "strategy_per_round":[2.0,4.0,6.0]}},
+	{"id":"supply_route", "name":"辎重商路", "tag":"经济", "max":3, "base_cost":550, "increment":300,
+		"levels":["每回合基础收入 +80（第 15 回合后仍生效）", "每回合累计 +160", "每回合累计 +240"],
+		"values":{"income":[80.0,160.0,240.0]}},
+	{"id":"front_oath", "name":"先登血誓", "tag":"前军构筑", "max":3, "base_cost":650, "increment":300,
+		"levels":["前排武将最大生命 +5%、伤害 +4%", "累计生命 +10%、伤害 +8%", "累计生命 +15%、伤害 +12%"],
+		"values":{"hp_pct":[0.05,0.10,0.15], "damage_pct":[0.04,0.08,0.12]}},
+	{"id":"middle_banner", "name":"中军令旗", "tag":"中军构筑", "max":3, "base_cost":650, "increment":300,
+		"levels":["中排武将兵略 +12、受控时间 -8%", "累计兵略 +24、受控 -16%", "累计兵略 +36、受控 -24%"],
+		"values":{"strategy":[12.0,24.0,36.0], "control_reduction":[0.08,0.16,0.24]}},
+	{"id":"rear_quiver", "name":"神机箭匣", "tag":"后军构筑", "max":3, "base_cost":650, "increment":300,
+		"levels":["后排武将伤害 +4%、开场行动条 +4", "累计伤害 +8%、行动条 +8", "累计伤害 +12%、行动条 +12"],
+		"values":{"damage_pct":[0.04,0.08,0.12], "opening_action":[4.0,8.0,12.0]}},
+	{"id":"extra_recruit", "name":"求贤加试", "tag":"一次性", "max":99, "base_cost":400, "increment":0, "consumable":true,
+		"levels":["下一回合额外进行 1 次武将三选一"]}
+]
+
 # 将印树保持七层深度，但成本压在可持续养成范围内。专属节点效果来自每名武将自己的数据树。
 const IMPRINT_NODE_COSTS := {"root":3, "role":5, "skill":7, "branch":9, "bond":8, "evergreen":10, "soul":16}
 const IMPRINT_ROOT_SWIFT_HASTE := 8.0
@@ -118,6 +145,11 @@ static func strategy_entry(id: String) -> Dictionary:
 
 static func doctrine_entry(id: String) -> Dictionary:
 	for entry in ENEMY_DOCTRINES:
+		if str(entry.id) == id: return entry
+	return {}
+
+static func armory_entry(id: String) -> Dictionary:
+	for entry in ARMORY_ITEMS:
 		if str(entry.id) == id: return entry
 	return {}
 

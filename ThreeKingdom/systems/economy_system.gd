@@ -127,7 +127,11 @@ func _replace_tianshu(book_id: String) -> bool:
 	return true
 
 func _unit_sell_price(unit: Dictionary) -> int:
-	return DEPLOYED_SELL_PRICE if int(unit.get("row", -1)) >= 0 else RESERVE_SELL_PRICE
+	var result := DEPLOYED_SELL_PRICE if int(unit.get("row", -1)) >= 0 else RESERVE_SELL_PRICE
+	var ledger_level := _tianshu_level("huozhi_milu")
+	if ledger_level == 1: result += 30
+	elif ledger_level >= 2: result += 80
+	return result
 
 func _economy_save_state() -> Dictionary:
 	return {

@@ -23,6 +23,7 @@ const TIANSHU_BOOKS := {
 	"taozhu_yice":{"name":"陶朱遗策", "en":"Legacy of Tao Zhu", "group":"通用·经济", "effects":["立即获得 300 金币。", "立即获得 600 金币。"]},
 	"tuntian_kaifu":{"name":"屯田开府", "en":"Agrarian Treasury", "group":"通用·经济", "effects":["每回合基础收入 +50。", "每回合基础收入 +100。"]},
 	"fujia_tianxia":{"name":"富甲天下", "en":"Wealth Under Heaven", "group":"通用·经济", "effects":["利息上限 +20。", "利息上限 +40，且每回合基础收入 +20。"]},
+	"huozhi_milu":{"name":"货殖秘录", "en":"Merchant's Ledger", "group":"通用·经济", "effects":["卖出任意武将时，额外获得 30 金币。", "卖出任意武将时，额外获得 80 金币。"]},
 	"jungong_juezhi":{"name":"军功爵制", "en":"Military Merit", "group":"通用·经济", "effects":["我方每击杀一名敌将，立即获得 40 金币。", "每次击杀获得 80 金币，且击杀者本回合兵略 +20。"]},
 	"mage_guoshi":{"name":"马革裹尸", "en":"Shrouded in Horsehide", "group":"通用·经济", "effects":["我方武将每阵亡一名，立即获得 40 金币。", "每次阵亡获得 90 金币。"]},
 	"maidu_huanzhu":{"name":"买椟还珠", "en":"Keep the Casket", "group":"通用·经济", "effects":["天书替换费用降低 80（降至 220）。", "天书替换费用降低 200（降至 100）。"]},

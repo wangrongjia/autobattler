@@ -22,6 +22,13 @@ func _endless_default_state() -> Dictionary:
 		"selected_candidate": "",
 		"doctrines": {},
 		"doctrine_history": [],
+		"armory": {},
+		"hero_legacies": {},
+		"armory_offers": [],
+		"armory_bought": [],
+		"armory_refresh_used": false,
+		"extra_recruit_round": 0,
+		"extra_recruit_count": 0,
 		"checkpoint": 0,
 		"checkpoint_reward": 0,
 		"checkpoint_imprints": 0,
@@ -39,7 +46,9 @@ func _run_reserve_limit() -> int:
 	return EndlessRules.RESERVE_LIMIT if _run_is_endless() else RESERVE_LIMIT
 
 func _run_draft_pick_count() -> int:
-	return EndlessRules.DRAFT_PICKS if _run_is_endless() else PICKS_PER_ROUND
+	if not _run_is_endless(): return PICKS_PER_ROUND
+	var bonus := int(endless_state.get("extra_recruit_count", 0)) if round_number == int(endless_state.get("extra_recruit_round", 0)) else 0
+	return EndlessRules.DRAFT_PICKS + bonus
 
 func _run_enemy_ruler_max_hp() -> int:
 	if not _run_is_endless(): return RULER_MAX_HP
@@ -63,8 +72,14 @@ func _is_free_tianshu_round() -> bool:
 	return round_number in FREE_TIANSHU_ROUNDS
 
 func _round_base_gold_income() -> int:
-	if _run_is_endless() and round_number > 15: return 0
-	return super._round_base_gold_income()
+	var result := 0 if _run_is_endless() and round_number > 15 else super._round_base_gold_income()
+	if _run_is_endless(): result += roundi(_endless_armory_value("supply_route", "income"))
+	return result
+
+func _tianshu_draft_refresh_limit() -> int:
+	var result := super._tianshu_draft_refresh_limit()
+	if _run_is_endless(): result += roundi(_endless_armory_value("scout_maps", "refresh_bonus"))
+	return result
 
 func _endless_new_run() -> void:
 	endless_state = _endless_default_state()
@@ -89,6 +104,10 @@ func _load_endless_state(value) -> void:
 func _endless_sanitize_state() -> void:
 	if not endless_state.get("strategies", {}) is Dictionary: endless_state.strategies = {}
 	if not endless_state.get("doctrines", {}) is Dictionary: endless_state.doctrines = {}
+	if not endless_state.get("armory", {}) is Dictionary: endless_state.armory = {}
+	if not endless_state.get("hero_legacies", {}) is Dictionary: endless_state.hero_legacies = {}
+	if not endless_state.get("armory_offers", []) is Array: endless_state.armory_offers = []
+	if not endless_state.get("armory_bought", []) is Array: endless_state.armory_bought = []
 	if not endless_state.get("candidates", []) is Array: endless_state.candidates = []
 	if not endless_state.get("strategy_history", []) is Array: endless_state.strategy_history = []
 	if not endless_state.get("doctrine_history", []) is Array: endless_state.doctrine_history = []
@@ -150,6 +169,9 @@ func _endless_open_checkpoint() -> void:
 	_endless_apply_checkpoint_training(checkpoint)
 	var doctrine := _endless_draw_doctrine()
 	_endless_roll_strategy_candidates()
+	endless_state.armory_bought = []
+	endless_state.armory_refresh_used = false
+	_endless_roll_armory_offers()
 	phase = "checkpoint"
 	_save_progression()
 	_log("[color=#f0c77a]【据点 %d】将魂 +%d%s；敌军获得【%s】。请选择且只能选择一项战策。[/color]" % [
@@ -232,6 +254,95 @@ func _endless_pick_strategy(id: String) -> bool:
 	_log("[color=#8fd4a0]【战策锁定】%s Lv%d：%s[/color]" % [str(entry.name), level, desc])
 	return true
 
+# ---------------- 军府：每据点随机军备构筑 ----------------
+
+func _endless_armory_level(id: String) -> int:
+	return int(endless_state.get("armory", {}).get(id, 0))
+
+func _endless_armory_value(id: String, key: String) -> float:
+	var level := _endless_armory_level(id)
+	if level <= 0: return 0.0
+	return EndlessRules.leveled_value(EndlessRules.armory_entry(id), key, level)
+
+func _endless_armory_price(token: String) -> int:
+	if token.begins_with("hero_legacy:"):
+		var hero_id := token.trim_prefix("hero_legacy:")
+		return 800 + 350 * int(endless_state.get("hero_legacies", {}).get(hero_id, 0))
+	var entry := EndlessRules.armory_entry(token)
+	if entry.is_empty(): return 0
+	return int(entry.get("base_cost", 0)) + int(entry.get("increment", 0)) * _endless_armory_level(token)
+
+func _endless_roll_armory_offers() -> void:
+	var pool: Array[String] = []
+	for entry in EndlessRules.ARMORY_ITEMS:
+		var id := str(entry.id)
+		if bool(entry.get("consumable", false)) or _endless_armory_level(id) < int(entry.max): pool.append(id)
+	pool.shuffle()
+	var offers: Array[String] = []
+	for id in pool:
+		if offers.size() >= 3: break
+		if not endless_state.armory_bought.has(id): offers.append(id)
+	var hero_ids: Array[String] = []
+	for unit in player_units:
+		var hero_id := str(unit.hero_id)
+		if not hero_ids.has(hero_id) and int(endless_state.hero_legacies.get(hero_id, 0)) < 3: hero_ids.append(hero_id)
+	hero_ids.shuffle()
+	if not hero_ids.is_empty():
+		var token := "hero_legacy:" + hero_ids[0]
+		if not endless_state.armory_bought.has(token): offers.append(token)
+	endless_state.armory_offers = offers
+
+func _endless_armory_offers() -> Array:
+	var result: Array = []
+	for raw_token in endless_state.get("armory_offers", []):
+		var token := str(raw_token)
+		if token.begins_with("hero_legacy:"):
+			var hero_id := token.trim_prefix("hero_legacy:")
+			var level := int(endless_state.hero_legacies.get(hero_id, 0))
+			result.append({"token":token, "name":"%s · 传世兵符" % _hero_name(hero_id), "tag":"核心武将", "level":level, "max":3,
+				"desc":"每经过 1 回合，该武将额外生命 +140、兵略 +1.5（当前升级后按 Lv%d 结算）" % (level + 1), "price":_endless_armory_price(token)})
+			continue
+		var entry := EndlessRules.armory_entry(token)
+		if entry.is_empty(): continue
+		var level := _endless_armory_level(token)
+		var consumable := bool(entry.get("consumable", false))
+		var desc := str((entry.levels as Array)[0 if consumable else clampi(level, 0, (entry.levels as Array).size() - 1)])
+		result.append({"token":token, "name":str(entry.name), "tag":str(entry.tag), "level":level, "max":int(entry.max), "desc":desc, "price":_endless_armory_price(token)})
+	return result
+
+func _endless_buy_armory(token: String) -> bool:
+	if phase != "checkpoint" or not endless_state.armory_offers.has(token): return false
+	if endless_state.armory_bought.has(token) or endless_state.armory_bought.size() >= EndlessRules.ARMORY_PURCHASE_LIMIT: return false
+	var price := _endless_armory_price(token)
+	if price <= 0 or not _spend_gold(price, "军府整备"): return false
+	if token.begins_with("hero_legacy:"):
+		var hero_id := token.trim_prefix("hero_legacy:")
+		endless_state.hero_legacies[hero_id] = mini(3, int(endless_state.hero_legacies.get(hero_id, 0)) + 1)
+		_log("[color=#e5c97a]【传世兵符】%s 成为本局重点培养武将，成长提高至 Lv%d。[/color]" % [_hero_name(hero_id), int(endless_state.hero_legacies[hero_id])])
+	elif token == "extra_recruit":
+		if int(endless_state.get("extra_recruit_round", 0)) != round_number + 1:
+			endless_state.extra_recruit_count = 0
+		endless_state.extra_recruit_round = round_number + 1
+		endless_state.extra_recruit_count = mini(2, int(endless_state.get("extra_recruit_count", 0)) + 1)
+		_log("[color=#8fd4a0]【求贤加试】下一回合额外进行 1 次武将三选一。[/color]")
+	else:
+		var entry := EndlessRules.armory_entry(token)
+		if entry.is_empty(): return false
+		endless_state.armory[token] = mini(int(entry.max), _endless_armory_level(token) + 1)
+		_log("[color=#8fd4a0]【军府·%s】提升至 Lv%d。[/color]" % [str(entry.name), _endless_armory_level(token)])
+	endless_state.armory_bought.append(token)
+	_endless_sync_player_roster()
+	call("_save_game", true)
+	return true
+
+func _endless_refresh_armory() -> bool:
+	if phase != "checkpoint" or bool(endless_state.get("armory_refresh_used", false)): return false
+	if not _spend_gold(EndlessRules.ARMORY_REFRESH_COST, "刷新军府备选"): return false
+	endless_state.armory_refresh_used = true
+	_endless_roll_armory_offers()
+	call("_save_game", true)
+	return true
+
 # ---------------- 敌军公开军势 ----------------
 
 func _endless_doctrine_level(id: String) -> int:
@@ -293,9 +404,10 @@ func _endless_imprint_mod(hero_id: String) -> Dictionary:
 func _endless_shared_growth(hero_id: String) -> Dictionary:
 	var imprint := _endless_imprint_mod(hero_id)
 	var linear_depth := maxi(0, round_number - 1)
+	var legacy_level := int(endless_state.get("hero_legacies", {}).get(hero_id, 0))
 	return {
-		"hp_flat":float(endless_state.player_growth.get("hp_flat", 0.0)) + EndlessRules.PLAYER_HP_PER_ROUND * linear_depth,
-		"strategy_flat":float(endless_state.player_growth.get("strategy_flat", 0.0)) + EndlessRules.PLAYER_STRATEGY_PER_ROUND * linear_depth,
+		"hp_flat":float(endless_state.player_growth.get("hp_flat", 0.0)) + (EndlessRules.PLAYER_HP_PER_ROUND + _endless_armory_value("veteran_roll", "hp_per_round") + 140.0 * legacy_level) * linear_depth,
+		"strategy_flat":float(endless_state.player_growth.get("strategy_flat", 0.0)) + (EndlessRules.PLAYER_STRATEGY_PER_ROUND + _endless_armory_value("veteran_roll", "strategy_per_round") + 1.5 * legacy_level) * linear_depth,
 		"cooldown_haste":float(endless_state.player_growth.get("cooldown_haste", 0.0)) + float(imprint.get("cooldown_haste_add", 0.0)),
 		"hp_pct":float(imprint.get("hp_pct", 0.0)) + float(imprint.get("max_hp_pct", 0.0)),
 		"strategy_pct":float(imprint.get("strategy_pct", 0.0)),
@@ -350,8 +462,18 @@ func _endless_on_battle_start() -> void:
 	for unit in combat_units:
 		if unit.team == "player":
 			_endless_sync_player_unit(unit, true)
+			if int(unit.row) == 0:
+				var hp_ratio := 1.0 + _endless_armory_value("front_oath", "hp_pct")
+				unit.max_hp = float(unit.max_hp) * hp_ratio
+				unit.hp = float(unit.hp) * hp_ratio
+				unit.endless_damage_pct = float(unit.endless_damage_pct) + _endless_armory_value("front_oath", "damage_pct")
+			elif int(unit.row) == 1:
+				unit.skill_value_bonus = float(unit.skill_value_bonus) + _endless_armory_value("middle_banner", "strategy")
+			elif int(unit.row) == 2:
+				unit.endless_damage_pct = float(unit.endless_damage_pct) + _endless_armory_value("rear_quiver", "damage_pct")
 			unit.endless_damage_pct = float(unit.endless_damage_pct) + faction_damage
-			unit.action = minf(ACTION_MAX, float(unit.action) + float(unit.endless_opening_action) + _endless_strategy_value("assault", "opening_action"))
+			var rear_action := _endless_armory_value("rear_quiver", "opening_action") if int(unit.row) == 2 else 0.0
+			unit.action = minf(ACTION_MAX, float(unit.action) + float(unit.endless_opening_action) + _endless_strategy_value("assault", "opening_action") + rear_action)
 			unit.invulnerable_time = maxf(float(unit.get("invulnerable_time", 0.0)), _endless_strategy_value("golden", "opening_invulnerable"))
 			var shield := float(unit.max_hp) * _endless_strategy_value("bulwark", "opening_shield")
 			unit.shield = float(unit.shield) + shield
@@ -392,6 +514,12 @@ func _endless_player_ruler_reduction() -> float:
 func _endless_enemy_ruler_damage_bonus() -> float:
 	return _endless_doctrine_value("siege", "ruler_damage") if _run_is_endless() else 0.0
 
+func _tianshu_control_decay_multiplier(unit: Dictionary) -> float:
+	var result := super._tianshu_control_decay_multiplier(unit)
+	if _run_is_endless() and unit.team == "player" and int(unit.row) == 1:
+		result *= 1.0 / maxf(0.05, 1.0 - _endless_armory_value("middle_banner", "control_reduction"))
+	return result
+
 # ---------------- 汇总/可视化数据 ----------------
 
 func _endless_player_summary() -> String:
@@ -416,6 +544,20 @@ func _endless_player_summary() -> String:
 		any = true
 		lines.append("%s Lv%d/%d：%s" % [str(entry.name), level, int(entry.max), str((entry.levels as Array)[level - 1])])
 	if not any: lines.append("尚无战策")
+	lines.append("")
+	lines.append("【军府构筑】")
+	var armory_any := false
+	for entry in EndlessRules.ARMORY_ITEMS:
+		var level := _endless_armory_level(str(entry.id))
+		if level <= 0 or bool(entry.get("consumable", false)): continue
+		armory_any = true
+		lines.append("%s Lv%d：%s" % [str(entry.name), level, str((entry.levels as Array)[clampi(level - 1, 0, (entry.levels as Array).size() - 1)])])
+	for hero_id in endless_state.get("hero_legacies", {}):
+		var level := int(endless_state.hero_legacies[hero_id])
+		if level <= 0: continue
+		armory_any = true
+		lines.append("%s · 传世兵符 Lv%d" % [_hero_name(str(hero_id)), level])
+	if not armory_any: lines.append("尚未购置军备")
 	return "\n".join(lines)
 
 func _endless_enemy_summary(at_round := round_number) -> String:
@@ -447,7 +589,8 @@ func _endless_checkpoint_payload() -> Dictionary:
 		"checkpoint":int(endless_state.get("checkpoint", 0)), "round":round_number,
 		"souls":int(endless_state.get("checkpoint_reward", 0)), "imprints":int(endless_state.get("checkpoint_imprints", 0)),
 		"candidates":_endless_strategy_candidates(), "pending":bool(endless_state.get("strategy_pending", false)),
-		"selected":str(endless_state.get("selected_candidate", "")),
+		"selected":str(endless_state.get("selected_candidate", "")), "armory":_endless_armory_offers(),
+		"armory_bought":int(endless_state.get("armory_bought", []).size()), "armory_refresh_used":bool(endless_state.get("armory_refresh_used", false)),
 		"player_summary":_endless_player_summary(), "enemy_summary":_endless_enemy_summary()
 	}
 

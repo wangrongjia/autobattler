@@ -77,6 +77,17 @@ func _initialize() -> void:
 		game.lab_enemy_lineup = [{"hero_id":"caocao", "level":2, "row":0, "col":0}, {"hero_id":"guojia", "level":1, "row":2, "col":1}]
 		game._refresh_lab_lineups()
 		await game._run_fast_battles()
+	if mode == "checkpoint":
+		game._endless_start_game()
+		game.menu_overlay.hide()
+		var checkpoint_hero: Dictionary = game._make_roster_unit("player", "huanggai")
+		checkpoint_hero.row = -1
+		game.player_units.append(checkpoint_hero)
+		game.round_number = 5
+		game.gold = 3000
+		game._endless_open_checkpoint()
+		game._render()
+		game.checkpoint_tabs.current_tab = 1
 	if mode == "formation" or mode == "combat":
 		game._choose_hero(game.choices[0])
 		game._choose_hero(game.choices[0])
@@ -89,7 +100,7 @@ func _initialize() -> void:
 			game._battle_tick()
 			game.tick_timer.stop()
 	await _settle()
-	var filenames := {"initial":"three_kingdoms_screen.png", "draft":"three_kingdoms_draft.png", "codex":"three_kingdoms_codex.png", "bond_codex":"three_kingdoms_bond_codex.png", "settings":"three_kingdoms_settings.png", "bond_progress":"three_kingdoms_bond_progress.png", "fire_effect":"three_kingdoms_fire_effect.png", "balance_lab":"three_kingdoms_balance_lab.png", "quick_battle":"three_kingdoms_quick_battle.png", "english":"three_kingdoms_english.png", "formation":"three_kingdoms_formation.png", "combat":"three_kingdoms_combat.png"}
+	var filenames := {"initial":"three_kingdoms_screen.png", "draft":"three_kingdoms_draft.png", "codex":"three_kingdoms_codex.png", "bond_codex":"three_kingdoms_bond_codex.png", "settings":"three_kingdoms_settings.png", "bond_progress":"three_kingdoms_bond_progress.png", "fire_effect":"three_kingdoms_fire_effect.png", "balance_lab":"three_kingdoms_balance_lab.png", "quick_battle":"three_kingdoms_quick_battle.png", "checkpoint":"three_kingdoms_checkpoint.png", "english":"three_kingdoms_english.png", "formation":"three_kingdoms_formation.png", "combat":"three_kingdoms_combat.png"}
 	_save(filenames[mode])
 	quit()
 

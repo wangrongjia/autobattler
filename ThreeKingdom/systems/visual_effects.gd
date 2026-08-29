@@ -19,7 +19,7 @@ func _play_visual_events(events: Array) -> void:
 				processed_groups[visual_group] = true
 				await _play_grouped_auxiliary(grouped_events)
 				continue
-			if group_style in ["row_burn", "tile_burn", "burn_tick", "poison_tick", "poison_apply", "weak_apply", "fear_tick", "fireball_chain"] or grouped_events.any(func(candidate): return str(candidate.get("kind", "")) in ["damage", "empty"]):
+			if group_style in ["row_burn", "tile_burn", "burn_tick", "poison_tick", "poison_apply", "weak_apply", "fear_tick", "charm_forced", "fireball_chain"] or grouped_events.any(func(candidate): return str(candidate.get("kind", "")) in ["damage", "empty"]):
 				processed_groups[visual_group] = true
 				await _play_grouped_damage(grouped_events)
 				continue
@@ -96,6 +96,14 @@ func _play_single_visual_event(event: Dictionary) -> void:
 			await heal_tween.finished
 		"charge":
 			await _play_action_shake(target, profile, speed_scale)
+		"repeat_cast":
+			_floating_text(target, t("羁绊二连 · 第2次", "BOND DOUBLE · 2ND"), Color("#e7a3ff"))
+			var repeat_tween := create_tween()
+			repeat_tween.tween_property(target, "scale", Vector2(1.12, 1.12), 0.08 * speed_scale)
+			repeat_tween.parallel().tween_property(target, "modulate", Color("#e7a3ff"), 0.08 * speed_scale)
+			repeat_tween.tween_property(target, "scale", Vector2.ONE, 0.14 * speed_scale)
+			repeat_tween.parallel().tween_property(target, "modulate", Color.WHITE, 0.14 * speed_scale)
+			await repeat_tween.finished
 		"skill":
 			var skill_tween := create_tween()
 			skill_tween.tween_property(target, "scale", Vector2(1.10, 1.10), 0.10 * speed_scale)
@@ -139,11 +147,14 @@ func _play_grouped_damage(grouped_events: Array) -> void:
 	# 群体伤害起手音:火球链用重击，燃/毒等持续伤害不配起手音(只有落点受击声)，其余按挥击。
 	if group_style == "fireball_chain":
 		_play_sfx("heavy", -5.0, 100, 0.08)
-	elif group_style not in ["row_burn", "tile_burn", "burn_tick", "poison_tick", "poison_apply", "weak_apply", "fear_tick"]:
+	elif group_style not in ["row_burn", "tile_burn", "burn_tick", "poison_tick", "poison_apply", "weak_apply", "fear_tick", "charm_forced"]:
 		_play_sfx("melee", -7.0, 70, 0.14)
 	var custom_impacts := false
 	if group_style in ["row_burn", "tile_burn", "burn_tick"]:
 		await _play_grouped_burn(grouped_events, speed_scale)
+	elif group_style == "charm_forced":
+		await _play_charm_forced(grouped_events, speed_scale)
+		custom_impacts = true
 	elif group_style in ["poison_tick", "poison_apply", "weak_apply", "fear_tick"]:
 		await _play_grouped_status_flare(grouped_events, speed_scale, group_style)
 	elif group_style == "fireball_chain" and is_instance_valid(actor):
@@ -191,6 +202,22 @@ func _play_grouped_damage(grouped_events: Array) -> void:
 		if last_death_tween == null: _play_sfx("death", -5.0, 80, 0.08) # 群体阵亡只响第一声
 		last_death_tween = _start_death_ghost(target, str(event.get("target_id", "")), speed_scale)
 	if last_death_tween != null: await last_death_tween.finished
+
+func _play_charm_forced(grouped_events: Array, speed_scale: float) -> void:
+	var hit = grouped_events.filter(func(event): return str(event.get("kind", "")) == "damage").front() if grouped_events.any(func(event): return str(event.get("kind", "")) == "damage") else null
+	if hit == null: return
+	var actor: Control = unit_cell_refs.get(str(hit.get("source_id", "")))
+	var target: Control = unit_cell_refs.get(str(hit.get("target_id", "")))
+	if not is_instance_valid(target): return
+	_floating_text(actor if is_instance_valid(actor) else target, t("魅惑 · 倒戈", "CHARMED · BETRAYAL"), Color("#e7a3ff"))
+	if is_instance_valid(actor) and actor != target:
+		var source_unit = _find_by_id(combat_units, str(hit.get("source_id", "")))
+		var profile := _hero_fx(str(source_unit.hero_id) if source_unit != null else "")
+		await _play_melee_strike(actor, target, speed_scale, profile, false)
+	if not is_instance_valid(target): return
+	_play_sfx("hit")
+	_floating_damage_text(target, int(hit.get("amount", 0)))
+	await _start_hit_recoil(target, speed_scale).finished
 
 func _play_grouped_status_flare(grouped_events: Array, speed_scale: float, group_style: String) -> void:
 	var is_poison := group_style in ["poison_tick", "poison_apply"]

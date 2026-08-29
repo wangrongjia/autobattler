@@ -540,14 +540,21 @@ func _scaled_cooldown_reduction(reduction: float) -> float:
 	return floorf(maxf(0.0, reduction) * BOND_COOLDOWN_REDUCTION_MULTIPLIER * 10.0 + 0.0001) / 10.0
 
 func _battle_tick() -> void:
-	if not battle_running or battle_paused or action_in_progress: return
+	if not battle_running or battle_paused: return
 	if _has_winner():
-		_finish_battle()
+		if not action_in_progress: _finish_battle()
 		return
-	var already_ready := combat_units.filter(func(unit): return unit.alive and _unit_has_active_skill(unit) and unit.stun <= 0 and unit.charm <= 0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.get("freeze", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
-	if not already_ready.is_empty():
-		_begin_action(already_ready[0])
+	if battle_time >= BATTLE_LIMIT and not final_battle:
+		if not action_in_progress: _finish_battle()
 		return
+	if not action_in_progress and not visual_events.is_empty():
+		_begin_effect_pause()
+		return
+	if not action_in_progress:
+		var already_ready := combat_units.filter(func(unit): return unit.alive and _unit_has_active_skill(unit) and unit.stun <= 0 and unit.charm <= 0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.get("freeze", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
+		if not already_ready.is_empty():
+			_begin_action(already_ready[0])
+			return
 	var delta := TICK * battle_speed
 	battle_time += delta
 	_record_replay_sample()
@@ -555,13 +562,8 @@ func _battle_tick() -> void:
 	var ambient_events: Array = visual_events.filter(func(event): return bool(event.get("nonblocking", false)))
 	if not ambient_events.is_empty():
 		visual_events = visual_events.filter(func(event): return not bool(event.get("nonblocking", false)))
-		call_deferred("_play_visual_events", ambient_events)
-	if _has_winner():
-		_finish_battle()
-		return
-	if not visual_events.is_empty():
-		_begin_effect_pause()
-		return
+		_queue_ambient_visual_events(ambient_events)
+	# 行动条与战斗时钟不再受状态动画或主动技能动画阻塞。动画期间只禁止开始下一次技能结算。
 	for unit in combat_units:
 		if not unit.alive or not _unit_has_active_skill(unit) or unit.stun > 0 or unit.charm > 0 or float(unit.get("fear", 0.0)) > 0.0 or float(unit.get("freeze", 0.0)) > 0.0: continue
 		var gain_per_second: float = ACTION_MAX / maxf(0.001, _unit_skill_cooldown(unit))
@@ -569,9 +571,16 @@ func _battle_tick() -> void:
 		unit.action = min(ACTION_MAX, float(unit.action) + gain_per_second * delta * _unit_action_gain_multiplier(unit) * (1.0 - float(unit.get("slow", 0.0)) - silence_slow))
 	_update_action_bars()
 	_update_battle_time_bar()
-	var ready := combat_units.filter(func(unit): return unit.alive and _unit_has_active_skill(unit) and unit.stun <= 0 and unit.charm <= 0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.get("freeze", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
-	if not ready.is_empty(): _begin_action(ready[0])
-	if battle_time >= BATTLE_LIMIT and not final_battle: _finish_battle()
+	if _has_winner():
+		if not action_in_progress: _finish_battle()
+		return
+	if not visual_events.is_empty():
+		if not action_in_progress: _begin_effect_pause()
+		return
+	if not action_in_progress:
+		var ready := combat_units.filter(func(unit): return unit.alive and _unit_has_active_skill(unit) and unit.stun <= 0 and unit.charm <= 0 and float(unit.get("fear", 0.0)) <= 0.0 and float(unit.get("freeze", 0.0)) <= 0.0 and float(unit.action) >= ACTION_MAX)
+		if not ready.is_empty(): _begin_action(ready[0])
+		elif battle_time >= BATTLE_LIMIT and not final_battle: _finish_battle()
 
 func _begin_action(unit: Dictionary) -> void:
 	if action_in_progress or not unit.alive: return
@@ -680,7 +689,7 @@ func _process_statuses(delta: float = TICK) -> void:
 				if adjacent.is_empty(): continue
 				var victim: Dictionary = adjacent[rng.randi_range(0, adjacent.size() - 1)]
 				var forced_amount := _unit_skill_stat_value(unit) * float(heroes.diaochan.ability_params.get("forced_attack_mult", 1.0))
-				_damage(unit, victim, forced_amount, "physical", t("魅惑倒戈", "Charmed betrayal"), "charm_attack:" + str(unit.id), "multi_target")
+				_damage(unit, victim, forced_amount, "physical", t("魅惑倒戈", "Charmed betrayal"), "charm_attack:" + str(unit.id), "charm_forced")
 		unit.charm = max(0.0, unit.charm - delta * control_decay)
 		if unit.charm <= 0.0:
 			unit.charm_forced_attack = false
@@ -823,7 +832,8 @@ func _perform_action(unit: Dictionary) -> void:
 	_after_active_skill(unit)
 	var qun_repeat_chance := 0.08 + (0.04 * _talent_level("qun", "逐鹿中原") if unit.team == "player" else 0.0)
 	if heroes[unit.hero_id].f == "qun" and int(unit.get("faction_tier", 0)) >= 3 and not _has_winner() and rng.randf() < qun_repeat_chance:
-		_log("[color=#d59af0]" + t("【乱世争衡】触发连续施法！", "[Chaos Struggle] Double cast triggered!") + "[/color]")
+		_log("[color=#d59af0]" + t("【乱世争衡】%s 触发羁绊二连：以下为第 2 次技能，不消耗行动条。" % _hero_name(str(unit.hero_id)), "[Chaos Struggle] %s triggers the second bond cast without consuming action." % _hero_name(str(unit.hero_id))) + "[/color]")
+		visual_events.append({"kind":"repeat_cast", "source_id":unit.id, "target_id":unit.id, "amount":2, "style":"magic"})
 		visual_events.append({"kind":"charge", "source_id":unit.id, "target_id":unit.id, "amount":0, "style":"magic"})
 		_cast_active_skill(unit)
 		_after_active_skill(unit)
@@ -2737,7 +2747,8 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		_log(_hero_name(target.hero_id) + t(" 反弹了指向性技能。", " reflects the targeted skill."))
 		return 0.0
 	var value: float = amount
-	var direct_tianshu_damage := source != null and group_style not in ["burn_tick", "poison_tick", "fear_tick"] and not str(visual_group).begins_with("status_")
+	var ambient_status_hit := group_style in ["burn_tick", "poison_tick", "fear_tick", "charm_forced"] or str(visual_group).begins_with("status_")
+	var direct_tianshu_damage := source != null and not ambient_status_hit
 	value *= 1.0 + float(target.get("vulnerable", 0.0))
 	if source != null:
 		value *= float(source.get("stat_mult", 1.0))
@@ -2826,7 +2837,7 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	_tianshu_on_damage(source, target, actual_damage, direct_tianshu_damage)
 	if propagate_links and actual_damage > 0.0: _propagate_pangtong_link(target, actual_damage, visual_group)
 	var effect_style := "effect" if source == null else ("magic" if damage_type == "magic" else ("ranged" if int(heroes[source.hero_id].range) > 2 else "melee"))
-	visual_events.append({"kind":"damage", "source_id":"" if source == null else source.id, "target_id":target.id, "team":target.team, "row":target.row, "col":target.col, "amount":round(value), "skill":true, "style":effect_style, "visual_group":visual_group, "group_style":group_style})
+	visual_events.append({"kind":"damage", "source_id":"" if source == null else source.id, "target_id":target.id, "team":target.team, "row":target.row, "col":target.col, "amount":round(value), "skill":true, "style":effect_style, "visual_group":visual_group, "group_style":group_style, "nonblocking":ambient_status_hit})
 	var source_name := t("环境", "Effect") if source == null else _hero_name(source.hero_id)
 	_log(source_name + t(" 对 ", " hits ") + _hero_name(target.hero_id) + t(" 造成 ", " for ") + str(round(value)) + t(" 伤害（", " damage (") + label + "）")
 	var wu_equalize_threshold := _tianshu_wu_equalize_threshold(target)
