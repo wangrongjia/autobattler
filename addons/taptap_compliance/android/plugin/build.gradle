@@ -1,0 +1,24 @@
+plugins {
+    id "com.android.library"
+}
+
+android {
+    namespace "com.threekingdom.taptap"
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 24
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    compileOnly files("../../../../android/build/libs/debug/godot-lib.template_debug.aar")
+    compileOnly "com.taptap.sdk:tap-core:4.10.7"
+    compileOnly "com.taptap.sdk:tap-login:4.10.7"
+    compileOnly "com.taptap.sdk:tap-compliance:4.10.7"
+}

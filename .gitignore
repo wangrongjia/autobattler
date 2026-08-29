@@ -6,3 +6,6 @@ Target/
 *.idsig
 audio_dl/
 build/
+.gradle/
+android/.build_version
+taptap.local.cfg

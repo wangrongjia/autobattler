@@ -28,6 +28,16 @@ window/size/window_width_override=1600
 window/size/window_height_override=900
 window/stretch/mode="canvas_items"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/taptap_compliance/plugin.cfg")
+
 [rendering]
 
 textures/vram_compression/import_etc2_astc=true
+
+[taptap]
+
+client_id=""
+client_token=""
+enable_log=false

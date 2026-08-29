@@ -1,5 +1,7 @@
 extends "res://ThreeKingdom/systems/visual_effects.gd"
 
+const TAPTAP_COMPLIANCE_GATE := preload("res://addons/taptap_compliance/taptap_compliance_gate.gd")
+
 func _ready() -> void:
 	rng.randomize()              # 用当前时间初始化随机数种子,保证每局随机不同
 	_add_extended_roster()       # 注册 武将
@@ -13,3 +15,5 @@ func _ready() -> void:
 	_build_ui()                  # 构建整个游戏界面(纯代码创建所有 UI 元素)
 	_new_game()                  # 开始新游戏(进入第 1 关选将阶段)
 	_build_main_menu()           # 构建主菜单覆盖层(盖在游戏上,等待玩家点击开始)
+	if OS.get_name() == "Android":
+		add_child(TAPTAP_COMPLIANCE_GATE.new())
