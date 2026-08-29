@@ -35,6 +35,6 @@ func _initialize() -> void:
 
 	assert("眩晕2.2秒" in game._skill_detail("caocao"))
 	assert("冻结5.4秒" in game._skill_detail("guojia"))
-	assert("冷却减少1秒" in game._skill_detail("chengong"))
+	assert("24%兵略值" in game._skill_detail("chengong"))
 	assert("灼烧3秒" in game._skill_detail("zhurong"))
 	quit()

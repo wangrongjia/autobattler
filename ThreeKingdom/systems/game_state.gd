@@ -347,7 +347,7 @@ func _add_extended_roster() -> void:
 	_register_hero("huanggai", "黄盖", "Huang Gai", "wu", 4380, 100, 8.8, 1, "Bitter-Flesh Column", "苦肉焚阵", "signature", {"max_hp_cost":0.10, "mult":2.0, "damage_cost_ratio":0.40, "zhouyu_burn":5.0, "zhouyu_burn_ratio":0.50, "sunjian_max_hp_cost":0.15, "sunjian_damage_cost_ratio":0.50}, "苦肉焚阵：消耗10%最大生命，对随机敌方一列造成200%兵略值加实际消耗生命40%的伤害；生命不足时消耗全部生命并在攻击后阵亡。", "Bitter-Flesh Column: Spend 10% max HP to damage an enemy column for 200% Strategy plus 40% of HP spent; spend all remaining HP and die after attacking if insufficient.")
 
 	_register_hero("gaoshun", "高顺", "Gao Shun", "qun", 5360, 100, 6.5, 1, "Formation Resolve", "陷阵之志", "signature", {"target_count":2, "mult":2.20, "vulnerable":0.40, "vulnerable_time":3.5, "lvbu_bonus_targets":1, "chengong_bonus_duration":3.5}, "陷阵之志：随机攻击两名敌军，造成220%兵略值伤害并施加6.3秒易碎。", "Formation Resolve: Strike 2 enemies for 220% Strategy and inflict Fragile for 6.3s.")
-	_register_hero("chengong", "陈宫", "Chen Gong", "qun", 2980, 100, 0.0, 2, "Measured Formation", "智迟谋速", "passive", {"cooldown_reduction":1.0, "lvbu_bonus_reduction":0.7, "gaoshun_bonus_reduction":0.7}, "智迟谋速（被动）：陈宫及其同列友军的技能冷却减少1秒。", "Measured Formation: Chen Gong and allies in his column reduce cooldowns by 1s.")
+	_register_hero("chengong", "陈宫", "Chen Gong", "qun", 2980, 100, 0.0, 2, "Measured Formation", "智迟谋速", "passive", {"haste_ratio":0.24, "lvbu_haste_ratio":0.16, "gaoshun_haste_ratio":0.16}, "智迟谋速（被动）：陈宫及其同列友军获得相当于陈宫24%兵略值的冷却极速；与吕布/高顺同阵时各额外+16%兵略值。", "Measured Formation (Passive): Chen Gong and allies in his column gain cooldown haste equal to 24% of his Strategy (+16% each with Lu Bu / Gao Shun).")
 	_register_hero("yanliang", "颜良", "Yan Liang", "qun", 5260, 100, 5.5, 1, "Hebei Fierce Assault", "河北猛袭", "signature", {"target_count":2, "wenchou_bonus_targets":1, "mult":2.0, "wenchou_damage_penalty_mult":0.30, "four_pillars_bonus_targets":1, "four_pillars_damage_bonus_mult":1.20}, "河北猛袭：随机攻击两名敌方中军或后军，造成200%兵略值伤害。", "Hebei Fierce Assault: Strike 2 enemy midguards or rearguards for 200% Strategy.")
 	_register_hero("wenchou", "文丑", "Wen Chou", "qun", 5260, 100, 5.5, 1, "Hebei Breakthrough", "河北破阵", "signature", {"target_count":2, "yanliang_bonus_targets":1, "mult":3.0, "yanliang_damage_penalty_mult":0.50, "four_pillars_bonus_targets":1, "four_pillars_damage_bonus_mult":1.50}, "河北破阵：随机攻击两名敌方前军或中军，造成300%兵略值伤害。", "Hebei Breakthrough: Strike 2 enemy vanguards or midguards for 300% Strategy.")
 	_register_hero("qunzhanghe", "群张郃", "Zhang He (Qun)", "qun", 300, 100, 6.0, 2, "Hebei Ward", "河北护阵", "signature", {"target_count":2, "shield_mult":2.0, "gaolan_shield_bonus_mult":0.60, "four_pillars_bonus_targets":1, "four_pillars_shield_bonus_mult":1.0}, "河北护阵：为当前生命值最低的两名友军施加200%兵略值护盾。", "Hebei Ward: Shield the 2 allies with the lowest current HP for 200% Strategy.")
@@ -426,7 +426,7 @@ func _apply_existing_faction_skill_reworks() -> void:
 	heroes.chengong.skill = "Measured Formation"
 	heroes.chengong.zh_skill = "智迟谋速"
 	heroes.chengong.ability = "passive"
-	_set_skill("chengong", {"cooldown_reduction":1.2, "lvbu_bonus_reduction":0.8, "gaoshun_bonus_reduction":0.8}, "智迟谋速（被动）：陈宫及其同列友军的技能冷却减少1.2秒，不受原冷却一半下限限制。", "Measured Formation: Chen Gong and allies in his column reduce cooldowns by 1.2s, bypassing the half-cooldown floor.")
+	_set_skill("chengong", {"haste_ratio":0.24, "lvbu_haste_ratio":0.16, "gaoshun_haste_ratio":0.16}, "智迟谋速（被动）：陈宫及其同列友军获得相当于陈宫24%兵略值的冷却极速；与吕布/高顺同阵时各额外+16%兵略值。极速按公式叠加、收益递减。", "Measured Formation (Passive): Chen Gong and allies in his column gain cooldown haste equal to 24% of his Strategy (+16% each with Lu Bu / Gao Shun); haste stacks with diminishing returns.")
 	heroes.gaoshun.skill = "Formation Resolve"
 	heroes.gaoshun.zh_skill = "陷阵之志"
 	_set_skill("gaoshun", {"target_count":2, "mult":2.20, "vulnerable":0.40, "vulnerable_time":3.5, "lvbu_bonus_targets":1, "chengong_bonus_duration":3.5}, "陷阵之志：随机攻击两名敌军，造成220%兵略值伤害并施加6.3秒易碎，易碎目标受到伤害提高0.4×兵略值%。", "Formation Resolve: Strike 2 enemies for 220% Strategy and inflict Fragile for 6.3s.")
@@ -551,7 +551,7 @@ func _make_roster_unit(team: String, hero_id: String) -> Dictionary:
 		"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0,
 		"vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":0.0, "spell_ward":0,
 		"cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0,
-		"bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0,
+		"bond_haste":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0,
 		"faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0,
 		"faction_cooldown_reduction":0.0, "shu_damage_stacks":0,
 		"four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false,

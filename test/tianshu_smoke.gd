@@ -55,7 +55,7 @@ func _init() -> void:
 	game._apply_tianshu_battle_start()
 	assert(is_equal_approx(game._tianshu_strategy_bonus(unit), 32.0))
 	assert(is_equal_approx(float(unit.max_hp), unit_base_hp * 1.12))
-	assert(is_equal_approx(game._tianshu_cooldown_reduction(unit), 0.5))
+	assert(is_equal_approx(game._tianshu_cooldown_haste(unit), 0.5 / float(game.heroes.sunshangxiang.cooldown) * 100.0))
 	game._apply_tianshu_battle_start()
 	assert(is_equal_approx(float(unit.max_hp), unit_base_hp * 1.12))
 	game._reset_tianshu_run()

@@ -26,7 +26,7 @@ func _play_hero_voice(hero_id: String, force := false) -> void:
 	skill_voice_player.play()
 
 func _ensure_unit_fields(unit: Dictionary) -> void:
-	var defaults := {"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0, "vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":0.0, "spell_ward":0, "cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0, "faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0, "faction_cooldown_reduction":0.0, "shu_damage_stacks":0, "shu_damage_decay_time":0.0,"four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false, "burn_missing_hp_scale":false, "burn_effects":[], "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0, "freeze":0.0, "freeze_shatter_damage":0.0, "freeze_shatter_per_second":0.0, "freeze_source_id":"", "poison":0.0, "poison_ratio":0.0, "poison_stacks":0, "poison_clock":0.0, "poison_source":"", "poison_effects":[], "regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_damage_reduction":0.0, "regen_source":"", "timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_damage_buff_source":"", "timed_reduction":0.0, "timed_reduction_time":0.0, "timed_action_bonus":0.0, "timed_action_time":0.0, "rear_damage_reduction":0.0, "rear_damage_reduction_time":0.0, "front_damage_reduction":0.0, "front_damage_reduction_time":0.0, "all_lifesteal":0.0, "all_lifesteal_time":0.0, "invulnerable_time":0.0, "bond_cooldown":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0, "skill_value_bonus":0.0, "gaolan_skill_value_bonus":0.0, "gaolan_aura_source":"", "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0, "skill_debuff_time":0.0, "zhangbao_revives_used":0}
+	var defaults := {"silence":0.0, "stealth":0.0, "slow":0.0, "slow_time":0.0, "vulnerable":0.0, "vulnerable_time":0.0, "grievous":0.0, "grievous_time":0.0, "strategy_mark":0.0, "zhuge_fire_mark":0.0, "spell_ward":0, "cast_count":0, "focus_target":"", "focus_stacks":0, "faction_tier":0, "faction_damage_reduction":0.0, "faction_hp_bonus":0.0, "faction_control_bonus":0.0, "faction_cooldown_reduction":0.0, "shu_damage_stacks":0, "shu_damage_decay_time":0.0,"four_heroes":false, "lvmeng_ganning":false, "stealth_ambush_bonus_ready":false, "burn_missing_hp_scale":false, "burn_effects":[], "fear":0.0, "fear_damage_ratio":0.0, "fear_clock":0.0, "freeze":0.0, "freeze_shatter_damage":0.0, "freeze_shatter_per_second":0.0, "freeze_source_id":"", "poison":0.0, "poison_ratio":0.0, "poison_stacks":0, "poison_clock":0.0, "poison_source":"", "poison_effects":[], "regen_per_second":0.0, "regen_time":0.0, "regen_clock":0.0, "regen_damage_reduction":0.0, "regen_source":"", "timed_damage_buff":0.0, "timed_damage_time":0.0, "timed_damage_buff_source":"", "timed_reduction":0.0, "timed_reduction_time":0.0, "timed_action_bonus":0.0, "timed_action_time":0.0, "rear_damage_reduction":0.0, "rear_damage_reduction_time":0.0, "front_damage_reduction":0.0, "front_damage_reduction_time":0.0, "all_lifesteal":0.0, "all_lifesteal_time":0.0, "invulnerable_time":0.0, "bond_haste":0.0, "sunquan_initial_max_hp":0.0, "sunshangxiang_skill_bonus":0.0, "skill_value_bonus":0.0, "gaolan_skill_value_bonus":0.0, "gaolan_aura_source":"", "timed_skill_value_bonus":0.0, "timed_skill_value_time":0.0, "liushan_aura_damage_bonus":0.0, "liushan_aura_lifesteal":0.0, "chain_effects":[], "four_pillars":false, "charm_forced_attack":false, "charm_attack_clock":0.0, "dongzhuo_diaochan_hp_bonus":0.0, "skill_debuff_time":0.0, "zhangbao_revives_used":0}
 	for key in defaults:
 		if not unit.has(key): unit[key] = defaults[key]
 
@@ -180,7 +180,7 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 		unit.huanggai_sunjian = false
 		unit.taishici_ganning = false
 		unit.luxun_sunquan = false
-		unit.bond_cooldown = 0.0
+		unit.bond_haste = 0.0
 		unit.dingfeng_xusheng = false
 		unit.heaven_death = false
 		unit.one_rider = false
@@ -252,26 +252,18 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 			if announce: _log(t("【五子良将】五人绝技全部获得完全体强化。", "[Five Elite Generals] All five signature skills reach their complete form."))
 		var xiahouyuan = _combat_hero(team, "xiahouyuan")
 		if xiahouyuan != null:
-			var xhy_cd := float(heroes.xiahouyuan.cooldown)
 			var cd_reduction := _scaled_cooldown_reduction(float(heroes.xiahouyuan.ability_params.get("bond_cooldown_reduction", 0.5)))
-			if _roster_has_all(active, ["xiahouyuan", "caoren"]): xhy_cd -= cd_reduction
-			if _roster_has_all(active, ["xiahouyuan", "xiahoudun"]): xhy_cd -= cd_reduction
-			xiahouyuan.bond_cooldown = xhy_cd
+			if _roster_has_all(active, ["xiahouyuan", "caoren"]): _add_bond_cooldown_haste(xiahouyuan, cd_reduction)
+			if _roster_has_all(active, ["xiahouyuan", "xiahoudun"]): _add_bond_cooldown_haste(xiahouyuan, cd_reduction)
 		var guojia = _combat_hero(team, "guojia")
 		if guojia != null:
-			var guo_cd := float(heroes.guojia.cooldown)
-			if _roster_has_all(active, ["guojia", "jiaxu"]): guo_cd -= _scaled_cooldown_reduction(float(heroes.guojia.ability_params.get("jiaxu_cooldown_reduction", 1.6)))
-			guojia.bond_cooldown = guo_cd
+			if _roster_has_all(active, ["guojia", "jiaxu"]): _add_bond_cooldown_haste(guojia, _scaled_cooldown_reduction(float(heroes.guojia.ability_params.get("jiaxu_cooldown_reduction", 1.6))))
 		var xunyu = _combat_hero(team, "xunyu")
 		if xunyu != null:
-			var xun_cd := float(heroes.xunyu.cooldown)
-			if _roster_has_all(active, ["xunyu", "jiaxu"]): xun_cd -= _scaled_cooldown_reduction(float(heroes.xunyu.ability_params.get("jiaxu_cooldown_reduction", 1.6)))
-			xunyu.bond_cooldown = xun_cd
+			if _roster_has_all(active, ["xunyu", "jiaxu"]): _add_bond_cooldown_haste(xunyu, _scaled_cooldown_reduction(float(heroes.xunyu.ability_params.get("jiaxu_cooldown_reduction", 1.6))))
 		var jiaxu = _combat_hero(team, "jiaxu")
 		if jiaxu != null:
-			var jia_cd := float(heroes.jiaxu.cooldown)
-			if _roster_has_all(active, ["jiaxu", "xunyu"]): jia_cd -= _scaled_cooldown_reduction(float(heroes.jiaxu.ability_params.get("xunyu_cooldown_reduction", 1.6)))
-			jiaxu.bond_cooldown = jia_cd
+			if _roster_has_all(active, ["jiaxu", "xunyu"]): _add_bond_cooldown_haste(jiaxu, _scaled_cooldown_reduction(float(heroes.jiaxu.ability_params.get("xunyu_cooldown_reduction", 1.6))))
 		if _roster_has_all(active, ["sunjian", "sunce", "sunquan", "sunshangxiang"]):
 			for id in ["sunjian", "sunce", "sunquan", "sunshangxiang"]: _combat_hero(team, id).sun_legacy = true
 			if announce: _log(t("【孙氏之志】强化孙坚、孙策、孙权与孙尚香的专属技能。", "[Sun Legacy] Empowers the signature skills of Sun Jian, Sun Ce, Sun Quan, and Sun Shangxiang."))
@@ -303,8 +295,8 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 			_combat_hero(team, "taishici").taishici_ganning = true
 			_combat_hero(team, "ganning").taishici_ganning = true
 			var bonded_ganning = _combat_hero(team, "ganning")
-			bonded_ganning.bond_cooldown = maxf(0.1, float(heroes.ganning.cooldown) - _scaled_cooldown_reduction(float(heroes.ganning.ability_params.get("taishici_cooldown_reduction", 1.2))))
-			if announce: _log(t("【江表双锋】太史慈伤害增加60%兵略值；甘宁冷却减少2.1秒。", "[Twin Blades of Jiangbiao] Taishi Ci gains 60% Strategy damage; Gan Ning's cooldown is reduced by 2.1s."))
+			_add_bond_cooldown_haste(bonded_ganning, _scaled_cooldown_reduction(float(heroes.ganning.ability_params.get("taishici_cooldown_reduction", 1.2))))
+			if announce: _log(t("【江表双锋】太史慈伤害增加60%兵略值；甘宁获得18冷却极速。", "[Twin Blades of Jiangbiao] Taishi Ci gains 60% Strategy damage; Gan Ning gains 18 cooldown haste."))
 		if _roster_has_all(active, ["luxun", "sunquan"]):
 			_combat_hero(team, "luxun").luxun_sunquan = true
 			_combat_hero(team, "sunquan").luxun_sunquan = true
@@ -321,18 +313,16 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 			if announce: _log(t("【河北四庭柱】颜良、文丑增加目标与伤害，高览扩大兵略值光环，群张郃强化护盾。", "[Hebei Pillars] Yan Liang and Wen Chou gain targets and damage, Gao Lan expands his Strategy aura, and Zhang He empowers his wards."))
 		var chengong = _combat_hero(team, "chengong")
 		if chengong != null and chengong.alive:
-			var cooldown_reduction := float(heroes.chengong.ability_params.get("cooldown_reduction", 1.0))
-			if _roster_has_all(active, ["chengong", "lvbu"]): cooldown_reduction += float(heroes.chengong.ability_params.get("lvbu_bonus_reduction", 0.8))
-			if _roster_has_all(active, ["chengong", "gaoshun"]): cooldown_reduction += float(heroes.chengong.ability_params.get("gaoshun_bonus_reduction", 0.8))
-			cooldown_reduction *= _unit_skill_effect_multiplier(chengong)
+			var haste_ratio := float(heroes.chengong.ability_params.get("haste_ratio", 0.24))
+			if _roster_has_all(active, ["chengong", "lvbu"]): haste_ratio += float(heroes.chengong.ability_params.get("lvbu_haste_ratio", 0.16))
+			if _roster_has_all(active, ["chengong", "gaoshun"]): haste_ratio += float(heroes.chengong.ability_params.get("gaoshun_haste_ratio", 0.16))
+			var bond_haste := _unit_skill_stat_value(chengong) * haste_ratio * _unit_skill_effect_multiplier(chengong)
 			for ally in active:
 				if not ally.alive or int(ally.col) != int(chengong.col): continue
-				var current_cooldown := float(ally.get("bond_cooldown", 0.0))
-				if current_cooldown <= 0.0: current_cooldown = float(heroes[ally.hero_id].cooldown)
-				ally.bond_cooldown = maxf(0.1, current_cooldown - cooldown_reduction)
-				# 增益估算（冷却类，仅开场记一次）：加速出手≈dps×r/(cd-r)×预期剩余时长。
+				ally.bond_haste = float(ally.get("bond_haste", 0.0)) + bond_haste
+				# 增益估算（冷却类，仅开场记一次）：出手频率增幅≈极速/(100+极速)。
 				if opening and ally.id != chengong.id:
-					_add_stat(chengong, "buff", _unit_live_dps(ally) * cooldown_reduction / maxf(0.5, current_cooldown - cooldown_reduction) * SUPPORT_AURA_HORIZON)
+					_add_stat(chengong, "buff", _unit_live_dps(ally) * (bond_haste / (100.0 + bond_haste)) * SUPPORT_AURA_HORIZON)
 		var gaolan = _combat_hero(team, "gaolan")
 		if gaolan != null and gaolan.alive:
 			var skill_bonus_ratio := float(heroes.gaolan.ability_params.get("skill_bonus_ratio", 0.20))
@@ -355,7 +345,7 @@ func _apply_combo_bonds(opening := true, announce := true) -> void:
 
 func _sync_duplicate_bond_benefits(team: String, opening: bool) -> void:
 	var templates := {}
-	var fields := ["heal_multiplier", "charm_multiplier", "control_multiplier", "current_hp_ratio", "ghost_bond", "multi_bonus", "burn_multiplier", "heal_extra_targets", "four_heroes", "lvmeng_ganning", "sun_legacy", "ambush_link", "sunce_taishi", "sunce_daqiao", "zhouyu_xiaoqiao", "zhouyu_huanggai", "huanggai_sunjian", "taishici_ganning", "luxun_sunquan", "bond_cooldown", "dingfeng_xusheng", "heaven_death", "one_rider", "fated_enemies", "flying_meteor", "skill_value_bonus", "liushan_aura_damage_bonus", "liushan_aura_lifesteal", "four_pillars"]
+	var fields := ["heal_multiplier", "charm_multiplier", "control_multiplier", "current_hp_ratio", "ghost_bond", "multi_bonus", "burn_multiplier", "heal_extra_targets", "four_heroes", "lvmeng_ganning", "sun_legacy", "ambush_link", "sunce_taishi", "sunce_daqiao", "zhouyu_xiaoqiao", "zhouyu_huanggai", "huanggai_sunjian", "taishici_ganning", "luxun_sunquan", "bond_haste", "dingfeng_xusheng", "heaven_death", "one_rider", "fated_enemies", "flying_meteor", "skill_value_bonus", "liushan_aura_damage_bonus", "liushan_aura_lifesteal", "four_pillars"]
 	for unit in _team_units(team):
 		if unit.alive and not templates.has(str(unit.hero_id)):
 			templates[str(unit.hero_id)] = unit
@@ -473,15 +463,23 @@ func _unit_action_gain_multiplier(unit: Dictionary) -> float:
 	return result
 
 func _unit_skill_cooldown(unit: Dictionary) -> float:
-	var bond_value := float(unit.get("bond_cooldown", 0.0))
-	var original := float(heroes[unit.hero_id].cooldown)
-	var base := bond_value if bond_value > 0.0 else original
-	var talent_reduction := float(unit.get("talent_cooldown_reduction", 0.0))
-	var rune_reduction := float(unit.get("rune_cooldown_reduction", 0.0))
-	# 天赋与符文的冷却缩减合并计算，合计最多达到武将原始冷却的一半，超出部分舍弃。
-	# 天书与羁绊（如陈宫被动）的冷却缩减不受此上限约束，仅受最终 2 秒下限保护。
-	var progression_reduction := minf(talent_reduction + rune_reduction, original * 0.5)
-	return maxf(2.0, base - progression_reduction - _tianshu_cooldown_reduction(unit))
+	# 所有来源汇入同一冷却极速池：实际冷却 = 基础冷却 × 100 / (100 + 极速)。
+	# 极速越高收益越递减；最终冷却最低 2 秒。负极速会按同一公式拖慢冷却。
+	var base := float(heroes[unit.hero_id].cooldown)
+	if base <= 0.05: return 0.0
+	var haste := maxf(-90.0, _unit_cooldown_haste(unit))
+	return maxf(2.0, base * 100.0 / (100.0 + haste))
+
+func _unit_cooldown_haste(unit: Dictionary) -> float:
+	return float(unit.get("talent_cooldown_haste", 0.0)) \
+		+ float(unit.get("rune_cooldown_haste", 0.0)) \
+		+ float(unit.get("bond_haste", 0.0)) \
+		+ _tianshu_cooldown_haste(unit)
+
+func _add_bond_cooldown_haste(unit: Dictionary, equivalent_seconds: float) -> void:
+	var base := float(heroes[unit.hero_id].cooldown)
+	if base <= 0.05 or equivalent_seconds <= 0.0: return
+	unit.bond_haste = float(unit.get("bond_haste", 0.0)) + equivalent_seconds / base * 100.0
 
 func _unit_has_active_skill(unit: Dictionary) -> bool:
 	return str(heroes[unit.hero_id].get("ability", "")) != "passive"

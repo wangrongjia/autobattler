@@ -3,7 +3,7 @@ extends "res://ThreeKingdom/systems/progression_system.gd"
 # 天书只在本局有效。独立的天书演武，以及所有难度的闯关均会启用本系统。
 const TIANSHU_BOOKS := {
 	"pojun":{"name":"破军天章", "en":"Army-Breaking Canon", "group":"通用·进攻", "effects":["所有我方武将兵略值 +16。", "所有我方武将兵略值 +32。"]},
-	"fengchi":{"name":"风驰电掣", "en":"Lightning March", "group":"通用·进攻", "effects":["所有我方武将技能冷却减少 0.25 秒。", "所有我方武将技能冷却减少 0.5 秒。"]},
+	"fengchi":{"name":"风驰电掣", "en":"Lightning March", "group":"通用·进攻", "effects":["所有我方武将获得相当于原冷却减少 0.25 秒的冷却极速。", "等值提高至原冷却减少 0.5 秒的冷却极速。"]},
 	"xianfa":{"name":"先发制人", "en":"First Strike", "group":"通用·进攻", "effects":["每场战斗开始时，所有我方武将行动条 +10。", "开场行动条加成提高至 +20。"]},
 	"chengxu":{"name":"乘虚而入", "en":"Exploit Weakness", "group":"通用·进攻", "effects":["对带有任意减益或控制的敌人伤害提高 10%。", "伤害提高至 20%。"]},
 	"canyang":{"name":"残阳血战", "en":"Last-Light Bloodbath", "group":"通用·进攻", "effects":["生命低于 50%时造成伤害提高 12%。", "增伤提高至 24%，并获得 10%全能吸血。"]},
@@ -49,7 +49,7 @@ const TIANSHU_BOOKS := {
 	"wu_tongzhou":{"name":"同舟共命", "en":"Shared Fate", "group":"吴", "faction":"wu", "effects":["吴 8 人羁绊的生命均摊改为任一吴将低于 10%生命时触发。", "触发阈值提高至低于 30%生命。"]},
 	"wu_zhiheng":{"name":"制衡之术", "en":"Art of Balance", "group":"吴", "faction":"wu", "effects":["每 5 秒，行动条最高和最低的吴将归于平均后都增加 15。", "归于平均后都增加 30，且二者获得 5 秒 10%增伤。"]},
 	"wu_yinghao":{"name":"江表英豪", "en":"Heroes of Jiangbiao", "group":"吴", "faction":"wu", "effects":["每名吴将首次施法获得 6%最大生命护盾。", "护盾提高至 12%，护盾存在时兵略 +50。"]},
-	"qun_jishu":{"name":"乱世疾书", "en":"Chaotic Age Codex", "group":"群", "faction":"qun", "effects":["群将技能冷却减少 0.35 秒。", "减少 0.7 秒。"]},
+	"qun_jishu":{"name":"乱世疾书", "en":"Chaotic Age Codex", "group":"群", "faction":"qun", "effects":["群将获得相当于原冷却减少 0.35 秒的冷却极速。", "等值提高至原冷却减少 0.7 秒的冷却极速。"]},
 	"qun_wushuang":{"name":"无双战意", "en":"Peerless Will", "group":"群", "faction":"qun", "effects":["群将每损失 10%生命，兵略 +6。", "每层兵略 +12，并获得 1%减伤。"]},
 	"qun_huangtian":{"name":"黄天雷契", "en":"Yellow Heaven Pact", "group":"群", "faction":"qun", "effects":["群将累计施法 5 次后，雷击 2 个随机敌方格，造成 200%平均兵略伤害。", "每 4 次触发，雷击 3 格造成 200%平均兵略伤害，并有 20%概率眩晕 1 秒。"]},
 	"qun_xiaoxiong":{"name":"枭雄并起", "en":"Rival Warlords", "group":"群", "faction":"qun", "effects":["每名上阵群将使全体群将兵略 +4，最多计入 8 名。", "每名群将提高至兵略 +8，最多计入 8 名。"]},
@@ -375,9 +375,10 @@ func _tianshu_recompute_unit_stats(unit: Dictionary) -> void:
 	unit.hp = clampf(new_max * hp_ratio, 0.0, new_max)
 	unit.tianshu_strategy_bonus = strategy_flat
 	unit.tianshu_strategy_multiplier = strategy_multiplier
-	unit.tianshu_cooldown_reduction = 0.0
-	if _tianshu_level("fengchi") > 0: unit.tianshu_cooldown_reduction += 0.25 * _tianshu_level("fengchi")
-	if faction == "qun" and _tianshu_level("qun_jishu") > 0: unit.tianshu_cooldown_reduction += 0.35 * _tianshu_level("qun_jishu")
+	var equivalent_seconds := 0.25 * _tianshu_level("fengchi")
+	if faction == "qun": equivalent_seconds += 0.35 * _tianshu_level("qun_jishu")
+	var base_cooldown := float(heroes[unit.hero_id].cooldown)
+	unit.tianshu_cooldown_haste = equivalent_seconds / base_cooldown * 100.0 if base_cooldown > 0.05 else 0.0
 
 func _apply_tianshu_battle_start() -> void:
 	if not _tianshu_enabled(): return
@@ -416,8 +417,8 @@ func _tianshu_strategy_bonus(unit: Dictionary) -> float:
 func _tianshu_strategy_multiplier(unit: Dictionary) -> float:
 	return float(unit.get("tianshu_strategy_multiplier", 1.0)) if unit.team == "player" and _tianshu_enabled() else 1.0
 
-func _tianshu_cooldown_reduction(unit: Dictionary) -> float:
-	return float(unit.get("tianshu_cooldown_reduction", 0.0)) if unit.team == "player" and _tianshu_enabled() else 0.0
+func _tianshu_cooldown_haste(unit: Dictionary) -> float:
+	return float(unit.get("tianshu_cooldown_haste", 0.0)) if unit.team == "player" and _tianshu_enabled() else 0.0
 
 func _tianshu_control_source_multiplier(unit: Dictionary) -> float:
 	if not _tianshu_enabled() or unit.team != "player": return 1.0

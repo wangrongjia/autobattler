@@ -23,7 +23,7 @@ func _initialize() -> void:
 	assert(is_equal_approx(float(game.heroes.xiahouyuan.ability_params.bond_damage_bonus_mult), 0.5))
 	assert(is_equal_approx(float(game.heroes.guojia.ability_params.empty_damage_mult), 2.8))
 	assert(is_equal_approx(float(game.heroes.zhouyu.ability_params.missing_hp_bonus_per_step), 0.06))
-	assert(is_equal_approx(float(game.heroes.chengong.ability_params.cooldown_reduction), 1.2))
+	assert(is_equal_approx(float(game.heroes.chengong.ability_params.haste_ratio), 0.24))
 	assert(int(game.heroes.qunzhanghe.ability_params.four_pillars_bonus_targets) == 2)
 	assert(is_equal_approx(float(game.heroes.zuoci.ability_params.thunder_mult), 2.0))
 	print("catalog_patch:parameters_ok")

@@ -69,11 +69,11 @@ func _init() -> void:
 	var extreme_rune := {"uid":1, "tier":6, "kind":"Q2"}
 	var extreme_effect: Dictionary = game._rune_effect(extreme_rune)
 	assert(is_equal_approx(float(extreme_effect.hp), -320.0))
-	assert(is_equal_approx(float(extreme_effect.cooldown), 2.0))
+	assert(is_equal_approx(float(extreme_effect.cooldown), 40.0))
 	game.rune_inventory = [extreme_rune, {"uid":2, "tier":6, "kind":"Q2"}, {"uid":3, "tier":6, "kind":"Q2"}]
 	game.rune_loadouts = {"sunshangxiang":[1, 2, 3]}
 	var player = game._make_roster_unit("player", "sunshangxiang")
-	assert(is_equal_approx(game._unit_skill_cooldown(player), float(game.heroes.sunshangxiang.cooldown) * 0.5))
+	assert(is_equal_approx(game._unit_skill_cooldown(player), float(game.heroes.sunshangxiang.cooldown) * 100.0 / 220.0))
 	game.general_souls = game.RUNE_DRAW_COST * 10
 	game.rune_inventory = []
 	var ten_draws: Array = game._draw_runes(10)

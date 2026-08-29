@@ -40,7 +40,7 @@ const RUNE_KINDS := [
 	{"id":"Q6", "name":"深谋", "class":"极", "positive":"strategy", "negative":"cooldown"}
 ]
 
-# [节点名, 层数, 最大等级, 每级生命, 每级兵略, 每级冷却缩减, 上层累计解锁门槛]
+# [节点名, 层数, 最大等级, 每级生命, 每级兵略, 旧制每级减秒（运行时×20换算极速）, 上层累计解锁门槛]
 const TALENT_TREES := {
 	"all":{"name":"通用·天下大势", "faction":"", "nodes":[
 		["厚德",1,5,40.0,0.0,0.0,0], ["修文",1,5,0.0,1.0,0.0,0], ["敏行",1,5,0.0,0.0,0.05,0],
@@ -340,13 +340,13 @@ func _rune_effect(rune: Dictionary) -> Dictionary:
 	for stat in str(kind.get("positive", "")).split(",", false):
 		if stat == "hp": result.hp += amount * 40.0
 		elif stat == "strategy": result.strategy += amount
-		elif stat == "cooldown": result.cooldown += amount * 0.05
+		elif stat == "cooldown": result.cooldown += amount
 	if not str(kind.get("negative", "")).is_empty():
 		var penalty := float(tier_data.penalty)
 		match str(kind.negative):
 			"hp": result.hp -= penalty * 40.0
 			"strategy": result.strategy -= penalty
-			"cooldown": result.cooldown -= penalty * 0.05
+			"cooldown": result.cooldown -= penalty
 	return result
 
 func _rune_description(rune: Dictionary) -> String:
@@ -354,7 +354,7 @@ func _rune_description(rune: Dictionary) -> String:
 	var parts: Array[String] = []
 	if not is_zero_approx(float(effect.hp)): parts.append("生命%+.0f" % float(effect.hp))
 	if not is_zero_approx(float(effect.strategy)): parts.append("兵略%+.1f" % float(effect.strategy))
-	if not is_zero_approx(float(effect.cooldown)): parts.append(("冷却缩减+%.3fs" % float(effect.cooldown)) if float(effect.cooldown) > 0 else "冷却增加%.3fs" % absf(float(effect.cooldown)))
+	if not is_zero_approx(float(effect.cooldown)): parts.append(("冷却极速+%.0f" % float(effect.cooldown)) if float(effect.cooldown) > 0 else "冷却极速%.0f（拖慢冷却）" % float(effect.cooldown))
 	return " · ".join(parts)
 
 func _rune_display_name(rune: Dictionary) -> String:
@@ -387,7 +387,7 @@ func _talent_effect_description(tree_id: String, node_name: String) -> String:
 		"all:神算":"每场战斗开局随机 3 名友军行动条 +30。",
 		"all:百炼":"一级使符文转换消耗降低 20%，二级降低 50%。",
 		"all:天命":"所有阵营羁绊数值额外提高 20%。",
-		"all:群英":"所有武将生命 +400、兵略 +10、技能冷却减少 0.5 秒。",
+		"all:群英":"所有武将生命 +400、兵略 +10、冷却极速 +10。",
 		"all:长治":"我方主公最大生命值增加 10000。",
 		"shu:汉室坚壁":"1级：第 1 回合开始时随机获得 1 名蜀阵营武将加入备战席；2级：前 2 回合每回合各获得 1 名。",
 		"shu:桃园同心":"每级使蜀阵营 8 人羁绊叠层上限 +1、每层减伤 +1%、持续时间 +1 秒。",
@@ -405,7 +405,7 @@ func _talent_effect_description(tree_id: String, node_name: String) -> String:
 	var effects: Array[String] = []
 	if float(node[3]) != 0.0: effects.append("每级生命 %+.0f，满级 %+.0f" % [float(node[3]), float(node[3]) * int(node[2])])
 	if float(node[4]) != 0.0: effects.append("每级兵略 %+.1f，满级 %+.1f" % [float(node[4]), float(node[4]) * int(node[2])])
-	if float(node[5]) != 0.0: effects.append("每级技能冷却减少 %.3f 秒，满级减少 %.3f 秒" % [float(node[5]), float(node[5]) * int(node[2])])
+	if float(node[5]) != 0.0: effects.append("每级冷却极速 +%.1f，满级 +%.1f（实际冷却=基础冷却×100/(100+极速)）" % [float(node[5]) * 20.0, float(node[5]) * 20.0 * int(node[2])])
 	return "；".join(effects) + "。"
 
 func _talent_points_before_layer(tree_id: String, layer: int) -> int:
@@ -447,7 +447,7 @@ func _talent_stat_bonus(hero_id: String) -> Dictionary:
 			var level := _talent_level(tree_id, str(node[0]))
 			result.hp += float(node[3]) * level
 			result.strategy += float(node[4]) * level
-			result.cooldown += float(node[5]) * level
+			result.cooldown += float(node[5]) * level * 20.0
 	return result
 
 func _rune_stat_bonus(hero_id: String) -> Dictionary:
@@ -476,8 +476,8 @@ func _apply_progression_to_new_unit(unit: Dictionary) -> void:
 	unit.max_hp = maxf(1.0, base_hp + float(talent.hp) + rune_hp)
 	unit.hp = unit.max_hp
 	unit.skill_value_bonus = float(talent.strategy) + float(runes.strategy)
-	unit.talent_cooldown_reduction = float(talent.cooldown)
-	unit.rune_cooldown_reduction = float(runes.cooldown)
+	unit.talent_cooldown_haste = float(talent.cooldown)
+	unit.rune_cooldown_haste = float(runes.cooldown)
 
 func _player_ruler_max_hp() -> int:
 	return RULER_MAX_HP + 4000 * _talent_level("all", "明君") + 10000 * _talent_level("all", "长治")

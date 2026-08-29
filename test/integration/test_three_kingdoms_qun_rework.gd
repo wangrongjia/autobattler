@@ -57,8 +57,10 @@ func _initialize() -> void:
 	gaoshun.col = 0
 	game.combat_units = [chengong, lvbu, gaoshun]
 	game._apply_combo_bonds(false, false)
-	assert(is_equal_approx(float(lvbu.bond_cooldown), 10.2))
-	assert(is_equal_approx(float(gaoshun.bond_cooldown), 10.2))
+	assert(is_equal_approx(float(lvbu.bond_haste), 56.0))
+	assert(is_equal_approx(float(gaoshun.bond_haste), 56.0))
+	assert(is_equal_approx(game._unit_skill_cooldown(lvbu), float(game.heroes.lvbu.cooldown) * 100.0 / 156.0))
+	assert(is_equal_approx(game._unit_skill_cooldown(gaoshun), float(game.heroes.gaoshun.cooldown) * 100.0 / 156.0))
 	print("qun_rework:chengong_ok")
 
 	var diaochan := _unit(game, "player", "diaochan", 2, 4)
