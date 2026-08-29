@@ -129,9 +129,11 @@ var checkpoint_summary_box: HBoxContainer
 var checkpoint_continue_button: Button
 var checkpoint_reward_label: Label
 var imprint_overlay: Control
-var imprint_hero_options: OptionButton
 var imprint_currency_label: Label
+var imprint_faction_grid: HBoxContainer
+var imprint_hero_grid: HBoxContainer
 var imprint_tree_box: VBoxContainer
+var imprint_selected_faction := "shu"
 var imprint_selected_hero := "guanyu"
 var sell_layer: CanvasLayer
 var sell_zone: Control
@@ -847,7 +849,7 @@ func _build_ui() -> void:
 	root.add_child(reserve_panel)
 	tick_timer = Timer.new()
 	tick_timer.wait_time = TICK
-	tick_timer.timeout.connect(_battle_tick)
+	# 战斗模拟改由 _process 的固定步长累计器驱动；Timer 仅保留兼容旧流程的 start/stop 调用。
 	add_child(tick_timer)
 	_build_draft_layer()
 	_build_sell_zone()
@@ -855,6 +857,17 @@ func _build_ui() -> void:
 	_build_unit_inspector()
 
 func _process(_delta: float) -> void:
+	# 真实时间固定步长：动画播放时只累计，结束后单帧最多偿还 6 步；后台积压最多保留 5 秒。
+	if battle_running and not _battle_clock_paused():
+		battle_accum = minf(5.0, battle_accum + maxf(0.0, _delta))
+		var steps := 0
+		while battle_accum >= TICK and steps < 6 and battle_running and not _battle_clock_paused() and not action_in_progress:
+			battle_accum -= TICK
+			steps += 1
+			_battle_tick()
+	if boards_dirty:
+		boards_dirty = false
+		_render_combat_boards_now()
 	if not is_instance_valid(sell_zone) or not sell_zone.visible:
 		return
 	if sell_zone_grace_frames > 0:
@@ -1985,7 +1998,7 @@ func _build_endless_overlays() -> void:
 	endless_player_summary_label.bbcode_enabled = true
 	endless_player_summary_label.scroll_active = true
 	endless_player_summary_label.add_theme_font_size_override("normal_font_size", 17)
-	endless_player_summary_label.add_theme_color_override("default_color", Color("#dcebdc"))
+	endless_player_summary_label.add_theme_color_override("default_color", _imprint_ui_color("#dcebdc", "#284734"))
 	player_panel.add_child(endless_player_summary_label)
 	summaries.add_child(player_panel)
 	var enemy_panel := PanelContainer.new()
@@ -1996,7 +2009,7 @@ func _build_endless_overlays() -> void:
 	endless_enemy_summary_label.bbcode_enabled = true
 	endless_enemy_summary_label.scroll_active = true
 	endless_enemy_summary_label.add_theme_font_size_override("normal_font_size", 17)
-	endless_enemy_summary_label.add_theme_color_override("default_color", Color("#f0d7d1"))
+	endless_enemy_summary_label.add_theme_color_override("default_color", _imprint_ui_color("#f0d7d1", "#622f29"))
 	enemy_panel.add_child(endless_enemy_summary_label)
 	summaries.add_child(enemy_panel)
 	var overview_actions := HBoxContainer.new()
@@ -2039,20 +2052,11 @@ func _build_endless_overlays() -> void:
 	checkpoint_actions.add_child(checkpoint_continue_button)
 	checkpoint_root.add_child(checkpoint_actions)
 
-	# 将印树：英雄筛选 + 三路分层节点，移动端也能顺序阅读。
+	# 将印树：先选阵营，再以武将卡片选择角色；右侧展示完整七层专属树。
 	imprint_overlay = _full_overlay(1900, PremiumUIArt.Variant.CODEX, Color("#9b7147"))
 	var imprint_root := _overlay_panel(imprint_overlay, "将印树 · 名将专精", func(): imprint_overlay.hide())
 	var imprint_top := HBoxContainer.new()
 	imprint_top.add_theme_constant_override("separation", 10)
-	imprint_hero_options = OptionButton.new()
-	imprint_hero_options.custom_minimum_size = Vector2(300, 48)
-	var hero_ids: Array = heroes.keys()
-	hero_ids.sort_custom(func(a, b): return _hero_name(str(a)) < _hero_name(str(b)))
-	for hero_id in hero_ids:
-		imprint_hero_options.add_item("%s · %s" % [_faction_name(str(heroes[hero_id].f)), _hero_name(str(hero_id))])
-		imprint_hero_options.set_item_metadata(imprint_hero_options.item_count - 1, str(hero_id))
-	imprint_hero_options.item_selected.connect(_on_imprint_hero_selected)
-	imprint_top.add_child(imprint_hero_options)
 	imprint_currency_label = _label("", 18, Color("#f0c77a"))
 	imprint_currency_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	imprint_currency_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -2062,9 +2066,23 @@ func _build_endless_overlays() -> void:
 	refund.pressed.connect(_on_imprint_refund)
 	imprint_top.add_child(refund)
 	imprint_root.add_child(imprint_top)
-	var imprint_hint := _label("三路根基 → 三路专精 → 名将之印。节点效果只在无尽模式生效，点击可升级。", 16, Color("#c9b98f"))
+	var imprint_hint := _label("先选阵营与武将，再沿七层专属路线养成；定位/绝技三选二，分歧二选一。效果只在无尽模式生效。", 16, Color("#c9b98f"))
 	imprint_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	imprint_root.add_child(imprint_hint)
+	imprint_faction_grid = HBoxContainer.new()
+	imprint_faction_grid.alignment = BoxContainer.ALIGNMENT_CENTER
+	imprint_faction_grid.add_theme_constant_override("separation", 12)
+	imprint_root.add_child(imprint_faction_grid)
+	var hero_scroll := ScrollContainer.new()
+	hero_scroll.custom_minimum_size.y = 116
+	hero_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	hero_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_enable_touch_scroll(hero_scroll, true, false)
+	imprint_root.add_child(hero_scroll)
+	imprint_hero_grid = HBoxContainer.new()
+	imprint_hero_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	imprint_hero_grid.add_theme_constant_override("separation", 8)
+	hero_scroll.add_child(imprint_hero_grid)
 	var imprint_scroll := ScrollContainer.new()
 	imprint_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	imprint_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -2093,8 +2111,8 @@ func _show_endless_overview() -> void:
 
 func _render_endless_overview() -> void:
 	if not is_instance_valid(endless_player_summary_label): return
-	endless_player_summary_label.text = "[font_size=23][color=#8fd4a0]我方养成汇总[/color][/font_size]\n\n" + _endless_player_summary()
-	endless_enemy_summary_label.text = "[font_size=23][color=#e8916d]敌方强化汇总[/color][/font_size]\n\n" + _endless_enemy_summary()
+	endless_player_summary_label.text = _bbc("[font_size=23][color=#8fd4a0]我方养成汇总[/color][/font_size]\n\n" + _endless_player_summary())
+	endless_enemy_summary_label.text = _bbc("[font_size=23][color=#e8916d]敌方强化汇总[/color][/font_size]\n\n" + _endless_enemy_summary())
 
 func _summary_card(title_text: String, body: String, friendly: bool) -> PanelContainer:
 	var panel := PanelContainer.new()
@@ -2105,8 +2123,8 @@ func _summary_card(title_text: String, body: String, friendly: bool) -> PanelCon
 	text_box.bbcode_enabled = true
 	text_box.scroll_active = true
 	text_box.add_theme_font_size_override("normal_font_size", 15)
-	text_box.add_theme_color_override("default_color", Color("#dcebdc") if friendly else Color("#f0d7d1"))
-	text_box.text = "[font_size=19][b]%s[/b][/font_size]\n%s" % [title_text, body]
+	text_box.add_theme_color_override("default_color", _imprint_ui_color("#dcebdc", "#284734") if friendly else _imprint_ui_color("#f0d7d1", "#622f29"))
+	text_box.text = _bbc("[font_size=19][b]%s[/b][/font_size]\n%s" % [title_text, body])
 	panel.add_child(text_box)
 	return panel
 
@@ -2172,65 +2190,116 @@ func _show_imprint_overlay() -> void:
 	_render_imprint_overlay()
 	imprint_overlay.show()
 
-func _on_imprint_hero_selected(index: int) -> void:
-	if index < 0 or index >= imprint_hero_options.item_count: return
-	imprint_selected_hero = str(imprint_hero_options.get_item_metadata(index))
+func _imprint_ui_color(dark: String, light: String) -> Color:
+	return Color(light if _light_mode() else dark)
+
+func _on_imprint_faction_selected(faction: String) -> void:
+	imprint_selected_faction = faction
+	var candidates := _imprint_faction_heroes(faction)
+	if not candidates.has(imprint_selected_hero) and not candidates.is_empty(): imprint_selected_hero = str(candidates[0])
 	_render_imprint_overlay()
+
+func _on_imprint_hero_selected(hero_id: String) -> void:
+	if not heroes.has(hero_id): return
+	imprint_selected_hero = hero_id
+	imprint_selected_faction = str(heroes[hero_id].f)
+	_render_imprint_overlay()
+
+func _imprint_faction_heroes(faction: String) -> Array:
+	var result: Array = []
+	for hero_id in heroes:
+		if str(heroes[hero_id].f) == faction and not _endless_imprint_tree(str(hero_id)).is_empty(): result.append(str(hero_id))
+	result.sort_custom(func(a, b): return _hero_name(str(a)) < _hero_name(str(b)))
+	return result
+
+func _imprint_invested_levels(hero_id: String) -> int:
+	var total := 0
+	for level in endless_imprint_nodes.get(hero_id, {}).values(): total += int(level)
+	return total
+
+func _render_imprint_selectors() -> void:
+	_clear_dynamic_children(imprint_faction_grid)
+	for faction in ["shu", "wei", "wu", "qun"]:
+		var selected: bool = imprint_selected_faction == str(faction)
+		var button := _button("%s · %d将" % [_faction_name(faction), _imprint_faction_heroes(faction).size()])
+		button.custom_minimum_size = Vector2(180, 46)
+		button.add_theme_font_size_override("font_size", 18)
+		_accent_button(button, FACTION_COLORS[faction], selected)
+		button.pressed.connect(_on_imprint_faction_selected.bind(faction))
+		imprint_faction_grid.add_child(button)
+	_clear_dynamic_children(imprint_hero_grid)
+	for hero_id in _imprint_faction_heroes(imprint_selected_faction):
+		var selected: bool = str(hero_id) == imprint_selected_hero
+		var invested := _imprint_invested_levels(hero_id)
+		var card := _button("%s\n%s" % [_hero_name(hero_id), "已投入 %d 级" % invested if invested > 0 else "尚未养成"])
+		card.custom_minimum_size = Vector2(170, 88)
+		card.add_theme_font_size_override("font_size", 16)
+		card.icon = _portrait_source_texture(hero_id)
+		card.add_theme_constant_override("icon_max_width", 54)
+		card.expand_icon = true
+		card.tooltip_text = "%s · 点击查看专属七层将印树" % _hero_name(hero_id)
+		_accent_button(card, FACTION_COLORS[imprint_selected_faction], selected)
+		card.pressed.connect(_on_imprint_hero_selected.bind(hero_id))
+		imprint_hero_grid.add_child(card)
 
 func _render_imprint_overlay() -> void:
 	if not is_instance_valid(imprint_tree_box): return
-	if not heroes.has(imprint_selected_hero): imprint_selected_hero = "guanyu"
-	for index in imprint_hero_options.item_count:
-		if str(imprint_hero_options.get_item_metadata(index)) == imprint_selected_hero:
-			imprint_hero_options.select(index)
-			break
-	imprint_currency_label.text = "当前武将：%s　　通用将印：%d" % [_hero_name(imprint_selected_hero), endless_imprints]
+	if not heroes.has(imprint_selected_hero) or _endless_imprint_tree(imprint_selected_hero).is_empty(): imprint_selected_hero = "guanyu"
+	imprint_selected_faction = str(heroes[imprint_selected_hero].f)
+	_render_imprint_selectors()
+	imprint_currency_label.text = "当前：%s · %s　｜　通用将印：%d　｜　已投入：%d 级" % [_faction_name(imprint_selected_faction), _hero_name(imprint_selected_hero), endless_imprints, _imprint_invested_levels(imprint_selected_hero)]
 	_clear_dynamic_children(imprint_tree_box)
-	var row_titles := ["第一层 · 根基", "第二层 · 专精", "第三层 · 终印"]
-	var lane_colors := [Color("#6189a5"), Color("#a66d4e"), Color("#728f62")]
-	for row_index in 3:
-		var title := _label(row_titles[row_index], 18, Color("#d9bd7a"))
+	var layers := [
+		{"id":"root", "title":"第一层 · 根基", "rule":"三项均可升至 3 级"},
+		{"id":"role", "title":"第二层 · 定位", "rule":"三选二 · 每项 2 级"},
+		{"id":"skill", "title":"第三层 · 绝技", "rule":"三选二 · 专属机制"},
+		{"id":"branch", "title":"第四层 · 分歧", "rule":"二选一 · 决定流派"},
+		{"id":"bond", "title":"第五层 · 羁绊", "rule":"强化武将关系"},
+		{"id":"evergreen", "title":"第六层 · 长青", "rule":"战斗/回合成长"},
+		{"id":"soul", "title":"第七层 · 将魂", "rule":"终极专属机制"}
+	]
+	var layer_colors := [Color("#6f8fa8"), Color("#8d7650"), Color("#a86549"), Color("#8560a0"), Color("#b18b45"), Color("#5f8d68"), Color("#b74e45")]
+	for row_index in layers.size():
+		var layer: Dictionary = layers[row_index]
+		var layer_id := str(layer.id)
+		var unlocked := _endless_imprint_layer_unlocked(imprint_selected_hero, layer_id)
+		var title_text := "%s　｜　%s" % [str(layer.title), str(layer.rule)]
+		if not unlocked: title_text += "　（%s）" % _endless_imprint_layer_hint(imprint_selected_hero, layer_id)
+		var title := _label(title_text, 18, layer_colors[row_index] if unlocked else _imprint_ui_color("#756f64", "#766a58"))
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		imprint_tree_box.add_child(title)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 14)
-		for lane in 3:
-			var node: Dictionary = {}
-			for candidate in EndlessRules.IMPRINT_NODES:
-				if int(candidate.row) == row_index and int(candidate.lane) == lane:
-					node = candidate
-					break
-			if node.is_empty():
-				var spacer := Control.new()
-				spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				row.add_child(spacer)
-				continue
-			var node_id := str(node.id)
+		for node_id in _endless_imprint_layer_nodes(imprint_selected_hero, layer_id):
 			var level := _endless_imprint_level(imprint_selected_hero, node_id)
+			var max_level := _endless_imprint_node_max(imprint_selected_hero, node_id)
 			var panel := PanelContainer.new()
 			panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			panel.custom_minimum_size.y = 125
-			_style(panel, Color("#171612ec"), 6, lane_colors[lane], 3 if level > 0 else 1)
+			panel.custom_minimum_size.y = 132
+			var bg := _imprint_ui_color("#171612ec", "#f7efdbee") if unlocked else _imprint_ui_color("#11110fd4", "#e7decae8")
+			var border: Color = layer_colors[row_index] if unlocked else _imprint_ui_color("#4d4942", "#a99b82")
+			_style(panel, bg, 6, border, 3 if level > 0 else 1)
 			var box := VBoxContainer.new()
 			box.add_theme_constant_override("separation", 5)
 			panel.add_child(box)
-			var node_name := _label("%s　Lv%d/%d" % [str(node.name), level, int(node.max)], 20, lane_colors[lane].lightened(0.35))
+			var node_name := _label("%s　Lv%d/%d" % [_endless_imprint_node_name(imprint_selected_hero, node_id), level, max_level], 19, layer_colors[row_index].lightened(0.18))
 			node_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(node_name)
-			var node_desc := _label(str(node.desc), 14, Color("#d5cbb8"))
+			var node_desc := _label(_endless_imprint_node_desc(imprint_selected_hero, node_id), 14, _imprint_ui_color("#ddd2bb", "#493b29"))
 			node_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			node_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			node_desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			box.add_child(node_desc)
-			var upgrade := _button("已满级" if level >= int(node.max) else "升级 · %d 将印" % int(node.cost))
+			var upgrade := _button("已满级" if level >= max_level else "升级 · %d 将印" % _endless_imprint_node_cost(node_id))
 			upgrade.disabled = not _endless_imprint_can_upgrade(imprint_selected_hero, node_id)
-			upgrade.tooltip_text = "前置：%s" % ("无" if (node.requires as Array).is_empty() else "、".join(node.requires))
+			upgrade.tooltip_text = _endless_imprint_layer_hint(imprint_selected_hero, layer_id) if not unlocked else str(layer.rule)
+			if level > 0: _accent_button(upgrade, layer_colors[row_index], true)
 			upgrade.pressed.connect(_on_imprint_upgrade.bind(node_id))
 			box.add_child(upgrade)
 			row.add_child(panel)
 		imprint_tree_box.add_child(row)
-		if row_index < 2:
-			var arrow := _label("↓　　↓　　↓", 24, Color("#806b4c"))
+		if row_index < layers.size() - 1:
+			var arrow := _label("◆\n▼", 17, _imprint_ui_color("#806b4c", "#76582f"))
 			arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			imprint_tree_box.add_child(arrow)
 
@@ -3669,13 +3738,20 @@ func _build_settings_overlay() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	settings_overlay.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(700, 820)
+	panel.custom_minimum_size = Vector2(760, 840)
 	_style(panel, Color("#12120ff0"), 5, Color("#8e673d"), 2)
 	center.add_child(panel)
+	var settings_scroll := ScrollContainer.new()
+	settings_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	settings_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_enable_touch_scroll(settings_scroll, false, true)
+	panel.add_child(settings_scroll)
 	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 8)
-	panel.add_child(box)
+	settings_scroll.add_child(box)
 	var title := _label(t("游戏设置", "SETTINGS"), 30, Color("#f0c77a"))
 	title.add_theme_constant_override("outline_size", 5)
 	title.add_theme_color_override("font_outline_color", Color("#1a1008"))
@@ -3747,6 +3823,38 @@ func _build_settings_overlay() -> void:
 		add_stars.pressed.connect(_on_add_debug_stars)
 		resource_row.add_child(add_stars)
 		box.add_child(resource_row)
+		var debug_growth_title := _label("测试养成捷径（仅测试包）", 17, Color("#e7bd66"))
+		debug_growth_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(debug_growth_title)
+		var max_talents := _button("一键点满全部天赋")
+		max_talents.custom_minimum_size = Vector2(420, 46)
+		_accent_button(max_talents, Color("#7c6541"), true)
+		max_talents.pressed.connect(_on_debug_max_all_talents)
+		box.add_child(max_talents)
+		var rune_row := HBoxContainer.new()
+		rune_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		rune_row.add_theme_constant_override("separation", 8)
+		debug_rune_kind_options = OptionButton.new()
+		debug_rune_kind_options.custom_minimum_size = Vector2(250, 46)
+		for kind in RUNE_KINDS:
+			debug_rune_kind_options.add_item("六阶 · %s · %s" % [str(kind.get("class", "")), str(kind.name)])
+			debug_rune_kind_options.set_item_metadata(debug_rune_kind_options.item_count - 1, str(kind.id))
+		rune_row.add_child(debug_rune_kind_options)
+		var equip_all_runes := _button("生成并装备给全部武将")
+		equip_all_runes.custom_minimum_size = Vector2(280, 46)
+		_accent_button(equip_all_runes, Color("#a44f4f"), true)
+		equip_all_runes.pressed.connect(_on_debug_equip_rune_all)
+		rune_row.add_child(equip_all_runes)
+		box.add_child(rune_row)
+		var max_imprints := _button("一键点亮全部武将将印树（合法满级路线）")
+		max_imprints.custom_minimum_size = Vector2(520, 46)
+		_accent_button(max_imprints, Color("#8a5e91"), true)
+		max_imprints.pressed.connect(_on_debug_light_all_imprints)
+		box.add_child(max_imprints)
+		debug_tools_status_label = _label("", 14, Color("#8fd4a0"))
+		debug_tools_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		debug_tools_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(debug_tools_status_label)
 		var lab_button := _button("平衡实验室")
 		_accent_button(lab_button, Color("#705f8f"))
 		lab_button.custom_minimum_size = Vector2(360, 46)
@@ -3777,6 +3885,26 @@ func _on_add_debug_souls() -> void:
 func _on_add_debug_stars() -> void:
 	_add_debug_stars()
 	_refresh_home()
+
+func _set_debug_tools_status(message: String) -> void:
+	if is_instance_valid(debug_tools_status_label): debug_tools_status_label.text = message
+	_refresh_home()
+
+func _on_debug_max_all_talents() -> void:
+	var changed := _debug_max_all_talents()
+	_endless_sync_player_roster()
+	_set_debug_tools_status("已点满全部天赋，本次补齐 %d 级。" % changed)
+
+func _on_debug_equip_rune_all() -> void:
+	if not is_instance_valid(debug_rune_kind_options) or debug_rune_kind_options.selected < 0: return
+	var kind_id := str(debug_rune_kind_options.get_item_metadata(debug_rune_kind_options.selected))
+	var equipped := _debug_equip_tier6_rune_all(kind_id)
+	_endless_sync_player_roster()
+	_set_debug_tools_status("已为 %d 名武将分别生成并装备：%s。" % [equipped, _rune_display_name({"tier":6, "kind":kind_id})])
+
+func _on_debug_light_all_imprints() -> void:
+	var completed := _debug_light_all_imprint_trees()
+	_set_debug_tools_status("已点亮 %d 名武将的完整合法将印路线。" % completed)
 
 func _toggle_challenge_limit_setting() -> void:
 	limit_challenges = not limit_challenges
@@ -6109,6 +6237,13 @@ func _roster_text(units: Array) -> String:
 	return "  |  ".join(entries)
 
 func _render_combat_boards() -> void:
+	# 高频刷新合并到本帧末；首次渲染仍同步执行，保证动画立即拿得到格子引用。
+	if unit_cell_refs.is_empty():
+		_render_combat_boards_now()
+		return
+	boards_dirty = true
+
+func _render_combat_boards_now() -> void:
 	var p_preview: Array = []
 	var e_preview: Array = []
 	for unit in combat_units:
@@ -6185,4 +6320,10 @@ func _log(text_value: String) -> void:
 		for unit in combat_units:
 			text_value = text_value.replace(_hero_name(unit.hero_id), _combat_name(unit))
 	log_box.append_text(_bbc(text_value) + "\n")
+	# 长战斗日志封顶：超过 300 行时批量裁回最近 200 行，避免富文本排版成本持续增长。
+	if log_box.get_line_count() > 300:
+		var all_lines := log_box.text.split("\n")
+		var kept := PackedStringArray()
+		for index in range(maxi(0, all_lines.size() - 200), all_lines.size()): kept.append(all_lines[index])
+		log_box.text = "\n".join(kept)
 	log_box.scroll_to_line(log_box.get_line_count())

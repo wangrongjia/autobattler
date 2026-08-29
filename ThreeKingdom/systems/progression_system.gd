@@ -507,3 +507,33 @@ func _add_debug_souls() -> void:
 func _add_debug_stars() -> void:
 	general_stars += 100
 	_save_progression()
+
+func _debug_max_all_talents() -> int:
+	if not _debug_tools_enabled(): return 0
+	var changed := 0
+	for tree_id in TALENT_TREES:
+		for node in TALENT_TREES[tree_id].nodes:
+			var key := _talent_key(str(tree_id), str(node[0]))
+			var old_level := int(talent_levels.get(key, 0))
+			var max_level := int(node[2])
+			if old_level < max_level:
+				talent_levels[key] = max_level
+				changed += max_level - old_level
+	_save_progression()
+	return changed
+
+func _debug_equip_tier6_rune_all(kind_id: String) -> int:
+	if not _debug_tools_enabled() or _rune_kind(kind_id).is_empty(): return 0
+	var equipped := 0
+	for hero_id in heroes:
+		# 每名武将生成独立符文实例；槽位已满时仅替换最早装备的一枚，旧符文保留在资源仓库。
+		var rune := {"uid":next_rune_id, "tier":6, "kind":kind_id}
+		next_rune_id += 1
+		rune_inventory.append(rune)
+		var slots: Array = rune_loadouts.get(str(hero_id), []).duplicate()
+		if slots.size() >= 6: slots.pop_front()
+		slots.append(int(rune.uid))
+		rune_loadouts[str(hero_id)] = slots
+		equipped += 1
+	_save_progression()
+	return equipped

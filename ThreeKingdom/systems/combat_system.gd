@@ -362,6 +362,8 @@ func _sync_duplicate_bond_benefits(team: String, opening: bool) -> void:
 
 func _grant_shield(target: Dictionary, amount: float, source = null) -> void:
 	if not target.alive or amount <= 0.0: return
+	if source != null:
+		amount *= 1.0 + _endless_imprint_value(source, "shield_pct")
 	var cap: float = max(float(target.shield), amount * 2.0)
 	var applied: float = min(float(target.shield) + amount, cap) - float(target.shield)
 	target.shield += applied
@@ -457,6 +459,7 @@ func _snapshot_battle_lineup() -> void:
 func _unit_action_gain_multiplier(unit: Dictionary) -> float:
 	var result := float(unit.get("action_gain_mult", 1.0))
 	result *= 1.0 + float(unit.get("timed_action_bonus", 0.0))
+	result *= 1.0 + float(unit.get("endless_action_gain_pct", 0.0))
 	result *= float(unit.get("endless_enemy_action_gain", 1.0))
 	var cooldown_reduction := clampf(float(unit.get("faction_cooldown_reduction", 0.0)), 0.0, 0.95)
 	if cooldown_reduction > 0.0:
@@ -497,7 +500,32 @@ func _unit_scaled_skill_value(unit: Dictionary) -> float:
 	return _unit_skill_stat_value(unit) * maxf(0.0, 1.0 - float(unit.get("skill_debuff", 0.0)))
 
 func _unit_skill_effect_multiplier(unit: Dictionary) -> float:
-	return _unit_skill_power_multiplier(unit) * maxf(0.0, 1.0 - float(unit.get("skill_debuff", 0.0)))
+	return _unit_skill_power_multiplier(unit) * maxf(0.0, 1.0 - float(unit.get("skill_debuff", 0.0))) * (1.0 + _endless_imprint_value(unit, "skill_effect_pct"))
+
+func _endless_imprint_value(unit, key: String, fallback := 0.0) -> float:
+	if unit == null: return fallback
+	var imprint = unit.get("endless_imprint_mod", {})
+	return float(imprint.get(key, fallback)) if imprint is Dictionary else fallback
+
+func _endless_imprint_damage_multiplier(source: Dictionary, target: Dictionary, group_style: String) -> float:
+	var result := 1.0
+	var target_ratio := float(target.hp) / maxf(1.0, float(target.max_hp))
+	var source_ratio := float(source.hp) / maxf(1.0, float(source.max_hp))
+	if int(target.row) == 0: result += _endless_imprint_value(source, "damage_front_pct")
+	elif int(target.row) == 1: result += _endless_imprint_value(source, "damage_mid_pct")
+	else: result += _endless_imprint_value(source, "damage_back_pct")
+	if target_ratio <= 0.50: result += _endless_imprint_value(source, "damage_low_pct")
+	if target_ratio >= 0.95: result += _endless_imprint_value(source, "damage_full_hp_pct")
+	if source_ratio <= 0.50: result += _endless_imprint_value(source, "damage_self_low_pct")
+	if source_ratio >= 0.80: result += _endless_imprint_value(source, "high_hp_damage_pct")
+	if _has_any_debuff(target): result += _endless_imprint_value(source, "damage_debuff_pct")
+	if float(target.get("burn", 0.0)) > 0.0: result += _endless_imprint_value(source, "damage_burning_pct")
+	if float(target.get("poison", 0.0)) > 0.0: result += _endless_imprint_value(source, "damage_poisoned_pct")
+	if float(target.get("charm", 0.0)) > 0.0: result += _endless_imprint_value(source, "damage_charmed_pct")
+	if float(target.get("action", 0.0)) >= ACTION_MAX * 0.80: result += _endless_imprint_value(source, "damage_high_action_pct")
+	if group_style == "burn_tick": result += _endless_imprint_value(source, "burn_damage_pct")
+	if group_style == "poison_tick": result += _endless_imprint_value(source, "poison_damage_pct")
+	return maxf(0.0, result)
 
 func _control_duration_multiplier(unit: Dictionary) -> float:
 	return float(unit.get("control_multiplier", 1.0)) * (1.0 + float(unit.get("faction_control_bonus", 0.0))) * _tianshu_control_source_multiplier(unit)
@@ -1024,27 +1052,36 @@ func _cast_huanggai_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.huanggai.ability_params
 	var pillars := bool(unit.get("huanggai_sunjian", false))
 	var cost_ratio := float(params.get("sunjian_max_hp_cost", 0.15)) if pillars else float(params.get("max_hp_cost", 0.10))
+	cost_ratio *= 1.0 - clampf(_endless_imprint_value(unit, "huanggai_cost_reduction_pct"), 0.0, 0.50)
 	var requested_cost := float(unit.max_hp) * cost_ratio
 	var hp_spent := minf(float(unit.hp), requested_cost)
 	unit.hp = maxf(0.0, float(unit.hp) - hp_spent)
 	var damage_ratio := float(params.get("sunjian_damage_cost_ratio", 0.50)) if pillars else float(params.get("damage_cost_ratio", 0.40))
+	# 黄盖仍围绕苦肉与生命构筑，但专属将印只强化转化效率，不再让全军生命成长直接形成无上限乘算。
+	damage_ratio *= 1.0 + minf(0.40, _endless_imprint_value(unit, "skill_effect_pct") * 0.40)
 	var amount := _unit_skill_stat_value(unit) * float(params.get("mult", 2.0)) + hp_spent * damage_ratio
 	var col := rng.randi_range(0, BOARD_COLUMNS - 1)
 	var target_team := _enemy_team_id(unit.team)
 	var visual_group := "huanggai_column:" + str(unit.id) + ":" + str(unit.get("cast_count", 0))
+	var imprint_burn_time := maxf(_endless_imprint_value(unit, "burn_duration_add"), _endless_imprint_value(unit, "burn_ground_on_hit"))
 	for row in BOARD_ROWS:
 		var tile := {"row":row, "col":col, "team":target_team}
 		var target = _unit_at(_enemy_units(unit.team), row, col)
 		if target == null:
 			_hit_ruler(unit, amount, tile, t("苦肉焚阵空击", "Bitter-Flesh Column missed"), visual_group, "column_impact", false)
-			if bool(unit.get("zhouyu_huanggai", false)):
-				_set_ground_burn(unit, target_team, row, col, float(params.get("zhouyu_burn", 5.0)), _unit_skill_stat_value(unit) * float(params.get("zhouyu_burn_ratio", 0.50)), visual_group)
+			if bool(unit.get("zhouyu_huanggai", false)) or imprint_burn_time > 0.0:
+				var burn_time := maxf(float(params.get("zhouyu_burn", 5.0)) if bool(unit.get("zhouyu_huanggai", false)) else 0.0, imprint_burn_time)
+				_set_ground_burn(unit, target_team, row, col, burn_time, _unit_skill_stat_value(unit) * float(params.get("zhouyu_burn_ratio", 0.50)), visual_group)
 		else:
 			_damage(unit, target, amount, "physical", t("苦肉焚阵", "Bitter-Flesh Column"), visual_group, "column_impact", false)
-			if target.alive and bool(unit.get("zhouyu_huanggai", false)):
-				_apply_skill_burn(unit, target, float(params.get("zhouyu_burn", 5.0)), _unit_skill_stat_value(unit) * float(params.get("zhouyu_burn_ratio", 0.50)))
+			if target.alive and (bool(unit.get("zhouyu_huanggai", false)) or imprint_burn_time > 0.0):
+				var burn_time := maxf(float(params.get("zhouyu_burn", 5.0)) if bool(unit.get("zhouyu_huanggai", false)) else 0.0, imprint_burn_time)
+				_apply_skill_burn(unit, target, burn_time, _unit_skill_stat_value(unit) * float(params.get("zhouyu_burn_ratio", 0.50)))
 	unit.cast_count = int(unit.get("cast_count", 0)) + 1
-	_finish_sacrifice_death(unit)
+	if _endless_imprint_value(unit, "no_self_death") >= 1.0 and float(unit.hp) <= 0.0:
+		unit.hp = maxf(1.0, float(unit.max_hp) * 0.08)
+	else:
+		_finish_sacrifice_death(unit)
 
 func _cast_dingfeng_skill(unit: Dictionary) -> void:
 	var params: Dictionary = heroes.dingfeng.ability_params
@@ -1423,6 +1460,14 @@ func _cast_weiyan_cleave(unit: Dictionary) -> void:
 
 func _after_active_skill(unit: Dictionary) -> void:
 	_tianshu_on_cast(unit)
+	var shield_pct := _endless_imprint_value(unit, "post_cast_shield_pct")
+	if shield_pct > 0.0: _grant_shield(unit, float(unit.max_hp) * shield_pct, unit)
+	var reduction := _endless_imprint_value(unit, "post_cast_reduction_pct")
+	if reduction > 0.0:
+		unit.timed_reduction = maxf(float(unit.get("timed_reduction", 0.0)), reduction)
+		unit.timed_reduction_time = maxf(float(unit.get("timed_reduction_time", 0.0)), 3.0)
+	var action_add := _endless_imprint_value(unit, "action_on_cast_add")
+	if action_add > 0.0: unit.action = minf(ACTION_MAX, float(unit.action) + action_add)
 	if heroes[unit.hero_id].f == "shu" and int(unit.get("faction_tier", 0)) >= 3:
 		unit.shu_damage_stacks = 0
 		unit.shu_damage_decay_time = 0.0
@@ -2540,6 +2585,9 @@ func _heal_weakest_fixed(unit: Dictionary, heal_amount: float, reduction: float,
 	target.damage_reduction = max(target.damage_reduction, reduction)
 func _heal_with_overflow(source: Dictionary, target, amount: float, visual_kind := "heal", nonblocking := false) -> void:
 	if source == null or amount <= 0.0: return
+	amount *= 1.0 + _endless_imprint_value(source, "heal_pct")
+	if target != null and float(target.hp) / maxf(1.0, float(target.max_hp)) <= 0.35:
+		amount *= 1.0 + _endless_imprint_value(source, "heal_low_pct")
 	amount *= _tianshu_heal_multiplier(source)
 	if target != null and target.alive:
 		amount *= 1.0 - clampf(float(target.get("grievous", 0.0)), 0.0, 0.95)
@@ -2556,6 +2604,9 @@ func _heal_with_overflow(source: Dictionary, target, amount: float, visual_kind 
 
 func _heal_unit_only(source: Dictionary, target: Dictionary, amount: float, visual_group := "", group_style := "") -> float:
 	if source == null or target == null or not target.alive or amount <= 0.0: return 0.0
+	amount *= 1.0 + _endless_imprint_value(source, "heal_pct")
+	if float(target.hp) / maxf(1.0, float(target.max_hp)) <= 0.35:
+		amount *= 1.0 + _endless_imprint_value(source, "heal_low_pct")
 	amount *= _tianshu_heal_multiplier(source)
 	amount *= 1.0 - clampf(float(target.get("grievous", 0.0)), 0.0, 0.95)
 	var missing := maxf(0.0, float(target.max_hp) - float(target.hp))
@@ -2693,6 +2744,10 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 		if scales_with_skill: value *= _unit_skill_power_multiplier(source)
 		value *= 1.0 + source.damage_buff + float(source.get("timed_damage_buff", 0.0)) + float(source.get("liushan_aura_damage_bonus", 0.0)) + float(source.get("kill_buff", 0.0))
 		value *= 1.0 + float(source.get("endless_damage_pct", 0.0))
+		value *= _endless_imprint_damage_multiplier(source, target, group_style)
+		var crit_chance := clampf(_endless_imprint_value(source, "crit_chance_pct"), 0.0, 0.75)
+		if crit_chance > 0.0 and rng.randf() < crit_chance:
+			value *= 1.5 + _endless_imprint_value(source, "crit_damage_pct")
 		if float(source.hp) / maxf(1.0, float(source.max_hp)) < 0.35:
 			value *= 1.0 + float(source.get("endless_low_hp_damage", 0.0))
 		value *= maxf(0.0, 1.0 - float(source.get("skill_debuff", 0.0)))
@@ -2754,6 +2809,9 @@ func _damage(source, target: Dictionary, amount: float, damage_type: String, lab
 	_add_stat(source, "damage", actual_damage)
 	_add_stat(target, "taken", actual_damage)
 	if source != null: _credit_damage_buff_sources(source, actual_damage)
+	if source != null and actual_damage > 0.0:
+		var lifesteal := clampf(_endless_imprint_value(source, "lifesteal_pct"), 0.0, 0.75)
+		if lifesteal > 0.0: _heal_unit_only(source, source, actual_damage * lifesteal)
 	if shatter_added > 0.0 and actual_damage > 0.0 and freeze_shatter_source != null:
 		# 破冰伤害计入冻结施放者名下,打破者只保留非破冰部分。
 		var shatter_share := minf(shatter_added, actual_damage)

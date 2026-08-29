@@ -26,6 +26,17 @@ const ENEMY_ACTION_CAP := 0.10
 const ENEMY_HASTE_PER_TEN_ROUNDS := 2.0
 const ENEMY_HASTE_CAP := 12.0
 
+# 将印树保持七层深度，但成本压在可持续养成范围内。专属节点效果来自每名武将自己的数据树。
+const IMPRINT_NODE_COSTS := {"root":3, "role":5, "skill":7, "branch":9, "bond":8, "evergreen":10, "soul":16}
+const IMPRINT_ROOT_SWIFT_HASTE := 8.0
+const IMPRINT_ROOT_SWIFT_ACTION := 0.035
+const ROOT_CLASS_BONUS := {
+	"output":{"hp":0.025, "strategy":0.04},
+	"tank":{"hp":0.05, "strategy":0.02},
+	"support":{"hp":0.035, "strategy":0.03},
+	"aura":{"hp":0.035, "strategy":0.025}
+}
+
 # 战策刻意控制在低斜率。数值项使用加法，不创建新的乘算膨胀区。
 const STRATEGIES := [
 	{"id":"provisions", "name":"军粮增配", "tag":"全军成长", "max":4,
@@ -76,17 +87,6 @@ const ENEMY_DOCTRINES := [
 	{"id":"veterans", "name":"百战精锐", "max":3, "levels":["敌军兵略额外提高 4%", "额外提高 7%", "额外提高 10%"], "values":{"strategy_pct":[0.04,0.07,0.10]}}
 ]
 
-# 简化为清晰的三路七节点。每名武将独立投入，但 UI 以树形路径呈现。
-const IMPRINT_NODES := [
-	{"id":"root_hp", "name":"固本", "lane":0, "row":0, "max":3, "cost":3, "requires":[], "desc":"每级：该武将在无尽模式最大生命 +3%", "effects":{"hp_pct":0.03}},
-	{"id":"root_strategy", "name":"砺锋", "lane":1, "row":0, "max":3, "cost":3, "requires":[], "desc":"每级：该武将在无尽模式兵略 +4%", "effects":{"strategy_pct":0.04}},
-	{"id":"root_haste", "name":"疾行", "lane":2, "row":0, "max":3, "cost":3, "requires":[], "desc":"每级：该武将在无尽模式冷却极速 +5", "effects":{"cooldown_haste":5.0}},
-	{"id":"guard", "name":"守势", "lane":0, "row":1, "max":3, "cost":5, "requires":["root_hp"], "desc":"每级：受到伤害降低 2%", "effects":{"reduction":0.02}},
-	{"id":"break", "name":"破阵", "lane":1, "row":1, "max":3, "cost":5, "requires":["root_strategy"], "desc":"每级：造成伤害提高 3%", "effects":{"damage":0.03}},
-	{"id":"initiative", "name":"先机", "lane":2, "row":1, "max":3, "cost":5, "requires":["root_haste"], "desc":"每级：开场行动条 +4", "effects":{"opening_action":4.0}},
-	{"id":"mastery", "name":"名将之印", "lane":1, "row":2, "max":1, "cost":12, "requires":["guard","break","initiative"], "desc":"三路各投入至少 1 级后解锁：生命与兵略再提高 6%", "effects":{"hp_pct":0.06,"strategy_pct":0.06}}
-]
-
 static func depth(round_number: int) -> int:
 	return maxi(0, round_number - 1)
 
@@ -118,11 +118,6 @@ static func strategy_entry(id: String) -> Dictionary:
 
 static func doctrine_entry(id: String) -> Dictionary:
 	for entry in ENEMY_DOCTRINES:
-		if str(entry.id) == id: return entry
-	return {}
-
-static func imprint_entry(id: String) -> Dictionary:
-	for entry in IMPRINT_NODES:
 		if str(entry.id) == id: return entry
 	return {}
 

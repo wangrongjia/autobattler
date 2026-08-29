@@ -1470,6 +1470,9 @@ func _battle_tick() -> void:
 		return
 	super._battle_tick()
 
+func _battle_clock_paused() -> bool:
+	return super._battle_clock_paused() or (lab_live_battle and lab_live_paused)
+
 func _render() -> void:
 	super._render()
 	if not lab_live_battle: return

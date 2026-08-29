@@ -103,6 +103,8 @@ var battle_button: Button          # 开始战斗按钮
 var battle_pause_button: Button    # 正常战斗的暂停/继续按钮
 var language_button: Button        # 中英文切换按钮
 var tick_timer: Timer              # 战斗循环定时器(每 TICK 秒触发一次 _battle_tick)
+var battle_accum := 0.0            # 固定步长累计器：动画期间继续按真实时间计息，结束后限量补步
+var boards_dirty := false          # 棋盘高频刷新合并标记：每帧至多全量重绘一次
 var battle_time_bar: ProgressBar   # 战斗时间进度条(显示剩余战斗时间)
 var battle_time_label: Label       # 战斗时间数字标签(如 "18s" 或 "∞ 无时限")
 var battle_workspace: HBoxContainer # 棋盘与信息侧栏的横向工作区
@@ -201,6 +203,8 @@ var enemy_faction_setting_options: OptionButton # 敌方随机阵营过滤
 var board_side_setting_options: OptionButton # 棋盘居左/居右
 var theme_toggle_button: Button     # 主界面右上角的昼/夜(绢纸/玄墨)主题切换按钮
 var enemy_strategy_setting_options: OptionButton # 敌方兵略值加成
+var debug_rune_kind_options: OptionButton # 测试包：批量生成并装备的六阶符文模板
+var debug_tools_status_label: Label # 测试包：批量操作结果
 var draft_faction_filter := ""     # 我方选将阵营过滤(空=全部, 或 shu/wei/wu/qun)
 var enemy_faction_filter := ""     # 敌方随机武将阵营过滤
 var player_factions: Array[String] = []  # 闯关简单/一般/困难:本关我方出战阵营限制(空=全阵营,随存档保存)
@@ -299,6 +303,9 @@ func _debug_tools_enabled() -> bool:
 	# 或导出预设 Features 里附加了 debug_tools 标签时才启用。
 	# 正式包中设置页会隐藏作弊类调试项，读取配置时也会把这些开关强制回退为默认值。
 	return OS.is_debug_build() or OS.has_feature("debug_tools")
+
+func _battle_clock_paused() -> bool:
+	return battle_paused
 
 func _reset_faction_battle_state() -> void:
 	faction_battle_state = {

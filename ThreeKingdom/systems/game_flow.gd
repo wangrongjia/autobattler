@@ -696,6 +696,8 @@ func _start_battle() -> void:
 	battle_running = true
 	battle_paused = false
 	battle_time = 0.0
+	battle_accum = 0.0
+	boards_dirty = false
 	action_in_progress = false
 	battle_speed = game_speed
 	selected_unit = ""
@@ -734,6 +736,7 @@ func _finish_battle() -> void:
 		call("_hide_unit_inspector")
 	tick_timer.stop()
 	battle_running = false
+	battle_accum = 0.0
 	battle_paused = false
 	action_in_progress = false
 	_capture_battle_stats()
