@@ -1,4 +1,4 @@
-extends "res://ThreeKingdom/systems/economy_system.gd"
+extends "res://ThreeKingdom/systems/endless_system.gd"
 
 func _new_game() -> void:
 	round_number = 1
@@ -6,10 +6,11 @@ func _new_game() -> void:
 	if game_mode != "challenge": player_factions.clear() # 出战阵营限制仅闯关模式有效
 	_reset_tianshu_run()
 	_reset_economy_run()
+	if game_mode == "endless": _endless_new_run()
 	_roll_hell_theme()
 	_roll_enemy_factions()
 	player_ruler_hp = _player_ruler_max_hp()
-	enemy_ruler_hp = RULER_MAX_HP
+	enemy_ruler_hp = _run_enemy_ruler_max_hp()
 	ruler_regen = {"player":{"amount":0.0, "time":0.0, "clock":0.0}, "enemy":{"amount":0.0, "time":0.0, "clock":0.0}}
 	player_units = []
 	enemy_units = []
@@ -48,12 +49,14 @@ func _new_game() -> void:
 			_log("[color=#e8916d]本关敌军出没阵营：%s。敌方增援只会从上述阵营中刷新。[/color]" % "、".join(enemy_names))
 	elif game_mode == "tianshu":
 		_log("[color=#e5a8ff]天书演武开始：第 3/6/9/12/15 回合免费选天书，其他抽取可在天书阁购买。[/color]")
+	elif game_mode == "endless":
+		_log("[color=#e5a8ff]【∞ 无尽远征】回合无上限；每 5 回合一个据点（据点 3 起掉落将印）；备战席 18 格；第 15 回合后基础收入冻结。[/color]")
 	elif game_mode == "tutorial":
 		_log("[color=#8fd4a0]新手引导：按提示完成 选天书 → 选将 → 布阵 → 战斗 一次完整流程。[/color]")
 	else:
 		_log(t("征战开始：每关进行三轮三选一，选项从左到右固定为前军、中军、后军。", "Campaign begins with three pick-one-of-three rounds; slots are fixed to Vanguard, Midguard, and Rearguard."))
-	if game_mode == "challenge":
-		# 闯关模式：每回合开始(选将阶段)自动保存，中途退出后可从本回合继续。
+	if game_mode == "challenge" or game_mode == "endless":
+		# 闯关/无尽模式：每回合开始(选将阶段)自动保存，中途退出后可从本回合继续。
 		_save_game(true)
 	_render()
 
@@ -107,7 +110,7 @@ func _save_game(silent := false) -> bool:
 		if not silent: _log(t("战斗过程中不能保存，请在选人或布阵阶段保存。", "Save during draft or formation, not combat."))
 		return false
 	var data := {
-		"version":7, "round_number":round_number, "phase":phase, "game_mode":game_mode,
+		"version": EndlessRules.ENDLESS_SAVE_VERSION if _run_is_endless() else 7, "round_number":round_number, "phase":phase, "game_mode":game_mode,
 		"selected_stage":selected_stage, "selected_difficulty":selected_difficulty,
 		"hell_faction":hell_faction, "hell_theme_name":hell_theme_name,
 		"player_factions":player_factions, "enemy_factions":enemy_factions,
@@ -124,7 +127,9 @@ func _save_game(silent := false) -> bool:
 		"tianshu":_tianshu_save_state(),
 		"economy":_economy_save_state()
 	}
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if _run_is_endless():
+		data["endless"] = _endless_save_state()
+	var file := FileAccess.open(_run_save_path(), FileAccess.WRITE)
 	if file == null: return false
 	file.store_string(JSON.stringify(data))
 	file.close()
@@ -133,13 +138,14 @@ func _save_game(silent := false) -> bool:
 	_render()
 	return true
 
-func _load_game() -> bool:
-	if battle_running or not FileAccess.file_exists(SAVE_PATH): return false
-	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+func _load_game(from_path := "") -> bool:
+	var target_path := from_path if not from_path.is_empty() else SAVE_PATH
+	if battle_running or not FileAccess.file_exists(target_path): return false
+	var file := FileAccess.open(target_path, FileAccess.READ)
 	if file == null: return false
 	var data = JSON.parse_string(file.get_as_text())
 	file.close()
-	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) not in [3, 4, 5, 6, 7]:
+	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) not in [3, 4, 5, 6, 7, EndlessRules.ENDLESS_SAVE_VERSION]:
 		_log(t("存档版本不兼容。", "The save version is incompatible."))
 		return false
 	tick_timer.stop()
@@ -178,9 +184,12 @@ func _load_game() -> bool:
 		if enemy_factions.is_empty():
 			_roll_enemy_factions()
 	round_number = int(data.round_number)
+	if round_number < 1: round_number = 1   # 无尽模式回合无上限，但读档防御负数
 	phase = str(data.phase)
 	player_ruler_hp = int(data.player_ruler_hp)
 	enemy_ruler_hp = int(data.enemy_ruler_hp)
+	if str(data.get("game_mode", "")) == "endless":
+		_load_endless_state(data.get("endless", {}))
 	player_units = _sanitize_loaded_units(data.player_units, "player")
 	enemy_units = _sanitize_loaded_units(data.enemy_units, "enemy")
 	draft_roster_baseline = _sanitize_loaded_units(data.get("draft_roster_baseline", player_units.duplicate(true)), "player")
@@ -196,7 +205,7 @@ func _load_game() -> bool:
 		draft_refresh_available[index] = bool(loaded_refresh_state[index])
 	refresh_charges = int(data.get("refresh_charges", 0))
 	var loaded_reserves := _reserve_units()
-	while loaded_reserves.size() > RESERVE_LIMIT:
+	while loaded_reserves.size() > _run_reserve_limit():
 		player_units.erase(loaded_reserves.pop_back())
 		refresh_charges += 1
 	selected_unit = str(data.selected_unit)
@@ -218,6 +227,9 @@ func _load_game() -> bool:
 		_generate_tianshu_choices()
 	elif phase == "draft" and choices.size() != DRAFT_SIZE:
 		_generate_choices()
+	if phase == "checkpoint" and str(data.get("game_mode", "")) == "endless":
+		# 据点页：候选从 endless_state 恢复，无需重掷
+		pass
 	_log(t("存档已读取。", "Save loaded."))
 	_render()
 	return true
@@ -266,13 +278,21 @@ func _clear_run_save() -> void:
 func _prepare_round() -> void:
 	phase = "draft"
 	draft_user_hidden = false
-	draft_picks_remaining = PICKS_PER_ROUND
+	if _run_is_endless():
+		# 无尽：3 次/回合永不降频；求贤/集思广略折入快照后消耗标记
+		endless_state.pick_total = _run_draft_pick_count()
+		_endless_consume_prep_flags()
+		draft_picks_remaining = int(endless_state.pick_total)
+	else:
+		draft_picks_remaining = PICKS_PER_ROUND
 	pending_unit_ids = []
 	chosen_this_round = []
 	draft_roster_baseline = player_units.duplicate(true)
 	selected_unit = ""
 	_settle_round_economy()
-	_add_enemy_wave()    # 每回合敌方增援:普通随机3人;王者前两关4人、其余羁绊三人组;地狱前两轮5人、其余本局随机阵营3人;满员不挤人、阵亡后补位
+	if _run_is_endless():
+		_endless_prepare_round()    # 统帅事件/主公曲线/存量重算/军情公示/休养
+	_add_enemy_wave()    # 每回合敌方增援:普通随机3人;王者前两关4人、其余羁绊三人组;地狱前两轮5人、其余本局随机阵营3人;满员不挤人、阵亡后补位;无尽由评分导演选人
 	_grant_faction_talent_recruits()  # 第4层阵营天赋:前N回合每回合开始时随机获得1名本阵营武将入备战席
 	if _tianshu_enabled() and _is_free_tianshu_round():
 		_begin_tianshu_draw(1, "free", "draft", true)
@@ -429,6 +449,9 @@ func _add_enemy_wave() -> void:
 		# 并按各排空位轮转目标行,保证前/中/后排都能补到人。
 		wave_title = hell_theme_name if not hell_theme_name.is_empty() else "地狱·全面压制"
 		wave = _hell_wave_picks(wave_limit)
+	elif game_mode == "endless":
+		# 无尽：敌方评分导演（run_seed 确定性随机流 + 智能权重）
+		wave = _endless_draft_enemy_wave(wave_limit)
 	else:
 		# 简单/一般/困难/其它模式:随机3名(可重复出现同名新单位)
 		# 简单/一般/困难时先按本局随机锁定的敌方出没阵营过滤,再叠加手动设置的阵营过滤。
@@ -547,8 +570,10 @@ func _choose_hero(id: String) -> void:
 	chosen_this_round.append(id)
 	draft_picks_remaining -= 1
 	_tianshu_consume_pool_pick()
-	var locked_count := PICKS_PER_ROUND - draft_picks_remaining
-	_log(t("第%d/3轮锁定：" % locked_count, "Pick %d/3 locked: " % locked_count) + _hero_name(id))
+	var pick_total := PICKS_PER_ROUND
+	if _run_is_endless(): pick_total = int(endless_state.get("pick_total", PICKS_PER_ROUND))
+	var locked_count := pick_total - draft_picks_remaining
+	_log(t("第%d/%d轮锁定：" % [locked_count, pick_total], "Pick %d/%d locked: " % [locked_count, pick_total]) + _hero_name(id))
 	_play_hero_voice(id, true) # 选将锁定：武将喊话
 	if draft_picks_remaining <= 0:
 		phase = "placement"
@@ -559,7 +584,7 @@ func _choose_hero(id: String) -> void:
 	_render()
 
 func _can_accept_hero(hero_id: String) -> bool:
-	return _reserve_units().size() < RESERVE_LIMIT
+	return _reserve_units().size() < _run_reserve_limit()
 
 func _try_upgrade(roster: Array, hero_id: String):
 	# Compatibility shim for old callers/saves. Duplicate heroes remain separate.
@@ -672,7 +697,11 @@ func _start_battle() -> void:
 	_apply_tianshu_battle_start()
 	_apply_faction_bonuses()
 	_apply_opening_skills()
-	_log("[color=#f6c860]" + t("第 ", "Round ") + str(round_number) + t(" 回合战斗开始（30 秒）！", " battle begins (30 seconds)!") + "[/color]")
+	_endless_on_battle_start()    # 无尽：将印聚合注入/军势·事件·战策开局（combat_system 覆盖实现）
+	if game_mode == "endless":
+		_log("[color=#f6c860]" + "【无尽远征】第 " + str(round_number) + t(" 回合战斗开始（30 秒）！", " battle begins (30 seconds)!") + "[/color]")
+	else:
+		_log("[color=#f6c860]" + t("第 ", "Round ") + str(round_number) + t(" 回合战斗开始（30 秒）！", " battle begins (30 seconds)!") + "[/color]")
 	tick_timer.start()
 	_render()
 
@@ -696,7 +725,16 @@ func _finish_battle() -> void:
 	_log("[color=#f6c860]" + result + "[/color]")
 	var decisive := player_ruler_hp <= 0 or enemy_ruler_hp <= 0
 	var player_won := enemy_ruler_hp <= 0 and player_ruler_hp > 0
-	if game_mode == "challenge":
+	if game_mode == "endless":
+		# 无尽：结算贡献/破阵奖励 → 据点页或直接推进；终局结算由 _endless_end_run 弹出
+		var endless_outcome := _endless_finish_battle()
+		if endless_outcome == "advance":
+			round_number += 1
+			_prepare_round()
+			_save_game(true)
+		elif endless_outcome == "checkpoint":
+			_save_game(true)
+	elif game_mode == "challenge":
 		if decisive or round_number >= ROUND_LIMIT:
 			phase = "finished"
 			var challenge_result := _complete_challenge(player_won if decisive else player_ruler_hp > enemy_ruler_hp)
@@ -755,3 +793,82 @@ func _start_final_battle() -> void:
 	else:
 		phase = "finished"
 		_log(t("我方已无可上阵武将，征战失败。", "No allied generals remain to deploy. Campaign failed."))
+
+# ==================== 无尽 · 敌方评分导演（§2.3，run_seed 确定性随机流）====================
+
+func _endless_draft_enemy_wave(wave_limit: int) -> Array:
+	var weight := EndlessRules.enemy_director_weight(round_number)
+	var picks: Array = []
+	var picked := {}
+	for index in wave_limit:
+		var candidate := ""
+		if _endless_randf() < weight:
+			candidate = _endless_scored_enemy_pick(picked)
+		else:
+			var pool: Array = heroes.keys().filter(func(hero_id): return not picked.has(str(hero_id)))
+			if pool.is_empty(): pool = heroes.keys()
+			candidate = str(pool[_endless_randi_range(0, pool.size() - 1)])
+		picked[candidate] = true
+		picks.append(candidate)
+	return picks
+
+func _endless_scored_enemy_pick(excluded: Dictionary) -> String:
+	var fielded_rows := {0: 0, 1: 0, 2: 0}
+	var fielded_roles := {}
+	var fielded_factions := {}
+	var fielded_heroes := {}
+	for unit in enemy_units:
+		if not unit.alive or int(unit.row) < 0: continue
+		fielded_rows[int(unit.row)] = int(fielded_rows[int(unit.row)]) + 1
+		fielded_factions[str(heroes[unit.hero_id].f)] = true
+		fielded_heroes[str(unit.hero_id)] = true
+		for role in EndlessRules.HERO_ROLES.get(str(unit.hero_id), []):
+			fielded_roles[str(role)] = true
+	var best := ""
+	var best_score := -99999.0
+	for hero_id in heroes.keys():
+		if excluded.has(str(hero_id)): continue
+		if fielded_heroes.has(str(hero_id)): continue   # 场上已有同名存活，避免重复铺场
+		var score := _endless_randf() * 10.0            # 基础扰动，保证同分不僵死
+		# 组合羁绊：能一步凑齐的组合大幅加权，推进中的次之
+		for squad in ENEMY_SQUADS:
+			var members: Array = squad.heroes
+			if not members.has(str(hero_id)): continue
+			var others_present := 0
+			for member in members:
+				if str(member) != str(hero_id) and fielded_heroes.has(str(member)): others_present += 1
+			if others_present == members.size() - 1 and members.size() <= 3: score += 45.0
+			elif others_present > 0: score += 25.0
+		# 跨阵营档位（2/5/8 人羁绊）
+		var faction_copy := fielded_factions.duplicate()
+		faction_copy[str(heroes[hero_id].f)] = true
+		match faction_copy.size():
+			2: score += 20.0
+			3: score += 35.0
+			4: score += 60.0
+		# 补行位 / 补角色
+		var hero: Dictionary = heroes[hero_id]
+		var usable_rows := [0] if int(hero.range) == 1 else [0, 1, 2]
+		var emptiest := 3
+		for row in usable_rows:
+			emptiest = mini(emptiest, int(fielded_rows[row]))
+		if emptiest <= 0: score += 20.0
+		elif emptiest == 1: score += 10.0
+		for role in EndlessRules.HERO_ROLES.get(str(hero_id), []):
+			if not fielded_roles.has(str(role)):
+				score += 8.0 + 5.0 * (EndlessRules.HERO_ROLES.get(str(hero_id), []) as Array).size()
+		# 本局军势协同（粗粒度）
+		var momentum_total := 0
+		for id in endless_state.momentum: momentum_total += int(endless_state.momentum[id])
+		score += mini(25.0, momentum_total * 3.0)
+		if score > best_score:
+			best_score = score
+			best = str(hero_id)
+	return best
+
+# 据点页"继续远征"：校验通过后推进回合并自动存档（由 game_ui 调用）
+func _endless_after_checkpoint() -> void:
+	if not _endless_checkpoint_continue(): return
+	round_number += 1
+	_prepare_round()
+	_save_game(true)

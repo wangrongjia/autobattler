@@ -49,11 +49,11 @@ func _init() -> void:
 	game.selected_stage = 20
 	game.selected_difficulty = 4
 	game.game_mode = "challenge"
-	assert(game._challenge_strategy_bonus() == 300.0)
+	assert(game._challenge_strategy_bonus() == 320.0)   # 20关×10 + 地狱难度100 + 全局平值20（上游数值调整后）
 	assert(game._challenge_soul_reward(3) == 6600)
 	var enemy = game._make_roster_unit("enemy", "guanyu")
 	assert(is_equal_approx(float(enemy.max_hp), float(game.heroes.guanyu.hp) * 2.0))
-	assert(is_equal_approx(float(enemy.skill_value_bonus), 300.0))
+	assert(is_equal_approx(float(enemy.skill_value_bonus), 320.0))
 	game.talent_levels = {"all:明君":2, "all:神算":1, "all:天命":1, "all:群英":1, "all:长治":1, "shu:汉室坚壁":2}
 	assert(game._player_ruler_max_hp() == game.RULER_MAX_HP + 18000)
 	assert(is_equal_approx(game._talent_bond_multiplier("player"), 1.2))
@@ -69,11 +69,13 @@ func _init() -> void:
 	var extreme_rune := {"uid":1, "tier":6, "kind":"Q2"}
 	var extreme_effect: Dictionary = game._rune_effect(extreme_rune)
 	assert(is_equal_approx(float(extreme_effect.hp), -320.0))
-	assert(is_equal_approx(float(extreme_effect.cooldown), 2.0))
+	assert(is_equal_approx(float(extreme_effect.cooldown), 40.0))   # Q2 六级：旧 2.0s → 极速 40（1 秒 = 20 极速）
 	game.rune_inventory = [extreme_rune, {"uid":2, "tier":6, "kind":"Q2"}, {"uid":3, "tier":6, "kind":"Q2"}]
 	game.rune_loadouts = {"sunshangxiang":[1, 2, 3]}
 	var player = game._make_roster_unit("player", "sunshangxiang")
-	assert(is_equal_approx(game._unit_skill_cooldown(player), float(game.heroes.sunshangxiang.cooldown) * 0.5))
+	# 冷却极速制：3×Q2 六级 = 3×40 极速 → 实际冷却 = 原冷却×100/(100+120)（收益递减，无 50% 上限）
+	var sss_cd: float = float(game.heroes.sunshangxiang.cooldown)
+	assert(is_equal_approx(game._unit_skill_cooldown(player), sss_cd * 100.0 / (100.0 + 120.0)))
 	game.general_souls = game.RUNE_DRAW_COST * 10
 	game.rune_inventory = []
 	var ten_draws: Array = game._draw_runes(10)
@@ -85,9 +87,9 @@ func _init() -> void:
 	]
 	game.rune_loadouts = {"sunshangxiang":[101, 105]}
 	var batch_result: Dictionary = game._synthesize_all_runes(1)
-	assert(batch_result.consumed == 4 and (batch_result.created as Array).size() == 2)
-	assert(game.rune_inventory.filter(func(rune): return int(rune.tier) == 1).size() == 1)
-	assert(game.rune_loadouts.sunshangxiang == [105])
+	assert(batch_result.consumed == 2 and (batch_result.created as Array).size() == 1)   # 一键合成只消耗未装备符文（102/103 配对）
+	assert(game.rune_inventory.filter(func(rune): return int(rune.tier) == 1).size() == 3)   # 装备中的 101/105 与未配对的 104 保留
+	assert(game.rune_loadouts.sunshangxiang == [101, 105])   # 装备中的符文不自动拆下
 	game.stage_star_records = {}
 	game.limit_challenges = true
 	assert(game._is_stage_unlocked(1, 0))
@@ -148,7 +150,7 @@ func _init() -> void:
 	game._show_battle_menu()
 	game._select_challenge_stage(20, 4)
 	assert(game.game_mode == "quick" and game.battle_menu_overlay.visible)
-	assert(game.challenge_detail_bonus_label.text.contains("最终兵略加成：+300"))
+	assert(game.challenge_detail_bonus_label.text.contains("最终兵略加成：+320"))
 	assert(game.challenge_detail_star_label.text.contains("50,000"))
 	game._confirm_challenge()
 	assert(game.phase == "draft" and game.round_number == 1)
